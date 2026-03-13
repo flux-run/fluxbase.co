@@ -26,7 +26,7 @@ export default function OpenSourcePage() {
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
           <Link href="/docs/quickstart" className="btn-primary">Get Started →</Link>
-          <Link href="https://github.com/user/flux" className="btn-secondary">View on GitHub</Link>
+          <Link href="https://github.com/flux-run/flux" className="btn-secondary">View on GitHub</Link>
         </div>
       </section>
 
@@ -119,7 +119,7 @@ export default function OpenSourcePage() {
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
           <Link href="/docs/quickstart" className="btn-primary">Quickstart →</Link>
-          <Link href="https://github.com/user/flux" className="btn-secondary">View on GitHub</Link>
+          <Link href="https://github.com/flux-run/flux" className="btn-secondary">View on GitHub</Link>
         </div>
       </section>
     </MarketingLayout>

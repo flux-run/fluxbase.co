@@ -45,7 +45,7 @@ export function NavBar() {
         ))}
       </div>
 
-      <Link href="https://github.com/getflux/flux" style={{
+      <Link href="https://github.com/flux-run/flux" style={{
         marginLeft: 'auto',
         background: 'transparent',
         color: 'var(--mg-muted)', fontSize: '.8rem', fontWeight: 500,

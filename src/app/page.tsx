@@ -39,7 +39,7 @@ export default function HomePage() {
         </div>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 28 }}>
           <Link href="/docs/quickstart" className="btn-primary">Get Started →</Link>
-          <Link href="https://github.com/user/flux" className="btn-secondary">GitHub</Link>
+          <Link href="https://github.com/flux-run/flux" className="btn-secondary">GitHub</Link>
         </div>
         <div className="install-hint">
           <span className="prompt">$</span>
@@ -420,7 +420,7 @@ export default function HomePage() {
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 24 }}>
               <Link href="/docs/quickstart" className="btn-primary">Quickstart →</Link>
-              <Link href="https://github.com/user/flux" className="btn-secondary">View on GitHub</Link>
+              <Link href="https://github.com/flux-run/flux" className="btn-secondary">View on GitHub</Link>
             </div>
             <div className="install-hint" style={{ marginTop: 0 }}>
               <span className="prompt">$</span>

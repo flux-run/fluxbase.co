@@ -121,7 +121,7 @@ spec:
     spec:
       containers:
         - name: flux
-          image: ghcr.io/getflux/flux:latest
+          image: ghcr.io/flux-run/flux:latest
           ports:
             - containerPort: 4000
           env:

@@ -29,15 +29,15 @@ export default function Page() {
 <pre><code><span class="shell-prompt">$</span> curl -fsSL https://flux.sh/install.sh | bash</code></pre>
 
 <h3>Homebrew (coming soon)</h3>
-<pre><code><span class="shell-prompt">$</span> brew install getflux/tap/flux</code></pre>
+<pre><code><span class="shell-prompt">$</span> brew install flux-run/tap/flux</code></pre>
 
 <h3>Manual download</h3>
 <pre><code><span class="cm"># Apple Silicon (M1/M2/M3/M4)</span>
-<span class="shell-prompt">$</span> curl -fsSL https://github.com/getflux/flux/releases/latest/download/flux-darwin-arm64 \\
+<span class="shell-prompt">$</span> curl -fsSL https://github.com/flux-run/flux/releases/latest/download/flux-darwin-arm64 \\
     -o /usr/local/bin/flux &amp;&amp; chmod +x /usr/local/bin/flux
 
 <span class="cm"># Intel Mac</span>
-<span class="shell-prompt">$</span> curl -fsSL https://github.com/getflux/flux/releases/latest/download/flux-darwin-amd64 \\
+<span class="shell-prompt">$</span> curl -fsSL https://github.com/flux-run/flux/releases/latest/download/flux-darwin-amd64 \\
     -o /usr/local/bin/flux &amp;&amp; chmod +x /usr/local/bin/flux</code></pre>
 
 <!-- Linux -->
@@ -47,11 +47,11 @@ export default function Page() {
 
 <h3>Manual download</h3>
 <pre><code><span class="cm"># x86_64 / amd64</span>
-<span class="shell-prompt">$</span> curl -fsSL https://github.com/getflux/flux/releases/latest/download/flux-linux-amd64 \\
+<span class="shell-prompt">$</span> curl -fsSL https://github.com/flux-run/flux/releases/latest/download/flux-linux-amd64 \\
     -o /usr/local/bin/flux &amp;&amp; chmod +x /usr/local/bin/flux
 
 <span class="cm"># ARM64 (Graviton, Raspberry Pi, etc.)</span>
-<span class="shell-prompt">$</span> curl -fsSL https://github.com/getflux/flux/releases/latest/download/flux-linux-arm64 \\
+<span class="shell-prompt">$</span> curl -fsSL https://github.com/flux-run/flux/releases/latest/download/flux-linux-arm64 \\
     -o /usr/local/bin/flux &amp;&amp; chmod +x /usr/local/bin/flux</code></pre>
 
 <!-- Windows -->
@@ -59,12 +59,12 @@ export default function Page() {
 <h3>Direct download</h3>
 <p>Download the binary for your architecture and add it to a directory in your <code>PATH</code>:</p>
 <ul>
-  <li><a href="https://github.com/getflux/flux/releases/latest/download/flux-windows-amd64.exe">flux-windows-amd64.exe</a> — Intel/AMD 64-bit</li>
-  <li><a href="https://github.com/getflux/flux/releases/latest/download/flux-windows-arm64.exe">flux-windows-arm64.exe</a> — ARM64 (Snapdragon, etc.)</li>
+  <li><a href="https://github.com/flux-run/flux/releases/latest/download/flux-windows-amd64.exe">flux-windows-amd64.exe</a> — Intel/AMD 64-bit</li>
+  <li><a href="https://github.com/flux-run/flux/releases/latest/download/flux-windows-arm64.exe">flux-windows-arm64.exe</a> — ARM64 (Snapdragon, etc.)</li>
 </ul>
 
 <h3>Scoop (coming soon)</h3>
-<pre><code>scoop bucket add getflux https://github.com/getflux/scoop
+<pre><code>scoop bucket add flux-run https://github.com/flux-run/scoop
 scoop install flux</code></pre>
 
 <!-- Verify -->

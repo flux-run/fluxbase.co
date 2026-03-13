@@ -23,7 +23,7 @@ export function Footer() {
           { href: '/cli', label: 'CLI' },
           { href: '/docs', label: 'Docs' },
           { href: '/docs/quickstart', label: 'Quickstart' },
-          { href: 'https://github.com/getflux/flux', label: 'GitHub' },
+          { href: 'https://github.com/flux-run/flux', label: 'GitHub' },
         ].map(({ href, label }) => (
           <Link key={href} href={href} style={{ color: 'var(--mg-muted)', textDecoration: 'none' }}>
             {label}
