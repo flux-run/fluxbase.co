@@ -42,10 +42,6 @@ $ flux --version</code></pre>
     <tr><td colspan="2" style="color:var(--muted);font-size:.75rem;font-weight:700;letter-spacing:.08em;padding-top:12px">INCIDENT TOOLS</td></tr>
     <tr><td><code>flux incident replay</code></td><td>Replay a traffic window against current code</td></tr>
     <tr><td><code>flux bug bisect</code></td><td>Binary-search commits to find a regression</td></tr>
-    <tr><td colspan="2" style="color:var(--muted);font-size:.75rem;font-weight:700;letter-spacing:.08em;padding-top:12px">AGENTS</td></tr>
-    <tr><td><code>flux agent trace</code></td><td>Trace an AI agent run step-by-step</td></tr>
-    <tr><td><code>flux agent diff</code></td><td>Compare two agent runs tool-call by tool-call</td></tr>
-    <tr><td><code>flux agent why</code></td><td>Root-cause why an AI agent run failed</td></tr>
     <tr><td colspan="2" style="color:var(--muted);font-size:.75rem;font-weight:700;letter-spacing:.08em;padding-top:12px">QUERY TOOLS</td></tr>
     <tr><td><code>flux explain</code></td><td>Preview the query plan for a <code>ctx.db</code> call</td></tr>
     <tr><td colspan="2" style="color:var(--muted);font-size:.75rem;font-weight:700;letter-spacing:.08em;padding-top:12px">PROJECT MANAGEMENT</td></tr>
@@ -381,54 +377,6 @@ $ flux incident replay --request 550e8400</code></pre>
   FIRST BAD COMMIT
   def456  "feat: add retry logic to stripe.charge"
   2026-03-08  alice@example.com</code></pre>
-
-<!-- ─── AGENTS ──────────────────────────────────────────────────────────── -->
-
-<h2 id="flux-agent-why">flux agent why</h2>
-<p>Root-cause why an AI agent run failed. Reads the agent's execution record and returns the first failing step, the tool call input that caused it, and what the agent did before the failure.</p>
-<pre><code>flux agent why &lt;request-id&gt;</code></pre>
-<pre><code>$ flux agent why 7f3a9
-
-  AGENT RUN  7f3a9  booking_agent
-  STATUS     failed at step 2/3
-
-  FAILING STEP
-  tool.book_room  (step 2)
-  Stripe 402: card_declined
-
-  WHAT LED HERE
-  step 1  search_hotels  →  top_id: h_991  (Tokyo, $420/night)
-  step 2  book_room      →  card declined  ✗
-
-  DB MUTATIONS
-  reservations  INSERT  rolled back
-
-  → flux agent diff 7f3a9 prev  # compare with last run</code></pre>
-
-<hr>
-
-<h2 id="flux-agent-trace">flux agent trace</h2>
-<p>Show the full tool-call trace for an AI agent run — each step, its input, output, and whether it succeeded.</p>
-<pre><code>flux agent trace &lt;request-id&gt;</code></pre>
-<pre><code>$ flux agent trace b3c4d5e6
-
-  Step 1  search_hotels    { city: "NYC", budget: 400 }   → { results: 8 }   14ms
-  Step 2  select_hotel     h_881                           → { price: 380 }    2ms
-  Step 3  book_room        { hotel: h_881, nights: 2 }    → 201              220ms
-  Step 4  send_confirm     { email: "a@b.com" }           → 200               8ms</code></pre>
-
-<hr>
-
-<h2 id="flux-agent-diff">flux agent diff</h2>
-<p>Compare two agent runs tool-call by tool-call. Highlights steps where the decision, output, or outcome changed between runs.</p>
-<pre><code>flux agent diff &lt;request-id-a&gt; &lt;request-id-b&gt;</code></pre>
-<pre><code>$ flux agent diff b3c4d5e6 prev
-
-  STEP              PREV              THIS RUN
-  ──────────────────────────────────────────────────
-  search_hotels     { results: 8 }   { results: 12 }
-  selected hotel    h_881 ($380)     h_991 ($420)    ← different decision
-  book_room         ✔ 201            ✗ 402           ← failed this run</code></pre>
 
 <!-- ─── QUERY TOOLS ──────────────────────────────────────────────────────── -->
 

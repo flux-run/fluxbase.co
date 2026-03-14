@@ -88,7 +88,6 @@ export default function HomePage() {
               { icon: '🗄️', label: 'Database', hint: 'Postgres with typed access via ctx.db. Every write recorded.' },
               { icon: '📬', label: 'Queue', hint: 'Async jobs with retries, delay, dead-letter. Built in.' },
               { icon: '⏰', label: 'Cron', hint: 'Schedule directly on a function. One line of config.' },
-              { icon: '🤖', label: 'Agents', hint: 'YAML-defined LLM agents that use your functions as tools.' },
               { icon: '🔍', label: 'Execution Recording', hint: 'Every request traced automatically. flux why, flux trace, flux replay.' },
             ].map(({ icon, label, hint }) => (
               <div key={label} style={{ display: 'flex', gap: 14, padding: '18px 20px', border: '1px solid var(--mg-border)', borderRadius: 10, background: 'var(--mg-bg-surface)' }}>
@@ -260,7 +259,7 @@ export default function HomePage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {[
                 { label: 'Gateway', desc: 'routing, rate limiting, auth, CORS' },
-                { label: 'Runtime', desc: 'Deno V8 + Wasmtime execution, secrets, agents' },
+                { label: 'Runtime', desc: 'Deno V8 + Wasmtime execution, secrets' },
                 { label: 'API', desc: 'function registry, logs, schema' },
                 { label: 'Data Engine', desc: 'DB queries, mutation recording, cron' },
                 { label: 'Queue', desc: 'async jobs, retries, dead-letter' },
@@ -288,20 +287,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Agents ─────────────────────────────────────────── */}
-      <section style={section('var(--mg-bg-surface)')}>
-        <div style={inner}>
-          <span style={{ display: 'inline-block', fontSize: '.72rem', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--mg-muted)', background: 'rgba(255,255,255,.06)', padding: '4px 12px', borderRadius: 20, marginBottom: 20 }}>AI Agents</span>
-          <h2 className="section-h2">Recording gets even more valuable with agents.</h2>
-          <p style={{ ...muted, fontSize: '.95rem', maxWidth: 600, margin: '0 0 40px' }}>
-            AI agents make opaque decisions, invoke tools, and mutate state. Debugging them is chaos without shared context. Since Flux already records every function call and mutation, agent tracing comes for free — define agents in YAML, and every LLM call and tool invocation appears in the same execution trace.
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40, alignItems: 'start' }}>
-            <CodeWindow label="agents/support.yaml">{`name: support_agent\nmodel: gpt-4o\nsystem: |\n  You are a customer support agent.\n  Look up the user, assess their issue,\n  create a ticket, and send confirmation.\ntools:\n  - lookup_user\n  - create_ticket\n  - send_email\nmaxTurns: 10\ntemperature: 0.3`}</CodeWindow>
-            <CodeWindow label="flux trace (agent run)">{`<span style="color:var(--mg-green);">$</span> flux trace <span style="color:var(--mg-accent);">7f3a9</span>\n\n  Agent: <span style="color:var(--mg-accent);">support_agent</span>  ·  4 steps  ·  342ms\n\n  <span style="color:#c4b5fd;">agent_step</span>  LLM call #1             <span style="color:var(--mg-yellow);">28ms</span>\n    <span style="color:var(--mg-green);">→ tool:</span> lookup_user\n  <span style="color:var(--mg-green);">fn</span>          lookup_user             <span style="color:var(--mg-yellow);">12ms</span>\n  <span style="color:#c4b5fd;">agent_step</span>  LLM call #2             <span style="color:var(--mg-yellow);">35ms</span>\n    <span style="color:var(--mg-green);">→ tool:</span> create_ticket\n  <span style="color:var(--mg-green);">fn</span>          create_ticket           <span style="color:var(--mg-yellow);">8ms</span>\n  <span style="color:#c4b5fd;">agent_step</span>  LLM call #3             <span style="color:var(--mg-yellow);">22ms</span>\n    <span style="color:var(--mg-green);">→ tool:</span> send_email\n  <span style="color:var(--mg-green);">fn</span>          send_email              <span style="color:var(--mg-yellow);">180ms</span>\n  <span style="color:#c4b5fd;">agent_step</span>  LLM call #4 (final)     <span style="color:var(--mg-yellow);">18ms</span>\n    <span style="color:var(--mg-green);">→ done:</span> "Ticket #4821 created"`}</CodeWindow>
-          </div>
-        </div>
-      </section>
       {/* ── Performance ─────────────────────────────────────────── */}
       <section style={section()}>
         <div style={inner}>

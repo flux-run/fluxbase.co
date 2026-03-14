@@ -43,7 +43,6 @@ export default function OpenSourcePage() {
               { icon: '🗄️', title: 'Database', desc: 'Postgres with typed access via ctx.db. Every write recorded automatically.' },
               { icon: '📬', title: 'Queue', desc: 'Durable async jobs with retries, delay, and dead-letter queue.' },
               { icon: '⏰', title: 'Cron', desc: 'Schedule functions with cron syntax. One line of config.' },
-              { icon: '🤖', title: 'Agents', desc: 'YAML-defined LLM agents that use your functions as tools. Every step traced.' },
               { icon: '🔍', title: 'Execution Recording', desc: 'Every request traced: spans, mutations, inputs/outputs. flux why, flux trace, flux replay.' },
               { icon: '🛡️', title: 'Gateway', desc: 'Auth, rate limiting, CORS, routing. Built into the binary.' },
               { icon: '🔧', title: 'CLI', desc: 'flux init, flux dev, flux deploy, flux trace, flux why — everything from the terminal.' },

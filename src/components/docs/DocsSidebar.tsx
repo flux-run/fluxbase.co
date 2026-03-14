@@ -22,7 +22,6 @@ const NAV = [
       { href: '/docs/functions',            label: 'Functions'             },
       { href: '/docs/database',             label: 'Database'              },
       { href: '/docs/queue',                label: 'Queue & Async Jobs'    },
-      { href: '/docs/agents',               label: 'Agents'               },
       { href: '/docs/cron',                 label: 'Cron'                  },
       { href: '/docs/wasm',                 label: 'WebAssembly'           },
     ],

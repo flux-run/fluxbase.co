@@ -44,20 +44,6 @@ export default function Page() {
 <pre><code># Dev vs production for the same endpoint
 $ flux trace diff dev:4f9a3b2c prod:550e8400</code></pre>
 
-<h2>Compare AI agent runs</h2>
-
-<p>For agent workflows, compare tool-call sequences across runs:</p>
-
-<pre><code>$ flux agent diff 7f3a9 prev
-
-  STEP              PREV              THIS RUN
-  ──────────────────────────────────────────────────
-  search_hotels     { results: 8 }   { results: 12 }
-  selected hotel    h_881 ($380)     h_991 ($420)    ← different selection
-  book_room         ✔ 201            ✗ 402           ← card limit exceeded</code></pre>
-
-<p>See <a href="/docs/examples#ai-agent">the AI agent example</a> for a full debugging walkthrough.</p>
-
 <h2>Export a diff</h2>
 
 <pre><code>$ flux trace diff 4f9a3b2c 550e8400 --format json > diff.json</code></pre>

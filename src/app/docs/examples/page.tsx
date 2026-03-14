@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: 'Examples — Flux Docs',
-  description: 'Real-world examples: REST API, Stripe webhook handler, AI agent backend, background worker.',
+  description: 'Real-world examples: REST API, Stripe webhook handler, background worker.',
 }
 
 export default function Page() {
@@ -17,7 +17,6 @@ export default function Page() {
     <a href="#full-lifecycle" style="color:var(--accent);text-decoration:none;">Full incident lifecycle</a>
     <a href="#rest-api" style="color:var(--accent);text-decoration:none;">Build a REST API</a>
     <a href="#stripe-webhook" style="color:var(--accent);text-decoration:none;">Handle Stripe webhooks</a>
-    <a href="#ai-agent" style="color:var(--accent);text-decoration:none;">Build an AI agent backend</a>
     <a href="#background-worker" style="color:var(--accent);text-decoration:none;">Debug a background worker</a>
   </div>
 </nav>
@@ -180,61 +179,6 @@ $ flux why 7c8d9e0f
   ✔  req:1a2b3c4d  payment_intent.succeeded  200  44ms
   ✗  req:7c8d9e0f  payment_intent.succeeded  500  32ms
      └─ Still failing: customer_id not found</code></pre>
-
-<h2 id="ai-agent">Build an AI agent backend</h2>
-
-<p>AI agent workflows — where a model plans and invokes tools — are natively traced by Flux.</p>
-
-<pre><code>// functions/booking_agent.ts
-export default async function handler(req, ctx) {
-  const { userId, destination, dates } = await req.json()
-
-  const agent = ctx.agent()
-
-  const hotels = await agent.tool('search_hotels', { city: destination, dates })
-  const selected = hotels[0]
-
-  const reservation = await agent.tool('book_room', {
-    hotel_id: selected.id,
-    user_id: userId,
-  })
-
-  await ctx.db.insert('reservations', { user_id: userId, hotel_id: selected.id, ...reservation })
-
-  return new Response(JSON.stringify(reservation), { status: 201 })
-}
-</code></pre>
-
-<p>Every tool call is a span in the execution record. When the agent fails:</p>
-
-<pre><code>$ flux agent why 7f3a9
-
-  AGENT RUN  7f3a9  booking_agent
-  STATUS     failed at step 2/3
-
-  FAILING STEP
-  tool.book_room  (step 2)
-  Stripe 402: card_declined
-
-  WHAT LED HERE
-  step 1  search_hotels  →  top_id: h_991  (Tokyo, $420/night)
-  step 2  book_room      →  card declined  ✗
-
-  DB MUTATIONS
-  reservations  INSERT  rolled back
-
-  → flux agent diff 7f3a9 prev  # compare with last successful run</code></pre>
-
-<p>Diff the failing run against the last successful one to see exactly what changed:</p>
-
-<pre><code>$ flux agent diff 7f3a9 prev
-
-  STEP              PREV              THIS RUN
-  ──────────────────────────────────────────────────
-  search_hotels     { results: 8 }   { results: 12 }
-  selected hotel    h_881 ($380)     h_991 ($420)    ← different selection
-  book_room         ✔ 201            ✗ 402           ← card limit exceeded
-</code></pre>
 
 <h2 id="background-worker">Debug a background worker</h2>
 

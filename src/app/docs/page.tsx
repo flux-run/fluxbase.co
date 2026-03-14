@@ -40,7 +40,7 @@ export default function Page() {
   <a href="/docs/concepts" style="display:block;padding:20px 24px;border:1px solid var(--border);border-radius:10px;background:var(--bg-surface);color:var(--text);text-decoration:none;" onmouseenter="this.style.borderColor='var(--accent)'" onmouseleave="this.style.borderColor='var(--border)'">
     <div style="font-size:1.2rem;margin-bottom:8px;">💡</div>
     <div style="font-weight:700;margin-bottom:4px;">Core Concepts</div>
-    <div style="font-size:.85rem;color:var(--muted);">Execution records, ctx, functions, agents.</div>
+    <div style="font-size:.85rem;color:var(--muted);">Execution records, ctx, functions, database.</div>
   </a>
   <a href="/docs/functions" style="display:block;padding:20px 24px;border:1px solid var(--border);border-radius:10px;background:var(--bg-surface);color:var(--text);text-decoration:none;" onmouseenter="this.style.borderColor='var(--accent)'" onmouseleave="this.style.borderColor='var(--border)'">
     <div style="font-size:1.2rem;margin-bottom:8px;">⚡</div>
@@ -56,11 +56,6 @@ export default function Page() {
     <div style="font-size:1.2rem;margin-bottom:8px;">📬</div>
     <div style="font-weight:700;margin-bottom:4px;">Queue</div>
     <div style="font-size:.85rem;color:var(--muted);">Async jobs with retries, delay, dead-letter.</div>
-  </a>
-  <a href="/docs/agents" style="display:block;padding:20px 24px;border:1px solid var(--border);border-radius:10px;background:var(--bg-surface);color:var(--text);text-decoration:none;" onmouseenter="this.style.borderColor='var(--accent)'" onmouseleave="this.style.borderColor='var(--border)'">
-    <div style="font-size:1.2rem;margin-bottom:8px;">🤖</div>
-    <div style="font-weight:700;margin-bottom:4px;">Agents</div>
-    <div style="font-size:.85rem;color:var(--muted);">YAML-defined LLM agents with function tools.</div>
   </a>
   <a href="/cli" style="display:block;padding:20px 24px;border:1px solid var(--border);border-radius:10px;background:var(--bg-surface);color:var(--text);text-decoration:none;" onmouseenter="this.style.borderColor='var(--accent)'" onmouseleave="this.style.borderColor='var(--border)'">
     <div style="font-size:1.2rem;margin-bottom:8px;">⌨️</div>
@@ -79,7 +74,7 @@ export default function Page() {
 <p>Everything in Flux revolves around the <strong><a href="/docs/execution-record">execution record</a></strong> — a complete snapshot produced for every request: span tree, database mutations, inputs, outputs, and errors. All CLI commands are different ways to query that record.</p>
 
 <h3>1. Execution Recording</h3>
-<p>Every request is executed and recorded atomically. The runtime captures every span — gateway, function, database queries, agent steps — and stores them indexed by request ID. There is no setup required; recording happens at the runtime level.</p>
+<p>Every request is executed and recorded atomically. The runtime captures every span — gateway, function, database queries — and stores them indexed by request ID. There is no setup required; recording happens at the runtime level.</p>
 
 <h3>2. Mutation Logging</h3>
 <p>Every database write goes through the Data Engine, which logs the mutation — table, row, old value, new value, and the request ID that caused it. <code>flux state history</code> and <code>flux state blame</code> query this log.</p>
@@ -107,7 +102,7 @@ export default function Page() {
     </tr>
     <tr>
       <td>Runtime</td>
-      <td>Deno V8 + Wasmtime execution, agents, secrets</td>
+      <td>Deno V8 + Wasmtime execution, secrets</td>
       <td><a href="/docs/runtime">docs/runtime</a></td>
     </tr>
     <tr>

@@ -96,11 +96,6 @@ export default function ProductPage() {
                     ['What changed in the database?',   'flux state history',   'Every row mutation, linked to request'],
                     ['Who set this field to this value?','flux state blame',    'Per-column last-write attribution'],
                   ]},
-                  { group: 'AI Agents', rows: [
-                    ['Why did the agent do that?',      'flux agent trace <id>','Full agent run: every tool call, input/output, DB mutation'],
-                    ['Which tool call caused this?',    'flux agent why <id>',  'Root-cause within an agent run'],
-                    ['How did behaviour change?',       'flux agent diff',      'Compare runs across model versions or prompts'],
-                  ]},
                 ] as { group: string; rows: string[][] }[]).flatMap(({ group, rows }) => [
                   <tr key={`g-${group}`}>
                     <td colSpan={3} style={{ padding: '10px 16px 6px', fontSize: '.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--mg-accent)', background: 'var(--mg-bg-elevated)', borderBottom: '1px solid var(--mg-border)' }}>{group}</td>
@@ -227,42 +222,12 @@ export default function ProductPage() {
           </div>
           <div style={{ marginTop: 40 }}>
             <p style={{ fontSize: '.82rem', fontWeight: 700, color: 'var(--mg-muted)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 12 }}>Side-by-side deployment</p>
-            <CodeWindow label="nginx.conf (route by route)">{`upstream existing_api {\n  server 127.0.0.1:3000;  <span style="color:var(--mg-muted);"># Express / FastAPI / Rails</span>\n}\nupstream flux_api {\n  server 127.0.0.1:4000;  <span style="color:var(--mg-muted);"># Flux</span>\n}\n\nserver {\n  listen 443 ssl;\n\n  <span style="color:var(--mg-muted);"># New endpoints → Flux</span>\n  location /api/signup  { proxy_pass http://flux_api; }\n  location /api/agents  { proxy_pass http://flux_api; }\n\n  <span style="color:var(--mg-muted);"># Everything else → existing stack</span>\n  location /api/        { proxy_pass http://existing_api; }\n}`}</CodeWindow>
+            <CodeWindow label="nginx.conf (route by route)">{`upstream existing_api {\n  server 127.0.0.1:3000;  <span style="color:var(--mg-muted);"># Express / FastAPI / Rails</span>\n}\nupstream flux_api {\n  server 127.0.0.1:4000;  <span style="color:var(--mg-muted);"># Flux</span>\n}\n\nserver {\n  listen 443 ssl;\n\n  <span style="color:var(--mg-muted);"># New endpoints → Flux</span>\n  location /api/signup  { proxy_pass http://flux_api; }\n  location /api/orders  { proxy_pass http://flux_api; }\n\n  <span style="color:var(--mg-muted);"># Everything else → existing stack</span>\n  location /api/        { proxy_pass http://existing_api; }\n}`}</CodeWindow>
           </div>
         </div>
       </section>
 
-      {/* ── AI Agent Observability ───────────────────────────── */}
-      <section id="agent-observability" style={section('var(--mg-bg-surface)')}>
-        <div style={inner}>
-          <span className="section-label">AI Agent Observability</span>
-          <h2 className="section-h2">Debug AI agents the same way you debug backends.</h2>
-          <p style={{ ...muted, fontSize: '.95rem', maxWidth: 620, margin: '0 0 40px' }}>
-            AI agents make decisions, invoke tools, and mutate state — and when they go wrong, debugging is chaotic because execution evidence is scattered across LLM logs, tool logs, and database logs with no shared context. Flux captures all of it in one place by construction. Define agents in YAML, and every LLM call and tool invocation is recorded automatically.
-          </p>
-          <div style={grid2}>
-            <div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 32 }}>
-                {[
-                  { cmd: 'flux agent trace <id>',  desc: 'Step-by-step run trace: every tool call, input, output, and latency in execution order.' },
-                  { cmd: 'flux agent why <id>',    desc: 'Root-cause a failed agent run. Pinpoints the exact tool call or plan step that went wrong.' },
-                  { cmd: 'flux agent diff',         desc: 'Compare two runs side-by-side — different model versions, different prompts, or before/after a prompt change.' },
-                  { cmd: 'flux agent replay',       desc: 'Re-run any agent execution deterministically. Test updated logic against a real historical input.' },
-                ].map(({ cmd, desc }) => (
-                  <div key={cmd} style={{ background: 'var(--mg-bg-elevated)', border: '1px solid var(--mg-border)', borderRadius: 8, padding: '14px 16px' }}>
-                    <code style={{ fontSize: '.8rem', color: 'var(--mg-accent)', display: 'block', marginBottom: 6 }}>{cmd}</code>
-                    <p style={{ fontSize: '.8rem', color: 'var(--mg-muted)', lineHeight: 1.6, margin: 0 }}>{desc}</p>
-                  </div>
-                ))}
-              </div>
-              <p style={{ fontSize: '.82rem', color: 'var(--mg-muted)', lineHeight: 1.7, borderLeft: '2px solid var(--mg-accent)', paddingLeft: 14 }}>
-                Flux&apos;s architecture — deterministic execution, mutation logs, and request-linked spans — maps directly to what agent systems need. Agents are YAML schemas that reference your functions as tools. Every step is traced automatically.
-              </p>
-            </div>
-            <CodeWindow label="flux agent why 7f3a9">{`<span style="color:var(--mg-green);">$</span> flux agent why <span style="color:var(--mg-accent);">7f3a9</span>\n\n  <span style="color:#f8f8f2;">AGENT RUN</span>  7f3a9  book_hotel_workflow\n  <span style="color:#f8f8f2;">TRIGGER</span>    user.signup_requested\n  <span style="color:#f8f8f2;">STATUS</span>     <span style="color:var(--mg-red);">failed at step 3/5</span>\n\n  <span style="color:#f8f8f2;">FAILING STEP</span>\n  tool.book_room  (step 3)\n  <span style="color:var(--mg-red);">Stripe 402: card_declined</span>\n\n  <span style="color:#f8f8f2;">UPSTREAM STATE THAT LED HERE</span>\n  step 1  search_hotels  →  top_id: h_991\n  step 2  filter_results →  selected: h_991  price: $420\n  step 3  book_room      →  <span style="color:var(--mg-red);">card declined</span>\n\n  <span style="color:#f8f8f2;">DB MUTATIONS</span>\n  reservations  INSERT  <span style="color:var(--mg-red);">rolled back</span>\n\n  <span style="color:var(--mg-green);">→</span> flux agent diff <span style="color:var(--mg-muted);">7f3a9 prev  # 3 step changes</span>`}</CodeWindow>
-          </div>
-        </div>
-      </section>      {/* ── Performance ─────────────────────────────────────────── */}
+      {/* ── Performance ─────────────────────────────────────────── */}
       <section id="performance" style={section()}>
         <div style={inner}>
           <span className="section-label">Performance</span>
