@@ -38,7 +38,7 @@ export default function HowItWorksPage() {
       <section style={{ borderTop: '1px solid var(--mg-border)', padding: '36px 0', background: 'var(--mg-bg-elevated)' }}>
         <div style={{ maxWidth: 760, margin: '0 auto', padding: '0 24px', display: 'flex', gap: 32, flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'center' }}>
           {[
-            { n: '1', text: 'Flux runs your code — TypeScript on Deno V8, or Rust/Go/C/Python/Zig via Wasmtime.' },
+            { n: '1', text: 'Flux runs your code — TypeScript on Deno V8, or Rust/Go/Java/Python/PHP/AssemblyScript via Wasmtime.' },
             { n: '2', text: 'While it runs, every request’s spans, mutations, and inputs are recorded automatically.' },
             { n: '3', text: 'Later, inspect, replay against new code, or diff against any other request.' },
           ].map(({ n, text }) => (

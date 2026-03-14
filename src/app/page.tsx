@@ -84,7 +84,7 @@ export default function HomePage() {
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginTop: 8 }}>
             {[
-              { icon: '⚡', label: 'Functions', hint: 'TypeScript via Deno V8, or Python, Go, Java, PHP, Rust, C#, Ruby via WebAssembly.' },
+              { icon: '⚡', label: 'Functions', hint: 'TypeScript via Deno V8. Rust, Go, Java, Python, PHP, AssemblyScript via WebAssembly (Wasmtime).' },
               { icon: '🗄️', label: 'Database', hint: 'Postgres with typed access via ctx.db. Every write recorded.' },
               { icon: '📬', label: 'Queue', hint: 'Async jobs with retries, delay, dead-letter. Built in.' },
               { icon: '⏰', label: 'Cron', hint: 'Schedule directly on a function. One line of config.' },
@@ -222,14 +222,15 @@ export default function HomePage() {
           <p style={{ ...muted, fontSize: '.95rem', maxWidth: 600, margin: '0 0 40px' }}>
             Write functions in TypeScript and they run on Deno V8. Need raw performance or a different language? Compile to WebAssembly and Flux runs it on Wasmtime — same tracing, same ctx API, same execution records.
           </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, marginBottom: 40 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 12, marginBottom: 40 }}>
             {[
               { lang: 'TypeScript', runtime: 'Deno V8', color: '#3178c6' },
+              { lang: 'AssemblyScript', runtime: 'Wasmtime', color: '#007acc' },
               { lang: 'Rust', runtime: 'Wasmtime', color: '#dea584' },
-              { lang: 'Go', runtime: 'TinyGo \u2192 Wasm', color: '#00ADD8' },
+              { lang: 'Java', runtime: 'TeaVM → Wasm', color: '#f89820' },
+              { lang: 'Go', runtime: 'wasip1', color: '#00ADD8' },
+              { lang: 'PHP', runtime: 'php-8.2-wasm', color: '#8892be' },
               { lang: 'Python', runtime: 'py2wasm', color: '#3776ab' },
-              { lang: 'C / C++', runtime: 'WASI SDK', color: '#A8B9CC' },
-              { lang: 'Zig', runtime: 'Wasm target', color: '#f7a41d' },
             ].map(({ lang, runtime, color }) => (
               <div key={lang} style={{ textAlign: 'center', padding: '20px 12px', border: '1px solid var(--mg-border)', borderRadius: 10, background: 'var(--mg-bg-surface)' }}>
                 <div style={{ fontSize: '1rem', fontWeight: 700, color, marginBottom: 4 }}>{lang}</div>
