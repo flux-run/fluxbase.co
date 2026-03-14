@@ -137,12 +137,12 @@ export default function HowItWorksPage() {
           <span style={{ display: 'inline-block', fontSize: '.72rem', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--mg-muted)', background: 'var(--mg-bg-elevated)', padding: '4px 12px', borderRadius: 20, marginBottom: 20 }}>Technology</span>
           <h2 className="section-h2">Open foundations, high-performance core.</h2>
           <p style={{ ...muted, fontSize: '.95rem', maxWidth: 600, margin: '0 0 40px' }}>
-            Every module is written in Rust for predictable latency and memory safety. TypeScript functions run on Deno V8. Functions in Rust, Go, C, Python, or Zig compile to WebAssembly and run on Wasmtime with Cranelift AOT compilation. Your data stays in standard Postgres.
+            Every module is written in Rust for predictable latency and memory safety. TypeScript functions run on Deno V8. Functions in Python, Go, Java, PHP, Rust, C#, or Ruby compile to WebAssembly and run on Wasmtime with Cranelift AOT compilation. Your data stays in standard Postgres.
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 16 }}>
             {[
               { icon: '🛡️', title: 'Gateway', tech: 'Rust (Axum)', desc: 'Auth, rate limit (per-tenant token bucket), CORS, routing. Routes requests to the Runtime via in-process dispatch.' },
-              { icon: '⚡', title: 'Runtime', tech: 'Rust + Deno V8 + Wasmtime', desc: 'TypeScript runs on V8 isolates. Rust, Go, C, Python, Zig compile to WebAssembly and run on Wasmtime with Cranelift AOT. Both share the same host API and tracing.' },
+              { icon: '⚡', title: 'Runtime', tech: 'Rust + Deno V8 + Wasmtime', desc: 'TypeScript runs on V8 isolates. Python, Go, Java, PHP, Rust, C#, Ruby compile to WebAssembly and run on Wasmtime with Cranelift AOT. All share the same host API and tracing.' },
               { icon: '🗄️', title: 'Data Engine', tech: 'Rust (Axum)', desc: 'DB proxy: query compilation (JSON → SQL), column policies, row-level security. Writes mutation records for every change.' },
               { icon: '📬', title: 'Queue', tech: 'Rust', desc: 'Durable async job queue backed by Postgres. Workers execute functions through the Runtime. Fully traced.' },
               { icon: '🔌', title: 'API', tech: 'Rust (Axum)', desc: 'Management API: deploy functions, manage schemas, API keys, tenants. Used by the CLI and web dashboard.' },

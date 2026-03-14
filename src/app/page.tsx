@@ -84,7 +84,7 @@ export default function HomePage() {
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginTop: 8 }}>
             {[
-              { icon: '⚡', label: 'Functions', hint: 'TypeScript via Deno V8, or Rust, Go, C, Python, Zig via WebAssembly.' },
+              { icon: '⚡', label: 'Functions', hint: 'TypeScript via Deno V8, or Python, Go, Java, PHP, Rust, C#, Ruby via WebAssembly.' },
               { icon: '🗄️', label: 'Database', hint: 'Postgres with typed access via ctx.db. Every write recorded.' },
               { icon: '📬', label: 'Queue', hint: 'Async jobs with retries, delay, dead-letter. Built in.' },
               { icon: '⏰', label: 'Cron', hint: 'Schedule directly on a function. One line of config.' },

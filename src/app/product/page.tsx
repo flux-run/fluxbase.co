@@ -127,7 +127,7 @@ export default function ProductPage() {
               <span className="section-label">Deterministic Execution</span>
               <h3 style={{ fontSize: '1.4rem', fontWeight: 800, letterSpacing: '-.02em', marginBottom: 12, color: 'var(--mg-text)' }}>Every request is recorded automatically.</h3>
               <p style={{ ...muted, fontSize: '.95rem', lineHeight: 1.7 }}>
-                The Flux runtime captures a complete record of every request as it happens — gateway auth, function spans, every database query, tool latencies, async job hand-offs. Whether your function runs on Deno V8 (TypeScript) or Wasmtime (Rust, Go, C, Python, Zig) — same recording, same traces.
+                The Flux runtime captures a complete record of every request as it happens — gateway auth, function spans, every database query, tool latencies, async job hand-offs. Whether your function runs on Deno V8 (TypeScript) or Wasmtime (Python, Go, Java, PHP, Rust, C#, Ruby) — same recording, same traces.
               </p>
             </div>
             <CodeWindow label="automatic recording">{`<span style="color:var(--mg-muted);"># Every request produces:</span>\n\n  trace_requests      <span style="color:var(--mg-green);">→</span> span tree (gateway to db)\n  state_mutations     <span style="color:var(--mg-green);">→</span> every row change + request link\n  execution_spans     <span style="color:var(--mg-green);">→</span> timing, errors, tool calls\n\n<span style="color:var(--mg-muted);"># Nothing to configure. Zero SDK changes.</span>\n<span style="color:var(--mg-muted);"># The runtime records it all.</span>`}</CodeWindow>

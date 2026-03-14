@@ -39,7 +39,7 @@ export default function OpenSourcePage() {
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
             {[
-              { icon: '⚡', title: 'Functions', desc: 'TypeScript via Deno V8. Drop a file, get an endpoint. Hot-reload in dev.' },
+              { icon: '⚡', title: 'Functions', desc: 'TypeScript, Python, Go, Java, PHP, Rust, C#, Ruby. Drop a file, get an endpoint.' },
               { icon: '🗄️', title: 'Database', desc: 'Postgres with typed access via ctx.db. Every write recorded automatically.' },
               { icon: '📬', title: 'Queue', desc: 'Durable async jobs with retries, delay, and dead-letter queue.' },
               { icon: '⏰', title: 'Cron', desc: 'Schedule functions with cron syntax. One line of config.' },
