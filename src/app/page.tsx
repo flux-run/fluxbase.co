@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { MarketingLayout } from '@/components/marketing/MarketingLayout'
 import { CodeWindow } from '@/components/marketing/CodeWindow'
+import { WaitlistForm } from '@/components/marketing/WaitlistForm'
 
 export const metadata: Metadata = {
   title: 'Flux — Reproduce Any Production Bug in One Command',
@@ -392,6 +393,37 @@ export default function HomePage() {
                 <span style={{ fontWeight: 700, color: 'var(--mg-text)' }}>{label}.</span> {desc}
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Early Access / Waitlist ─────────────────────────── */}
+      <section id="waitlist" style={section()}>
+        <div style={inner}>
+          <span className="section-label">Early Access</span>
+          <h2 className="section-h2">Get notified when stable v1 ships.</h2>
+          <p style={{ ...muted, fontSize: '.95rem', maxWidth: 560, margin: '0 0 10px' }}>
+            The CLI and runtime are in active development. Join the waitlist — we&apos;ll send one email when the stable release is ready.
+          </p>
+          <div style={{ display: 'flex', gap: 40, alignItems: 'flex-start', flexWrap: 'wrap', marginTop: 32 }}>
+            <div style={{ flex: '1 1 300px' }}>
+              <WaitlistForm source="homepage" />
+            </div>
+            <div style={{ flex: '1 1 260px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {[
+                { icon: '⚡', label: 'Alpha CLI available now', hint: 'Install and experiment today — flux init, flux dev, flux deploy all work.' },
+                { icon: '🔒', label: 'Stable release coming', hint: 'Full flux.toml hot-reload, production hardening, and signed binaries.' },
+                { icon: '📣', label: 'One email, no spam', hint: "We'll notify you when it's ready. That's it." },
+              ].map(({ icon, label, hint }) => (
+                <div key={label} style={{ display: 'flex', gap: 12, fontSize: '.85rem' }}>
+                  <span style={{ fontSize: '1rem', flexShrink: 0, marginTop: 1 }}>{icon}</span>
+                  <div>
+                    <span style={{ fontWeight: 600, color: 'var(--mg-text)' }}>{label}</span>
+                    <span style={{ color: 'var(--mg-muted)' }}> — {hint}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
