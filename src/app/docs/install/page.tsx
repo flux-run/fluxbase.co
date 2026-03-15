@@ -14,7 +14,7 @@ export default function Page() {
 <!-- One-liner -->
 <h2>One-command install</h2>
 <p>The fastest way to install on macOS or Linux:</p>
-<pre><code><span class="shell-prompt">$</span> curl -fsSL https://flux.sh/install.sh | bash</code></pre>
+<pre><code><span class="shell-prompt">$</span> curl -fsSL https://fluxbase.co/install | bash</code></pre>
 
 <div class="callout callout-info">
   <div class="callout-title">What the script does</div>
@@ -26,7 +26,7 @@ export default function Page() {
 <!-- macOS -->
 <h2>macOS</h2>
 <h3>Automatic (recommended)</h3>
-<pre><code><span class="shell-prompt">$</span> curl -fsSL https://flux.sh/install.sh | bash</code></pre>
+<pre><code><span class="shell-prompt">$</span> curl -fsSL https://fluxbase.co/install | bash</code></pre>
 
 <h3>Homebrew (coming soon)</h3>
 <pre><code><span class="shell-prompt">$</span> brew install flux-run/tap/flux</code></pre>
@@ -43,7 +43,7 @@ export default function Page() {
 <!-- Linux -->
 <h2>Linux</h2>
 <h3>Automatic</h3>
-<pre><code><span class="shell-prompt">$</span> curl -fsSL https://flux.sh/install.sh | bash</code></pre>
+<pre><code><span class="shell-prompt">$</span> curl -fsSL https://fluxbase.co/install | bash</code></pre>
 
 <h3>Manual download</h3>
 <pre><code><span class="cm"># x86_64 / amd64</span>
@@ -56,8 +56,11 @@ export default function Page() {
 
 <!-- Windows -->
 <h2>Windows</h2>
+<h3>Automatic (PowerShell)</h3>
+<pre><code><span class="shell-prompt">PS&gt;</span> irm https://fluxbase.co/install.ps1 | iex</code></pre>
+
 <h3>Direct download</h3>
-<p>Download the binary for your architecture and add it to a directory in your <code>PATH</code>:</p>
+<p>Or download the binary for your architecture and add it to a directory in your <code>PATH</code>:</p>
 <ul>
   <li><a href="https://github.com/flux-run/flux/releases/latest/download/flux-windows-amd64.exe">flux-windows-amd64.exe</a> — Intel/AMD 64-bit</li>
   <li><a href="https://github.com/flux-run/flux/releases/latest/download/flux-windows-arm64.exe">flux-windows-arm64.exe</a> — ARM64 (Snapdragon, etc.)</li>

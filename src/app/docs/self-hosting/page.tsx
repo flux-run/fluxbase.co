@@ -59,7 +59,7 @@ export default function Page() {
 
 <p>If you prefer to run without Docker, download the binary directly:</p>
 
-<pre><code><span class="shell-prompt">$</span> curl -fsSL https://flux.sh/install.sh | sh
+<pre><code><span class="shell-prompt">$</span> curl -fsSL https://fluxbase.co/install | bash
 <span class="shell-prompt">$</span> export DATABASE_URL=postgres://user:password@localhost:5432/flux
 <span class="shell-prompt">$</span> flux serve</code></pre>
 

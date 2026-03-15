@@ -27,7 +27,7 @@ const label = (color: string, bgOverride?: string): React.CSSProperties => ({
   marginBottom: 20,
 })
 
-const installCode = `<span style="color:var(--mg-green);">$</span> curl -fsSL https://flux.sh/install | bash
+const installCode = `<span style="color:var(--mg-green);">$</span> curl -fsSL https://fluxbase.co/install | bash
 
   Installing flux CLI…
 

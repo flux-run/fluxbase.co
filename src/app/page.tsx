@@ -43,7 +43,7 @@ export default function HomePage() {
         </div>
         <div className="install-hint">
           <span className="prompt">$</span>
-          curl -fsSL https://flux.sh/install | bash
+          curl -fsSL https://fluxbase.co/install | bash
         </div>
       </section>
 
@@ -410,7 +410,7 @@ export default function HomePage() {
             </div>
             <div className="install-hint" style={{ marginTop: 0 }}>
               <span className="prompt">$</span>
-              curl -fsSL https://flux.sh/install | bash
+              curl -fsSL https://fluxbase.co/install | bash
             </div>
           </div>
           <div>

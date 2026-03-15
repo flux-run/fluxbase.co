@@ -12,7 +12,7 @@ export default function Page() {
 <p class="page-subtitle">Complete reference for the <code>flux</code> command-line tool.</p>
 
 <h2>Installation</h2>
-<pre><code>$ curl -fsSL https://flux.sh/install.sh | bash
+<pre><code>$ curl -fsSL https://fluxbase.co/install | bash
 $ flux --version</code></pre>
 
 <h2>Command index</h2>

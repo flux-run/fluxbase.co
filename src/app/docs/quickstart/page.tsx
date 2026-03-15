@@ -23,7 +23,7 @@ export default function Page() {
 
 <h2>1. Install the CLI</h2>
 
-<pre><code><span class="shell-prompt">$</span> curl -fsSL https://flux.sh/install.sh | bash
+<pre><code><span class="shell-prompt">$</span> curl -fsSL https://fluxbase.co/install | bash
 
   <span class="str">✔</span>  flux 1.0.0 installed to /usr/local/bin/flux</code></pre>
 
