@@ -36,11 +36,13 @@ ASSET="\${BIN_NAME}-\${OS_LABEL}-\${ARCH_LABEL}"
 
 # ── Resolve latest release tag ─────────────────────────────────────────────
 echo "Fetching latest flux release..."
-TAG="$(curl -fsSL "https://api.github.com/repos/\${REPO}/releases/latest" \
-  | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": "\\(.*\\)".*/\\1/')"
+API_RESPONSE="$(curl -sSL "https://api.github.com/repos/\${REPO}/releases/latest")"
+TAG="$(echo "\$API_RESPONSE" | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": "\\(.*\\)".*/\\1/')"
 
 if [ -z "$TAG" ]; then
-  echo "Could not determine latest release tag." >&2
+  echo "" >&2
+  echo "Error: no published release found for \${REPO}." >&2
+  echo "Check https://github.com/\${REPO}/releases or try again shortly." >&2
   exit 1
 fi
 
