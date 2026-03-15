@@ -81,24 +81,26 @@ export function DocsSidebar() {
       borderRight: '1px solid var(--mg-border)',
       background: 'var(--mg-bg-surface)',
     }}>
-      <div style={{ padding: '0 16px', marginBottom: 28 }}>
-        <input
-          type="text"
-          placeholder="Search docs…"
-          disabled
-          style={{
-            width: '100%',
-            padding: '6px 10px',
-            fontSize: '.8rem',
-            background: 'var(--mg-bg)',
-            border: '1px solid var(--mg-border)',
-            borderRadius: 6,
-            color: 'var(--mg-muted)',
-            outline: 'none',
-            boxSizing: 'border-box',
-            cursor: 'not-allowed',
-          }}
-        />
+      <div style={{ padding: '0 16px', marginBottom: 28 }} title="Search coming soon">
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '6px 10px',
+          fontSize: '.8rem',
+          background: 'var(--mg-bg)',
+          border: '1px solid var(--mg-border)',
+          borderRadius: 6,
+          color: 'var(--mg-muted)',
+          cursor: 'default',
+          userSelect: 'none',
+        }}>
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" style={{ flexShrink: 0 }}>
+            <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.099zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0" />
+          </svg>
+          <span>Search</span>
+          <span style={{ marginLeft: 'auto', fontSize: '.65rem', padding: '1px 5px', borderRadius: 4, background: 'var(--mg-bg-elevated)', border: '1px solid var(--mg-border)' }}>
+            coming soon
+          </span>
+        </div>
       </div>
 
       {NAV.map((group) => (
@@ -152,7 +154,7 @@ export function DocsSidebar() {
           )}
         </div>
         <a
-          href="https://github.com/flux-run/flux/issues/new?labels=bug&template=bug_report.md"
+          href="https://github.com/flux-run/flux/issues/new?labels=bug&template=bug_report.yml"
           target="_blank"
           rel="noopener noreferrer"
           style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 0', fontSize: '.875rem', color: 'var(--mg-muted)', textDecoration: 'none' }}
