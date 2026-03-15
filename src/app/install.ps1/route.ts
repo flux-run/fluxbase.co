@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { captureInstallEvent } from "../../lib/posthog-server";
 
 const REPO = "flux-run/flux";
 
@@ -58,7 +59,14 @@ Write-Host "  flux init my-app"
 Write-Host "  cd my-app; flux dev"
 `;
 
-export async function GET() {
+export async function GET(request: Request) {
+  // Fire-and-forget — don't block the script download
+  void captureInstallEvent("cli_install_download", {
+    platform: "windows",
+    referrer: request.headers.get("referer") ?? undefined,
+    user_agent: request.headers.get("user-agent") ?? undefined,
+  });
+
   return new NextResponse(INSTALL_SCRIPT, {
     headers: {
       "Content-Type": "text/plain; charset=utf-8",
