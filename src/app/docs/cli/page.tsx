@@ -47,9 +47,8 @@ $ flux --version</code></pre>
     <tr><td colspan="2" style="color:var(--muted);font-size:.75rem;font-weight:700;letter-spacing:.08em;padding-top:12px">PROJECT MANAGEMENT</td></tr>
     <tr><td><code>flux secrets</code></td><td>Manage project secrets</td></tr>
     <tr><td><code>flux project</code></td><td>Create, list, update, and delete projects</td></tr>
-    <tr><td><code>flux api-keys</code></td><td>Create and revoke API keys</td></tr>
-    <tr><td><code>flux auth ci</code></td><td>Issue a CI-scoped API key for non-interactive environments</td></tr>
-    <tr><td><code>flux db migrate</code></td><td>Apply pending schema migrations</td></tr>
+    <tr><td><code>flux api-key</code></td><td>Create, list, revoke, and rotate API keys</td></tr>
+    <tr><td><code>flux db push</code></td><td>Apply pending schema migrations</td></tr>
     <tr><td><code>flux queue</code></td><td>Inspect dead-letter queue and replay jobs</td></tr>
   </tbody>
 </table>
@@ -392,62 +391,45 @@ $ flux incident replay --request 550e8400</code></pre>
 
 <!-- ─── PROJECT MANAGEMENT ──────────────────────────────────────────────── -->
 
-<h2 id="flux-api-keys">flux api-keys</h2>
+<h2 id="flux-api-key">flux api-key</h2>
 <p>Create and revoke API keys for your project. API keys are used as <code>Authorization: Bearer &lt;key&gt;</code> headers on requests to the gateway. See <a href="/docs/gateway">API Gateway</a> for details.</p>
-<pre><code>flux api-keys create --name &lt;name&gt; [--scope &lt;scope&gt;]
-flux api-keys list
-flux api-keys revoke &lt;name&gt;</code></pre>
+<pre><code>flux api-key create --name &lt;name&gt; [--scopes &lt;scopes&gt;]
+flux api-key list
+flux api-key revoke &lt;id&gt;
+flux api-key rotate &lt;id&gt;</code></pre>
 <table>
   <thead><tr><th>Flag</th><th>Description</th></tr></thead>
   <tbody>
     <tr><td><code>--name</code></td><td>Human-readable label for the key (required for create)</td></tr>
-    <tr><td><code>--scope</code></td><td><code>full</code> (default) | <code>read-only</code> | <code>ci</code> — limits what the key can do</td></tr>
+    <tr><td><code>--scopes</code></td><td>Comma-separated permission scopes, e.g. <code>function:deploy,logs:read</code></td></tr>
   </tbody>
 </table>
-<pre><code>$ flux api-keys create --name "production-server"
+<pre><code>$ flux api-key create --name "production-server"
   ✔ Created  flx_live_abc123…  (production-server)
 
-$ flux api-keys list
-  production-server   flx_live_abc…  full     created 2026-03-10
-  ci-runner           flx_live_def…  ci       created 2026-03-08
+$ flux api-key list
+  production-server   flx_live_abc…  created 2026-03-10
+  ci-runner           flx_live_def…  created 2026-03-08
 
-$ flux api-keys revoke production-server
-  ✔ Revoked  production-server</code></pre>
-
-<hr>
-
-<h2 id="flux-auth-ci">flux auth ci</h2>
-<p>Issue a CI-scoped API key for use in non-interactive environments (GitHub Actions, CI pipelines). The key is printed to stdout and never stored on disk.</p>
-<pre><code>flux auth ci [--name &lt;name&gt;]</code></pre>
-<pre><code>$ flux auth ci --name github-actions
-  flx_ci_abc123…
-
-# In GitHub Actions:
-- run: flux bug bisect --request $REQ_ID
-  env:
-    FLUX_API_KEY: \${{ secrets.FLUX_CI_KEY }}</code></pre>
+$ flux api-key revoke &lt;id&gt;
+  ✔ Revoked</code></pre>
 
 <hr>
 
-<h2 id="flux-db-migrate">flux db migrate</h2>
-<p>Apply pending SQL migrations from the <code>schema/</code> directory. Migrations are run in filename order and tracked in a <code>schema_migrations</code> table.</p>
-<pre><code>flux db migrate [--env &lt;env&gt;] [--dry-run]</code></pre>
+<h2 id="flux-db-push">flux db push</h2>
+<p>Apply SQL migrations from the <code>schemas/</code> directory to the connected Flux database. Migrations are tracked and applied idempotently.</p>
+<pre><code>flux db push [--context &lt;name&gt;] [--dir &lt;dir&gt;]</code></pre>
 <table>
   <thead><tr><th>Flag</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>--env</code></td><td>Target environment: <code>production</code> (default) | <code>staging</code></td></tr>
-    <tr><td><code>--dry-run</code></td><td>Print pending migrations without applying them</td></tr>    
-    <tr><td><code>--rollback</code></td><td>Roll back the last applied migration</td></tr>
+    <tr><td><code>--context</code></td><td>Named context to connect to (default: active context)</td></tr>
+    <tr><td><code>--dir</code></td><td>Migrations directory (default: <code>schemas/</code>)</td></tr>
   </tbody>
 </table>
-<pre><code>$ flux db migrate
+<pre><code>$ flux db push
 
-  Pending migrations (2):
-    20260310_add_subscriptions.sql
-    20260311_add_plan_index.sql
-
-  Applying 20260310_add_subscriptions.sql…  ✔
-  Applying 20260311_add_plan_index.sql…     ✔
+  Applying schemas/users.sql…    ✔
+  Applying schemas/orders.sql…   ✔
 
   ✔ 2 migrations applied</code></pre>
 

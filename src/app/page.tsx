@@ -88,7 +88,7 @@ export default function HomePage() {
               { icon: '🗄️', label: 'Database', hint: 'Postgres with typed access via ctx.db. Every write recorded.' },
               { icon: '📬', label: 'Queue', hint: 'Async jobs with retries, delay, dead-letter. Built in.' },
               { icon: '⏰', label: 'Cron', hint: 'Schedule directly on a function. One line of config.' },
-              { icon: '🔍', label: 'Execution Recording', hint: 'Every request traced automatically. flux why, flux trace, flux replay.' },
+              { icon: '🔍', label: 'Execution Recording', hint: 'Every request traced automatically. flux why, flux trace, flux incident replay.' },
             ].map(({ icon, label, hint }) => (
               <div key={label} style={{ display: 'flex', gap: 14, padding: '18px 20px', border: '1px solid var(--mg-border)', borderRadius: 10, background: 'var(--mg-bg-surface)' }}>
                 <span style={{ fontSize: '1.3rem', flexShrink: 0, marginTop: 1 }}>{icon}</span>
