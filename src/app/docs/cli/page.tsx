@@ -156,12 +156,11 @@ $ flux deploy --dry-run</code></pre>
 
 <h2 id="flux-invoke">flux invoke</h2>
 <p>Invoke a deployed function directly, bypassing the server.</p>
-<pre><code>flux invoke &lt;name&gt; [--payload &lt;json&gt;] [--gateway] [--env &lt;env&gt;]</code></pre>
+<pre><code>flux invoke &lt;name&gt; [--payload &lt;json&gt;] [--env &lt;env&gt;]</code></pre>
 <table>
   <thead><tr><th>Flag</th><th>Description</th></tr></thead>
   <tbody>
     <tr><td><code>--payload</code></td><td>JSON body to pass as input</td></tr>
-    <tr><td><code>--gateway</code></td><td>Route through the server (auth + rate-limiting apply)</td></tr>
     <tr><td><code>--env</code></td><td>Target environment: <code>production</code> (default) | <code>staging</code></td></tr>
   </tbody>
 </table>
