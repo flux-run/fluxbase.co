@@ -123,7 +123,7 @@ $ flux create my-app --template todo-api</code></pre>
   ✔ Config file:        ~/.config/flux/config.toml
   ✔ Authenticated:      you@example.com
   ✔ API reachable:      http://localhost:4000  (42ms)
-  ✔ Gateway reachable:  https://localhost:4000   (38ms)</code></pre>
+  ✔ Server reachable:  https://localhost:4000   (38ms)</code></pre>
 
 <!-- ─── DEPLOY ──────────────────────────────────────────────────────────── -->
 
@@ -155,13 +155,13 @@ $ flux deploy --dry-run</code></pre>
 <hr>
 
 <h2 id="flux-invoke">flux invoke</h2>
-<p>Invoke a deployed function directly, bypassing the gateway.</p>
+<p>Invoke a deployed function directly, bypassing the server.</p>
 <pre><code>flux invoke &lt;name&gt; [--payload &lt;json&gt;] [--gateway] [--env &lt;env&gt;]</code></pre>
 <table>
   <thead><tr><th>Flag</th><th>Description</th></tr></thead>
   <tbody>
     <tr><td><code>--payload</code></td><td>JSON body to pass as input</td></tr>
-    <tr><td><code>--gateway</code></td><td>Route through the API gateway (auth + rate-limiting apply)</td></tr>
+    <tr><td><code>--gateway</code></td><td>Route through the server (auth + rate-limiting apply)</td></tr>
     <tr><td><code>--env</code></td><td>Target environment: <code>production</code> (default) | <code>staging</code></td></tr>
   </tbody>
 </table>
@@ -245,7 +245,7 @@ $ flux tail --filter path=/checkout --filter status=500 --since 1h</code></pre>
 <pre><code>flux trace &lt;request-id&gt;</code></pre>
 <pre><code>$ flux trace 550e8400
 
-  gateway                   2ms
+  server                    2ms
   └─ create_order           8ms
      ├─ db.insert(orders)   4ms
      ├─ stripe.charge     180ms  ✗ timeout
@@ -276,7 +276,7 @@ flux trace diff &lt;commit-a&gt;:&lt;request-id&gt; &lt;commit-b&gt;:&lt;request
 
   SPAN              REQUEST A       REQUEST B
   ──────────────────────────────────────────────────────
-  gateway           2ms             2ms               —
+  server            2ms             2ms               —
   create_order      81ms            44ms              faster
   ├─ db.insert      4ms             4ms               —
   ├─ stripe.charge  68ms ✔          → timeout (10s)   ✗ changed
@@ -392,7 +392,7 @@ $ flux incident replay --request 550e8400</code></pre>
 <!-- ─── PROJECT MANAGEMENT ──────────────────────────────────────────────── -->
 
 <h2 id="flux-api-key">flux api-key</h2>
-<p>Create and revoke API keys for your project. API keys are used as <code>Authorization: Bearer &lt;key&gt;</code> headers on requests to the gateway. See <a href="/docs/gateway">API Gateway</a> for details.</p>
+<p>Create and revoke API keys for your project. API keys are used as <code>Authorization: Bearer &lt;key&gt;</code> headers on requests to the server. See <a href="/docs/server">Server</a> for details.</p>
 <pre><code>flux api-key create --name &lt;name&gt; [--scopes &lt;scopes&gt;]
 flux api-key list
 flux api-key revoke &lt;id&gt;

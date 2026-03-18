@@ -44,7 +44,7 @@ export default function ProductPage() {
         <div style={{ maxWidth: 760, margin: '0 auto', padding: '0 24px', textAlign: 'center' }}>
           <p style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: 12 }}>One core concept: the execution record.</p>
           <p style={{ ...muted, fontSize: '.95rem', lineHeight: 1.7, marginBottom: 24 }}>
-            Every request Flux handles becomes an execution record — a complete snapshot of what the request did: gateway spans, function spans, database mutations, inputs, outputs, tool latencies, and async hand-offs. The commands below are different ways to query and act on that record.
+            Every request Flux handles becomes an execution record — a complete snapshot of what the request did: server spans, function spans, database mutations, inputs, outputs, tool latencies, and async hand-offs. The commands below are different ways to query and act on that record.
           </p>
           <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap', fontSize: '.83rem' }}>
             {[
@@ -122,10 +122,10 @@ export default function ProductPage() {
               <span className="section-label">Deterministic Execution</span>
               <h3 style={{ fontSize: '1.4rem', fontWeight: 800, letterSpacing: '-.02em', marginBottom: 12, color: 'var(--mg-text)' }}>Every request is recorded automatically.</h3>
               <p style={{ ...muted, fontSize: '.95rem', lineHeight: 1.7 }}>
-                The Flux runtime captures a complete record of every request as it happens — gateway auth, function spans, every database query, tool latencies, async job hand-offs. Whether your function runs on Deno V8 (TypeScript) or Wasmtime (Rust, Go, Java, Python, PHP, AssemblyScript) — same recording, same traces.
+                The Flux runtime captures a complete record of every request as it happens — server auth, function spans, every database query, tool latencies, async job hand-offs. Whether your function runs on Deno V8 (TypeScript) or Wasmtime (Rust, Go, Java, Python, PHP, AssemblyScript) — same recording, same traces.
               </p>
             </div>
-            <CodeWindow label="automatic recording">{`<span style="color:var(--mg-muted);"># Every request produces:</span>\n\n  trace_requests      <span style="color:var(--mg-green);">→</span> span tree (gateway to db)\n  state_mutations     <span style="color:var(--mg-green);">→</span> every row change + request link\n  execution_spans     <span style="color:var(--mg-green);">→</span> timing, errors, tool calls\n\n<span style="color:var(--mg-muted);"># Nothing to configure. Zero SDK changes.</span>\n<span style="color:var(--mg-muted);"># The runtime records it all.</span>`}</CodeWindow>
+            <CodeWindow label="automatic recording">{`<span style="color:var(--mg-muted);"># Every request produces:</span>\n\n  trace_requests      <span style="color:var(--mg-green);">→</span> span tree (server to db)\n  state_mutations     <span style="color:var(--mg-green);">→</span> every row change + request link\n  execution_spans     <span style="color:var(--mg-green);">→</span> timing, errors, tool calls\n\n<span style="color:var(--mg-muted);"># Nothing to configure. Zero SDK changes.</span>\n<span style="color:var(--mg-muted);"># The runtime records it all.</span>`}</CodeWindow>
           </div>
         </div>
       </section>
@@ -134,12 +134,12 @@ export default function ProductPage() {
       <section id="time-travel-debugging" style={section('var(--mg-bg-surface)')}>
         <div style={inner}>
           <div style={grid2}>
-            <CodeWindow label="flux trace debug 550e8400">{`<span style="color:var(--mg-green);">$</span> flux trace debug <span style="color:var(--mg-accent);">550e8400</span>\n\n  <span style="color:var(--mg-muted);">Step 1/4  gateway</span>\n  <span style="color:var(--mg-muted);">─────────────────────────────────────</span>\n  Input:   POST /signup  <span style="color:var(--mg-green);">{ email: "a@b.com" }</span>\n  Output:  <span style="color:var(--mg-green);">{ tenant_id: "t_123", passed: true }</span>\n  Time:    4ms\n\n  <span style="color:var(--mg-muted);">Step 2/4  create_user</span>\n  <span style="color:var(--mg-muted);">─────────────────────────────────────</span>\n  Input:   <span style="color:var(--mg-green);">{ email: "a@b.com" }</span>\n  Output:  <span style="color:var(--mg-green);">{ userId: "u_42" }</span>\n  Time:    81ms\n\n  <span style="color:var(--mg-muted);">↓ next  ↑ prev  e expand  q quit</span>`}</CodeWindow>
+            <CodeWindow label="flux trace debug 550e8400">{`<span style="color:var(--mg-green);">$</span> flux trace debug <span style="color:var(--mg-accent);">550e8400</span>\n\n  <span style="color:var(--mg-muted);">Step 1/4  server</span>\n  <span style="color:var(--mg-muted);">─────────────────────────────────────</span>\n  Input:   POST /signup  <span style="color:var(--mg-green);">{ email: "a@b.com" }</span>\n  Output:  <span style="color:var(--mg-green);">{ tenant_id: "t_123", passed: true }</span>\n  Time:    4ms\n\n  <span style="color:var(--mg-muted);">Step 2/4  create_user</span>\n  <span style="color:var(--mg-muted);">─────────────────────────────────────</span>\n  Input:   <span style="color:var(--mg-green);">{ email: "a@b.com" }</span>\n  Output:  <span style="color:var(--mg-green);">{ userId: "u_42" }</span>\n  Time:    81ms\n\n  <span style="color:var(--mg-muted);">↓ next  ↑ prev  e expand  q quit</span>`}</CodeWindow>
             <div>
               <span className="section-label">Time-Travel Debugging</span>
               <h3 style={{ fontSize: '1.4rem', fontWeight: 800, letterSpacing: '-.02em', marginBottom: 12, color: 'var(--mg-text)' }}>Step through any production request.</h3>
               <p style={{ ...muted, fontSize: '.95rem', lineHeight: 1.7 }}>
-                <code>flux trace debug &lt;id&gt;</code> opens an interactive terminal UI where you can navigate each span of a production request. See the exact input and output at every step — what the gateway received, what the function returned, what the database wrote. All from the actual production execution.
+                <code>flux trace debug &lt;id&gt;</code> opens an interactive terminal UI where you can navigate each span of a production request. See the exact input and output at every step — what the server received, what the function returned, what the database wrote. All from the actual production execution.
               </p>
             </div>
           </div>
@@ -238,7 +238,7 @@ export default function ProductPage() {
           <div style={grid2}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {[
-                { metric: '<0.1ms', label: 'Gateway routing', detail: 'DB route table cached in memory, invalidated via LISTEN/NOTIFY' },
+                { metric: '<0.1ms', label: 'Server routing', detail: 'DB route table cached in memory, invalidated via LISTEN/NOTIFY' },
                 { metric: '<0.4ms', label: 'Recording overhead per request', detail: 'Span creation + mutation log INSERT inside the same transaction' },
                 { metric: '~10µs', label: 'WASM instantiation (cached)', detail: 'Cranelift AOT compiles modules once, LRU cache of 256 entries' },
                 { metric: '0ms', label: 'V8 warm start', detail: 'Deno isolates stay warm between requests. Cold start ~5ms on first deploy.' },
@@ -252,7 +252,7 @@ export default function ProductPage() {
                 </div>
               ))}
             </div>
-            <CodeWindow label="why it's fast">{`<span style="color:var(--mg-muted);">// All in the same process:</span>\n\n  Gateway  ── in-memory dispatch ──  Runtime\n     │                                  │\n     │    <span style="color:var(--mg-green);">no HTTP hops</span>                   │\n     │    <span style="color:var(--mg-green);">no serialization</span>               │\n     │    <span style="color:var(--mg-green);">no service mesh</span>                │\n     │                                  │\n  Data Engine ── same Postgres txn ──  Queue\n\n<span style="color:var(--mg-muted);">// Mutation log = 1 extra INSERT</span>\n<span style="color:var(--mg-muted);">// in the SAME transaction as your write.</span>\n<span style="color:var(--mg-muted);">// No extra round-trip. No eventual consistency.</span>`}</CodeWindow>
+            <CodeWindow label="why it's fast">{`<span style="color:var(--mg-muted);">// All in the same process:</span>\n\n  Server   ── in-memory dispatch ──  Runtime\n     │                                  │\n     │    <span style="color:var(--mg-green);">no HTTP hops</span>                   │\n     │    <span style="color:var(--mg-green);">no serialization</span>               │\n     │    <span style="color:var(--mg-green);">no service mesh</span>                │\n     │                                  │\n  Postgres ── same Postgres txn ──  Queue\n\n<span style="color:var(--mg-muted);">// Mutation log = 1 extra INSERT</span>\n<span style="color:var(--mg-muted);">// in the SAME transaction as your write.</span>\n<span style="color:var(--mg-muted);">// No extra round-trip. No eventual consistency.</span>`}</CodeWindow>
           </div>
         </div>
       </section>

@@ -31,7 +31,7 @@ const docRoutes = [
   '/docs/find-regression',
   '/docs/cli',
   '/docs/architecture',
-  '/docs/gateway',
+  '/docs/server',
   '/docs/runtime',
   '/docs/data-engine',
   '/docs/secrets',

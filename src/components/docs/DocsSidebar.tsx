@@ -45,9 +45,8 @@ const NAV = [
     title: 'Architecture',
     links: [
       { href: '/docs/architecture',         label: 'Architecture'          },
-      { href: '/docs/gateway',              label: 'API Gateway'           },
+      { href: '/docs/server',               label: 'Server'                },
       { href: '/docs/runtime',              label: 'Runtime'               },
-      { href: '/docs/data-engine',          label: 'Data Engine'           },
       { href: '/docs/secrets',              label: 'Secrets'               },
     ],
   },

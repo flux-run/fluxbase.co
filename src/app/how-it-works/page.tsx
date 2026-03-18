@@ -5,7 +5,7 @@ import { CodeWindow } from '@/components/marketing/CodeWindow'
 
 export const metadata: Metadata = {
   title: 'How It Works — Flux',
-  description: 'Single binary, five in-process modules, one Postgres database. How Flux turns every request into a queryable execution record with zero configuration.',
+  description: 'Three standalone binaries, one Postgres database. How Flux turns every request into a queryable execution record with zero configuration.',
 }
 
 const inner: React.CSSProperties = { maxWidth: 1040, margin: '0 auto', padding: '0 24px' }
@@ -22,11 +22,11 @@ export default function HowItWorksPage() {
       <section className="hero" style={{ paddingBottom: 48 }}>
         <span className="eyebrow">How It Works</span>
         <h1 style={{ fontSize: 'clamp(2rem,5vw,3rem)' }}>
-          One binary. One port.<br />
+          Three binaries. Unlimited scale.<br />
           <span className="gradient-text">Every execution recorded.</span>
         </h1>
         <p style={{ maxWidth: 560, margin: '0 auto 32px', color: 'var(--mg-muted)' }}>
-          Flux is a single Rust binary with five in-process modules. Every layer — from the gateway to the database — emits structured spans tied to one request ID. The CLI reassembles them on demand.
+          Flux runs seamlessly across three optimized Rust binaries: CLI, Server, and Runtime. Every component emits structured spans tied to a single request ID. The CLI reassembles them on demand.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
           <Link href="/docs/quickstart" className="btn-primary">Try it →</Link>
@@ -54,18 +54,17 @@ export default function HowItWorksPage() {
       <section style={section('var(--mg-bg-surface)')}>
         <div style={inner}>
           <span className="section-label">The Architecture</span>
-          <h2 className="section-h2">Five modules. One process. One trace.</h2>
+          <h2 className="section-h2">Three binaries. One trace.</h2>
           <p style={{ ...muted, fontSize: '.95rem', maxWidth: 560, margin: '0 0 40px' }}>
-            All five modules run in a single binary on port :4000. Every layer is instrumented at the runtime level — no application-level tracing hooks needed. Span data is stored in Postgres alongside mutation logs.
+            Flux is built on a clean three-binary architecture. Every layer is instrumented — no application-level tracing hooks needed. Span data is stored seamlessly in your Postgres database.
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 48, alignItems: 'center' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
               {[
                 { icon: '👤', title: 'Client',          sub: 'Any HTTP client',                      hi: false, span: false },
-                { icon: '🛡️', title: 'Gateway',         sub: 'auth · rate limit · route → span',     hi: true,  span: true  },
-                { icon: '⚡', title: 'Runtime',         sub: 'TS (V8) or WASM (Wasmtime) → span',    hi: true,  span: true  },
-                { icon: '🗄️', title: 'Data Engine',     sub: 'query compiler · policy · SQL → span', hi: true,  span: true  },
-                { icon: '🐘', title: 'Your PostgreSQL', sub: 'standard Postgres, you own the data',  hi: false, span: false },
+                { icon: '🛡️', title: 'Server',          sub: 'gRPC server · async jobs · queue',     hi: true,  span: true  },
+                { icon: '⚡', title: 'Runtime',         sub: 'Deno V8 isolates · Postgres access',   hi: true,  span: true  },
+                { icon: '🐘', title: 'Your PostgreSQL', sub: 'execution store & your app data',      hi: false, span: false },
               ].map(({ icon, title, sub, hi }, i, arr) => (
                 <div key={title}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '16px 20px', border: `1px solid ${hi ? 'var(--mg-accent)' : 'var(--mg-border)'}`, borderRadius: 8, background: hi ? 'var(--mg-accent-dim)' : 'var(--mg-bg-surface)' }}>
@@ -80,7 +79,7 @@ export default function HowItWorksPage() {
               ))}
               <p style={{ fontSize: '.78rem', color: 'var(--mg-muted)', marginTop: 16 }}>* Each hop produces a span stored in the trace store.</p>
             </div>
-            <CodeWindow label="flux trace 4f9a3b2c">{`<span style="color:var(--mg-green);">$</span> flux trace <span style="color:var(--mg-accent);">4f9a3b2c</span>\n\n  Trace <span style="color:var(--mg-accent);">4f9a3b2c</span>  <span style="color:var(--mg-muted);">POST /create_user  200</span>\n\n  <span style="color:#f9a8d4;">▸ gateway</span>                     <span style="color:var(--mg-yellow);">3ms</span>\n    <span style="color:var(--mg-muted);">auth ✔  rate_limit ✔  cors ✔</span>\n\n  <span style="color:#f9a8d4;">▸ create_user</span>                 <span style="color:var(--mg-yellow);">81ms</span>\n    <span style="color:#60a5fa;">▸ db:select(users)</span>           <span style="color:var(--mg-yellow);">11ms</span>\n    <span style="color:#60a5fa;">▸ db:insert(users)</span>           <span style="color:var(--mg-yellow);">14ms</span>\n\n  <span style="color:#f9a8d4;">▸ send_welcome</span>  <span style="color:var(--mg-muted);">async →</span>  <span style="color:var(--mg-yellow);">queued</span>\n\n  <span style="color:var(--mg-muted);">── total: 98ms ─────────────────────</span>`}</CodeWindow>
+            <CodeWindow label="flux trace 4f9a3b2c">{`<span style="color:var(--mg-green);">$</span> flux trace <span style="color:var(--mg-accent);">4f9a3b2c</span>\n\n  Trace <span style="color:var(--mg-accent);">4f9a3b2c</span>  <span style="color:var(--mg-muted);">POST /create_user  200</span>\n\n  <span style="color:#f9a8d4;">▸ server</span>                      <span style="color:var(--mg-yellow);">3ms</span>\n    <span style="color:var(--mg-muted);">auth ✔  rate_limit ✔  grpc ✔</span>\n\n  <span style="color:#f9a8d4;">▸ create_user</span>                 <span style="color:var(--mg-yellow);">81ms</span>\n    <span style="color:#60a5fa;">▸ db:select(users)</span>           <span style="color:var(--mg-yellow);">11ms</span>\n    <span style="color:#60a5fa;">▸ db:insert(users)</span>           <span style="color:var(--mg-yellow);">14ms</span>\n\n  <span style="color:#f9a8d4;">▸ send_welcome</span>  <span style="color:var(--mg-muted);">async →</span>  <span style="color:var(--mg-yellow);">queued</span>\n\n  <span style="color:var(--mg-muted);">── total: 98ms ─────────────────────</span>`}</CodeWindow>
           </div>
         </div>
       </section>
@@ -93,9 +92,9 @@ export default function HowItWorksPage() {
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {[
               {
-                n: 1, title: 'Request capture', label: 'gateway → span',
-                desc: 'When a request arrives at the Gateway, Flux assigns it a globally unique request ID (UUID v4). This ID is propagated internally to every module. The gateway records auth result, rate-limit decision, matched route, and timing as the first span.',
-                code: `<span style="color:var(--mg-muted);"># Gateway emits:</span>\n{\n  request_id: <span style="color:var(--mg-accent);">"4f9a3b2c"</span>,\n  span: <span style="color:var(--mg-green);">"gateway"</span>,\n  method: <span style="color:var(--mg-green);">"POST"</span>,\n  path: <span style="color:var(--mg-green);">"/create_user"</span>,\n  auth: <span style="color:var(--mg-green);">"ok"</span>,\n  duration_ms: 3\n}`,
+                n: 1, title: 'Request capture', label: 'server → span',
+                desc: 'When a request arrives at the Server, Flux assigns it a globally unique request ID (UUID v4). This ID is propagated internally to every module. The server records auth result, rate-limit decision, matched route, and timing as the first span.',
+                code: `<span style="color:var(--mg-muted);"># Server emits:</span>\n{\n  request_id: <span style="color:var(--mg-accent);">"4f9a3b2c"</span>,\n  span: <span style="color:var(--mg-green);">"server"</span>,\n  method: <span style="color:var(--mg-green);">"POST"</span>,\n  path: <span style="color:var(--mg-green);">"/create_user"</span>,\n  auth: <span style="color:var(--mg-green);">"ok"</span>,\n  duration_ms: 3\n}`,
               },
               {
                 n: 2, title: 'Function execution', label: 'runtime → spans',
@@ -103,14 +102,14 @@ export default function HowItWorksPage() {
                 code: `<span style="color:var(--mg-muted);"># Runtime emits per call:</span>\n{\n  request_id: <span style="color:var(--mg-accent);">"4f9a3b2c"</span>,\n  span: <span style="color:var(--mg-green);">"create_user"</span>,\n  children: [\n    { span: <span style="color:#60a5fa;">"db:select(users)"</span>, <span style="color:var(--mg-yellow);">11ms</span> },\n    { span: <span style="color:#60a5fa;">"db:insert(users)"</span>, <span style="color:var(--mg-yellow);">14ms</span> }\n  ],\n  duration_ms: 81\n}`,
               },
               {
-                n: 3, title: 'Mutation logging', label: 'data engine → mutation log',
-                desc: 'Every database write goes through the Data Engine, which applies schema validation, column policies, and row-level security before executing the SQL. After execution, it writes a mutation record: which table, which row, old value, new value, and the request ID that caused it.',
+                n: 3, title: 'Mutation logging', label: 'server → mutation log',
+                desc: 'Every database write goes through the Server, which applies schema validation, column policies, and row-level security before executing the SQL. After execution, it writes a mutation record: which table, which row, old value, new value, and the request ID that caused it.',
                 code: `<span style="color:var(--mg-muted);"># Mutation record:</span>\n{\n  request_id: <span style="color:var(--mg-accent);">"4f9a3b2c"</span>,\n  table: <span style="color:var(--mg-green);">"users"</span>,\n  row_id: 42,\n  operation: <span style="color:var(--mg-green);">"insert"</span>,\n  data: { email: <span style="color:var(--mg-green);">"a@b.com"</span>, plan: <span style="color:var(--mg-green);">"free"</span> },\n  timestamp: <span style="color:var(--mg-muted);">"2026-03-10T14:22:01Z"</span>\n}`,
               },
               {
                 n: 4, title: 'Trace graph', label: 'trace store → rendered',
-                desc: 'All spans for a request ID are stored in an ordered graph. flux trace <id> retrieves them and renders the full tree — gateway, function, database queries, tool calls — in execution order with latencies.',
-                code: `<span style="color:var(--mg-green);">$</span> flux trace 4f9a3b2c\n\n  <span style="color:#f9a8d4;">gateway</span>           <span style="color:var(--mg-yellow);">3ms</span>\n  <span style="color:#f9a8d4;">create_user</span>      <span style="color:var(--mg-yellow);">81ms</span>\n    <span style="color:#60a5fa;">db:select</span>       <span style="color:var(--mg-yellow);">11ms</span>\n    <span style="color:#60a5fa;">db:insert</span>       <span style="color:var(--mg-yellow);">14ms</span>\n  <span style="color:#f9a8d4;">send_welcome</span>  <span style="color:var(--mg-muted);">async → queued</span>\n\n  <span style="color:var(--mg-muted);">total: 98ms</span>`,
+                desc: 'All spans for a request ID are stored in an ordered graph. flux trace <id> retrieves them and renders the full tree — server, function, database queries, tool calls — in execution order with latencies.',
+                code: `<span style="color:var(--mg-green);">$</span> flux trace 4f9a3b2c\n\n  <span style="color:#f9a8d4;">server</span>           <span style="color:var(--mg-yellow);">3ms</span>\n  <span style="color:#f9a8d4;">create_user</span>      <span style="color:var(--mg-yellow);">81ms</span>\n    <span style="color:#60a5fa;">db:select</span>       <span style="color:var(--mg-yellow);">11ms</span>\n    <span style="color:#60a5fa;">db:insert</span>       <span style="color:var(--mg-yellow);">14ms</span>\n  <span style="color:#f9a8d4;">send_welcome</span>  <span style="color:var(--mg-muted);">async → queued</span>\n\n  <span style="color:var(--mg-muted);">total: 98ms</span>`,
               },
               {
                 n: 5, title: 'Deterministic replay', label: 'replay — side-effects off',
@@ -137,15 +136,13 @@ export default function HowItWorksPage() {
           <span style={{ display: 'inline-block', fontSize: '.72rem', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--mg-muted)', background: 'var(--mg-bg-elevated)', padding: '4px 12px', borderRadius: 20, marginBottom: 20 }}>Technology</span>
           <h2 className="section-h2">Open foundations, high-performance core.</h2>
           <p style={{ ...muted, fontSize: '.95rem', maxWidth: 600, margin: '0 0 40px' }}>
-            Every module is written in Rust for predictable latency and memory safety. TypeScript functions run on Deno V8. Functions in Python, Go, Java, PHP, Rust, C#, or Ruby compile to WebAssembly and run on Wasmtime with Cranelift AOT compilation. Your data stays in standard Postgres.
+            Every binary is written in Rust for predictable latency and memory safety. TypeScript functions run on Deno V8 inside the Runtime. Your data stays in standard Postgres.
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 16 }}>
             {[
-              { icon: '🛡️', title: 'Gateway', tech: 'Rust (Axum)', desc: 'Auth, rate limit (per-tenant token bucket), CORS, routing. Routes requests to the Runtime via in-process dispatch.' },
-              { icon: '⚡', title: 'Runtime', tech: 'Rust + Deno V8 + Wasmtime', desc: 'TypeScript runs on V8 isolates. Python, Go, Java, PHP, Rust, C#, Ruby compile to WebAssembly and run on Wasmtime with Cranelift AOT. All share the same host API and tracing.' },
-              { icon: '🗄️', title: 'Data Engine', tech: 'Rust (Axum)', desc: 'DB proxy: query compilation (JSON → SQL), column policies, row-level security. Writes mutation records for every change.' },
-              { icon: '📬', title: 'Queue', tech: 'Rust', desc: 'Durable async job queue backed by Postgres. Workers execute functions through the Runtime. Fully traced.' },
-              { icon: '🔌', title: 'API', tech: 'Rust (Axum)', desc: 'Management API: deploy functions, manage schemas, API keys, tenants. Used by the CLI and web dashboard.' },
+              { icon: '🛡️', title: 'Server', tech: 'Rust (gRPC)', desc: 'Provides the orchestration, tracing aggregation, async jobs, and Postgres execution store.' },
+              { icon: '⚡', title: 'Runtime', tech: 'Rust + Deno V8', desc: 'Securely executes your code in V8 isolates. Injects Postgres access, records external bounds like fetch/Redis as traces.' },
+              { icon: '🗄️', title: 'Your PostgreSQL', tech: 'Standard Postgres', desc: 'Both the execution trace store and your application data live inside your own Postgres clusters.' },
             ].map(({ icon, title, tech, desc }) => (
               <div key={title} style={{ background: 'var(--mg-bg-surface)', border: '1px solid var(--mg-border)', borderRadius: 10, padding: 24 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>

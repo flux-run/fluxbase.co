@@ -84,8 +84,8 @@ export default function Page() {
 
 <pre><code>ctx.db.query({ operation: 'insert', table: 'users', data: { ... } })
   ↓
-  Data Engine writes the row to Postgres
-  Data Engine writes a mutation record to state_mutations
+  Server writes the row to Postgres
+  Server writes a mutation record to state_mutations
     { request_id, table: 'users', row_id, old: null, new: { ... } }
   Both writes are in the same transaction — they commit or roll back together</code></pre>
 
@@ -122,7 +122,7 @@ $ flux state blame users --id 42
 );</code></pre>
 
 <h2>Row-level security</h2>
-<p>You can enable tenant isolation by filtering on a <code>tenant_id</code> column. The gateway injects tenant context automatically when using project API keys.</p>
+<p>You can enable tenant isolation by filtering on a <code>tenant_id</code> column. The server injects tenant context automatically when using project API keys.</p>
 
 <h2>Observability</h2>
 <p>All database queries are automatically traced. Slow queries (&gt;100ms) are flagged, N+1 patterns are detected, and index suggestions are generated based on repeated filter columns. See <a href="/docs/observability">Observability</a>.</p>

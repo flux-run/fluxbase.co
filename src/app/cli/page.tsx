@@ -393,7 +393,7 @@ export default function CLIPage() {
         id="deploy"
         cmd="flux deploy"
         title="Deploy functions to production"
-        desc="Bundles all functions in the current project, uploads them, and makes them live behind the gateway in ~20 seconds. Returns a deploy ID and the public URL for each function."
+        desc="Bundles all functions in the current project, uploads them, and makes them live behind the server in ~20 seconds. Returns a deploy ID and the public URL for each function."
         codeLabel="flux deploy"
         code={deployCode}
       />

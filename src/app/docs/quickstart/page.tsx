@@ -150,7 +150,7 @@ export default function Page() {
 
   Trace 550e8400  POST /create_user  500
 
-  ▸ gateway                    4ms
+  ▸ server                    4ms
     auth ✔  rate_limit ✔
   ▸ create_user              10044ms
     ▸ db:insert(users)          14ms
@@ -164,7 +164,7 @@ export default function Page() {
 <pre><code><span class="shell-prompt">$</span> flux trace diff 4f9a3b2c 550e8400
 
   SPAN             BEFORE   AFTER     DELTA
-  gateway             3ms     4ms      +1ms
+  server              3ms     4ms      +1ms
   create_user        81ms  10044ms  +9963ms  ✗
   stripe.charge      12ms  10002ms  +9990ms  ✗</code></pre>
 

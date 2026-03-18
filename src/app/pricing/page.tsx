@@ -44,7 +44,7 @@ export default function OpenSourcePage() {
               { icon: '📬', title: 'Queue', desc: 'Durable async jobs with retries, delay, and dead-letter queue.' },
               { icon: '⏰', title: 'Cron', desc: 'Schedule functions with cron syntax. One line of config.' },
               { icon: '🔍', title: 'Execution Recording', desc: 'Every request traced: spans, mutations, inputs/outputs. flux why, flux trace, flux incident replay.' },
-              { icon: '🛡️', title: 'Gateway', desc: 'Auth, rate limiting, CORS, routing. Built into the binary.' },
+              { icon: '🛡️', title: 'Server', desc: 'Auth, rate limiting, CORS, routing. Built into the binary.' },
               { icon: '🔧', title: 'CLI', desc: 'flux init, flux dev, flux deploy, flux trace, flux why — everything from the terminal.' },
             ].map(({ icon, title, desc }) => (
               <div key={title} style={{ background: 'var(--mg-bg-elevated)', border: '1px solid var(--mg-border)', borderRadius: 10, padding: '22px 24px' }}>

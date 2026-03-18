@@ -44,19 +44,19 @@ export default function Page() {
   </thead>
   <tbody>
     <tr>
-      <td>Span recording (gateway, function, tool calls)</td>
+      <td>Span recording (server, function, tool calls)</td>
       <td>~0.1ms per span, async</td>
       <td>Written after the response is flushed — never on the critical path</td>
     </tr>
     <tr>
       <td>Mutation logging (DB writes)</td>
       <td>~0.2ms per mutation</td>
-      <td>Batched in the same transaction at the Data Engine level — no extra round-trip to Postgres</td>
+      <td>Batched in the same transaction by the server — no extra round-trip to Postgres</td>
     </tr>
     <tr>
       <td>Request input recording</td>
       <td>~0.05ms</td>
-      <td>Captured at gateway ingress before routing</td>
+      <td>Captured at server ingress before routing</td>
     </tr>
   </tbody>
 </table>
@@ -105,7 +105,7 @@ export default function Page() {
 
 <h2 id="trace-storage">Trace storage</h2>
 
-<p>Execution records are stored in three tables in your project's Postgres database, managed by the Data Engine:</p>
+<p>Execution records are stored in three tables in your project's Postgres database, managed by the server:</p>
 
 <table>
   <thead>
@@ -118,7 +118,7 @@ export default function Page() {
   </tbody>
 </table>
 
-<p>You can query these tables directly with standard Postgres tooling. They are owned by the <code>flux</code> schema and are read-only outside the Data Engine.</p>
+<p>You can query these tables directly with standard Postgres tooling. They are owned by the <code>flux</code> schema and are read-only outside the server.</p>
 
 <p><strong>Storage estimates</strong></p>
 <ul>
@@ -161,11 +161,11 @@ export default function Page() {
 
 <h2 id="scaling">Scaling</h2>
 
-<p><strong>Gateway</strong> — The gateway is a Rust binary that scales horizontally. It is stateless; all state is in Postgres. Load balancing and zero-downtime deploys are handled by the Flux infrastructure layer.</p>
+<p><strong>Server</strong> — The <code>flux-server</code> is a Rust binary that scales horizontally. It is stateless; all state is in Postgres. Load balancing and zero-downtime deploys are handled by the Flux infrastructure layer.</p>
 
 <p><strong>Runtime</strong> — The runtime pool scales vertically (more isolates per node) up to the plan concurrency limit, and horizontally beyond that on Pro and Enterprise plans.</p>
 
-<p><strong>Data Engine</strong> — The Data Engine is co-located with your Postgres instance. Write throughput scales with your Postgres plan. For very high mutation volumes, the Data Engine batches mutation log writes to avoid write amplification.</p>
+<p><strong>PostgreSQL</strong> — Write throughput scales with your Postgres plan. For very high mutation volumes, the Server batches mutation log writes to avoid write amplification.</p>
 
 <p><strong>Trace storage</strong> — The <code>execution_spans</code> and <code>state_mutations</code> tables are partitioned by day. Reads for long time ranges are query-planned against partitions only; old partitions are dropped atomically at retention cutoff without locking live traffic.</p>
 

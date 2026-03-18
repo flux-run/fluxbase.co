@@ -74,10 +74,10 @@ export default function Page() {
 <p>Everything in Flux revolves around the <strong><a href="/docs/execution-record">execution record</a></strong> — a complete snapshot produced for every request: span tree, database mutations, inputs, outputs, and errors. All CLI commands are different ways to query that record.</p>
 
 <h3>1. Execution Recording</h3>
-<p>Every request is executed and recorded atomically. The runtime captures every span — gateway, function, database queries — and stores them indexed by request ID. There is no setup required; recording happens at the runtime level.</p>
+<p>Every request is executed and recorded atomically. The runtime captures every span — server, function, database queries — and stores them indexed by request ID. There is no setup required; recording happens at the runtime level.</p>
 
 <h3>2. Mutation Logging</h3>
-<p>Every database write goes through the Data Engine, which logs the mutation — table, row, old value, new value, and the request ID that caused it. <code>flux state history</code> and <code>flux state blame</code> query this log.</p>
+<p>Every database write goes through the Server, which logs the mutation — table, row, old value, new value, and the request ID that caused it. <code>flux state history</code> and <code>flux state blame</code> query this log.</p>
 
 <h3>3. Incident Replay</h3>
 <p>Because the complete input to every request is recorded, any request can be deterministically re-executed. <code>flux incident replay</code> disables outbound side-effects while re-running database writes against the current code.</p>
@@ -96,34 +96,23 @@ export default function Page() {
   </thead>
   <tbody>
     <tr>
-      <td>Gateway</td>
-      <td>Auth, rate limiting, CORS, routing</td>
-      <td><a href="/docs/gateway">docs/gateway</a></td>
+      <td>Server</td>
+      <td>Auth, rate limiting, CORS, routing, mutation logging</td>
+      <td><a href="/docs/server">docs/server</a></td>
     </tr>
     <tr>
       <td>Runtime</td>
       <td>Deno V8 + Wasmtime execution, secrets</td>
       <td><a href="/docs/runtime">docs/runtime</a></td>
     </tr>
-    <tr>
-      <td>Data Engine</td>
-      <td>DB proxy, mutation recording, cron</td>
-      <td><a href="/docs/data-engine">docs/data-engine</a></td>
-    </tr>
-    <tr>
-      <td>Queue</td>
-      <td>Durable async job processing</td>
-      <td><a href="/docs/queue">docs/queue</a></td>
-    </tr>
-    <tr>
-      <td>API</td>
-      <td>Function registry, schema, management</td>
-      <td><a href="/docs/api">docs/api</a></td>
-    </tr>
   </tbody>
 </table>
 
-<p style="font-size:.85rem;color:var(--muted);margin-top:12px;">All five modules run in a single binary on port :4000. One Postgres database holds all state.</p>
+<div style="margin-top: 2rem;">
+<h3 style="font-size:1.1rem;margin:0 0 6px;color:var(--text)">Architecture &amp; Self-Hosting</h3>
+<p style="font-size:.95rem;color:var(--muted);margin:0;line-height:1.6">Understand the <code>cli</code>, <code>server</code>, and <code>runtime</code> stack and how to run it on your own hardware.</p>
+<p style="font-size:.85rem;color:var(--muted);margin-top:12px">Flux relies on optimized Rust binaries rather than microservice meshes. One Postgres database holds all execution state.</p>
+</div>
 
 <hr>
 

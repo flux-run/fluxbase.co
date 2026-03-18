@@ -44,7 +44,7 @@ export default function Page() {
 <p><strong>Step 3</strong> — If you need to see the full execution:</p>
 <pre><code>$ flux trace 550e8400
 
-  gateway                   2ms
+  server                    2ms
   └─ create_order           8ms
      ├─ db.insert(orders)   4ms
      ├─ stripe.charge     180ms  ← timeout here
@@ -123,7 +123,7 @@ export default function Page() {
 
   SPAN              BEFORE       AFTER
   ─────────────────────────────────────────────────────
-  gateway           2ms          2ms          — same
+  server            2ms          2ms          — same
   create_order      81ms         44ms         — faster
   ├─ db.insert      4ms          4ms          — same
   ├─ stripe.charge  68ms         → timeout    ✗ changed

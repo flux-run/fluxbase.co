@@ -49,7 +49,7 @@ export default function Page() {
 
 <pre><code>$ flux trace 550e8400
 
-  gateway                   2ms
+  server                    2ms
   └─ create_order           8ms
      ├─ db.insert(orders)   4ms
      ├─ stripe.charge     180ms  ← timeout here
@@ -59,7 +59,7 @@ export default function Page() {
 
 <pre><code>$ flux trace debug 550e8400
 
-  Step 1/4  gateway
+  Step 1/4  server
   ──────────────────────────────────
   Input:   POST /checkout  { ... }
   Output:  { tenant_id: "t_123" }

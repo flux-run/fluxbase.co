@@ -15,7 +15,7 @@ export default function Page() {
 
 <p>A request fails in production. You get an alert. Now what?</p>
 
-<p>With a traditional backend you open five tools in five tabs:</p>
+<p>With a traditional backend you open several tools in different tabs:</p>
 
 <table>
   <thead><tr><th>Tool</th><th>What you find</th><th>What's missing</th></tr></thead>
@@ -47,7 +47,7 @@ export default function Page() {
 <pre><code>Request: POST /signup  req:550e8400
 
   INPUT       { email: "a@b.com" }
-  SPANS       gateway → create_user → stripe.charge → db.insert
+  SPANS       server → create_user → stripe.charge → db.insert
   MUTATIONS   users.plan: free → null  (rolled back)
   ERROR       Stripe API timeout at payments/create.ts:42
   RESPONSE    500  44ms</code></pre>
@@ -93,7 +93,7 @@ Flux  → what your code did</code></pre>
 
 <h2>Open source and self-hosted</h2>
 
-<p>Flux is open source (MIT). The runtime — gateway, runtime engine, data engine, queue — ships as a single binary. Run it on your own infrastructure with one Postgres database as the only dependency.</p>
+<p>Flux is open source (MIT). The runtime — server, runtime engine, queue — ships as a single binary. Run it on your own infrastructure with one Postgres database as the only dependency.</p>
 
 <pre><code><span class="shell-prompt">$</span> flux init my-app && cd my-app
 <span class="shell-prompt">$</span> flux dev   <span class="cm"># starts Flux + embedded Postgres on localhost:4000</span></code></pre>
@@ -110,7 +110,7 @@ Flux  → what your code did</code></pre>
   <thead><tr><th>Capability</th><th>Bolt-on SDK</th><th>Flux runtime</th></tr></thead>
   <tbody>
     <tr><td>Trace spans</td><td>✔ (manual instrumentation)</td><td>✔ (automatic)</td></tr>
-    <tr><td>Record DB mutations in the same transaction</td><td>✗ Sits outside the database driver</td><td>✔ Data engine wraps the query</td></tr>
+    <tr><td>Record DB mutations in the same transaction</td><td>✗ Sits outside the database driver</td><td>✔ Server wraps the query</td></tr>
     <tr><td>Replay production traffic with side-effects disabled</td><td>✗ Can't intercept outbound calls</td><td>✔ Runtime controls all I/O</td></tr>
     <tr><td>Bisect across git history</td><td>✗ Can't re-deploy and re-execute per commit</td><td>✔ Runtime manages deploys</td></tr>
     <tr><td>Link every span to exact code version</td><td>✗ No deploy awareness</td><td>✔ Knows the code SHA for every execution</td></tr>

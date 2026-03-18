@@ -20,7 +20,7 @@ export default function Page() {
 ├─────────────────────────────────────────────────────────────┤
 │  INPUT       POST /signup  { email: "a@b.com" }             │
 ├─────────────────────────────────────────────────────────────┤
-│  SPANS       gateway              2ms  ✔                    │
+│  SPANS       server               2ms  ✔                    │
 │              create_user         81ms  ✔                    │
 │              ├─ db.insert(users)  4ms  ✔                    │
 │              └─ stripe.charge     —    ✗ timeout (10s)      │
@@ -39,7 +39,7 @@ export default function Page() {
   <tbody>
     <tr><td><code>request_id</code></td><td>Unique identifier — used in every <code>flux</code> command</td></tr>
     <tr><td><code>request_input</code></td><td>HTTP method, path, headers, body exactly as received</td></tr>
-    <tr><td><code>span_tree</code></td><td>Ordered tree of spans: gateway auth, function execution, DB queries, tool calls, async hand-offs</td></tr>
+    <tr><td><code>span_tree</code></td><td>Ordered tree of spans: server auth, function execution, DB queries, tool calls, async hand-offs</td></tr>
     <tr><td><code>db_mutations</code></td><td>Every INSERT / UPDATE / DELETE during this request — table, row, old value, new value</td></tr>
     <tr><td><code>response</code></td><td>Status code, body, and latency of the final response</td></tr>
     <tr><td><code>errors</code></td><td>Any exceptions thrown, including stack trace and the span where they occurred</td></tr>
@@ -49,12 +49,12 @@ export default function Page() {
 
 <h2>How it is produced</h2>
 
-<p>The execution record is produced by the Flux runtime as a side-effect of executing the request — no instrumentation, no SDK, no configuration required. The record is written atomically at the end of the request (or on failure) and stored in the Data Engine.</p>
+<p>The execution record is produced by the Flux runtime as a side-effect of executing the request — no instrumentation, no SDK, no configuration required. The record is written atomically at the end of the request (or on failure) and stored in Postgres.</p>
 
 <pre><code>Client
-  → Gateway      (records request input, auth span)
+  → Server       (records request input, auth span)
   → Runtime      (records function spans, tool calls, errors)
-  → Data Engine  (records DB mutations, links them to request_id)
+  → Postgres     (records DB mutations, links them to request_id)
   → Response     (records status, body, total latency)
 
 All spans assembled into execution record → stored by request_id</code></pre>
@@ -81,7 +81,7 @@ All spans assembled into execution record → stored by request_id</code></pre>
 
 <h2>Storage</h2>
 
-<p>Execution records are stored in the Data Engine alongside your PostgreSQL data. Span data is written to <code>trace_requests</code> and <code>execution_spans</code>; mutation data to <code>state_mutations</code>. All three tables are indexed by <code>request_id</code>.</p>
+<p>Execution records are stored alongside your PostgreSQL data. Span data is written to <code>trace_requests</code> and <code>execution_spans</code>; mutation data to <code>state_mutations</code>. All three tables are indexed by <code>request_id</code>.</p>
 
 <p>You can query them directly with <code>flux explain</code> or via standard PostgreSQL tooling — they are plain tables in your project database.</p>
 
@@ -104,7 +104,7 @@ All spans assembled into execution record → stored by request_id</code></pre>
 <p>Recording an execution record adds:</p>
 <ul>
   <li><strong>Span recording</strong>: ~0.1ms per span, written asynchronously after the response is sent</li>
-  <li><strong>Mutation logging</strong>: one additional write per DB mutation, batched in the same transaction at the Data Engine level — no extra round-trip</li>
+  <li><strong>Mutation logging</strong>: one additional write per DB mutation, batched in the same transaction by the server — no extra round-trip</li>
   <li><strong>Network overhead</strong>: zero — all recording is in-process</li>
 </ul>
 

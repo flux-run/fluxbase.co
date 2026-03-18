@@ -23,9 +23,8 @@ export default function Page() {
   </div>
 </nav>
 
-<h2 id="overview">Overview</h2>
-
-<p>Flux is a single Rust binary that runs five in-process modules on one port (<code>:4000</code>). All state lives in one Postgres database. There is no inter-service messaging, no Redis, no external queue — just the binary and Postgres.</p>
+<h2 id="overview">The Architecture</h2>
+<p>The Flux execution server (<code>flux-server</code>) is a standalone Rust binary that manages orchestration and queuing. It spawns secure execution isolates (<code>flux-runtime</code>). All execution state lives in one Postgres database. There is no complex mesh, no default Redis dependency, no external queue — just the server, runtime isolates, and Postgres.</p>
 
 <ul>
   <li>No distributed state to manage</li>
@@ -63,7 +62,8 @@ export default function Page() {
 <span class="shell-prompt">$</span> export DATABASE_URL=postgres://user:password@localhost:5432/flux
 <span class="shell-prompt">$</span> flux serve</code></pre>
 
-<p>The <code>flux serve</code> command starts all five modules (Gateway, Runtime, Data Engine, Queue, API) in a single process on port 4000.</p>
+<h3>1. Internal network</h3>
+<p>The <code>flux-server</code> binary starts the backend and begins listening for CLI/client requests and execution triggers. Since it binds to internal ports by default, it expects a reverse proxy or load balancer to route external traffic to it safely.</p>
 
 <h2 id="configuration">Configuration</h2>
 
@@ -92,7 +92,7 @@ export default function Page() {
     <tr><td><code>TRACE_RETENTION_DAYS</code></td><td>30</td><td>Days before execution records are deleted</td></tr>
     <tr><td><code>MAX_FUNCTION_DURATION_MS</code></td><td>30000</td><td>Timeout per function execution</td></tr>
     <tr><td><code>LOG_LEVEL</code></td><td>info</td><td><code>trace</code> / <code>debug</code> / <code>info</code> / <code>warn</code> / <code>error</code></td></tr>
-    <tr><td><code>RUST_LOG</code></td><td>—</td><td>Fine-grained module logging (e.g. <code>flux_gateway=debug</code>)</td></tr>
+    <tr><td><code>RUST_LOG</code></td><td>—</td><td>Fine-grained module logging (e.g. <code>flux_server=debug</code>)</td></tr>
   </tbody>
 </table>
 
@@ -104,7 +104,7 @@ export default function Page() {
 
 <h3>Multiple instances</h3>
 
-<p>Because all state is in Postgres, you can run multiple Flux instances behind a load balancer. The gateway uses <code>LISTEN/NOTIFY</code> to coordinate route cache invalidation across instances.</p>
+<p>Because all state is in Postgres, you can run multiple Flux instances behind a load balancer. The server uses <code>LISTEN/NOTIFY</code> to coordinate route cache invalidation across instances.</p>
 
 <pre><code><span class="cm"># Scale to 4 instances</span>
 <span class="shell-prompt">$</span> docker compose up -d --scale flux=4</code></pre>

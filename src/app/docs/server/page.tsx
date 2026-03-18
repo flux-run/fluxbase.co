@@ -1,28 +1,28 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'API Gateway — Flux Docs',
-  description: 'Flux API Gateway: authentication, rate limiting, CORS, routing, and request tracing — all configured automatically for your project.',
+  title: 'Server — Flux Docs',
+  description: 'Flux Server: authentication, rate limiting, CORS, routing, request tracing, and Postgres execution commits.',
 }
 
 export default function Page() {
   return (
     <div
-      dangerouslySetInnerHTML={{ __html: `<h1>API Gateway</h1>
-<p class="page-subtitle">Authentication, rate limiting, CORS, routing, and distributed tracing — automatically applied to every function you deploy.</p>
+      dangerouslySetInnerHTML={{ __html: `<h1>Server</h1>
+<p class="page-subtitle">Authentication, rate limiting, CORS, routing, and trace coordination — automatically applied as the entrypoint for every request.</p>
 
 <h2>Overview</h2>
-<p>The Flux API Gateway sits in front of all your deployed functions. It handles every concern that should be resolved before your business logic runs — authentication, routing, rate limiting, CORS — and stamps every request with a unique trace ID that flows through the entire system.</p>
+<p>The <code>flux-server</code> binary sits in front of your deployed functions. It acts as the orchestrator and entrypoint. It handles every concern that should be resolved before your business logic runs — authentication, routing, rate limiting, CORS — and stamps every request with a unique trace ID that flows through the system.</p>
 
-<p>You don't configure the gateway manually. Routes are derived from your <code>flux.json</code> files. Auth is enforced using your project API keys. CORS is handled automatically. Nothing to set up.</p>
+<p>You don't configure the routing manually. Routes are derived from your <code>flux.json</code> files. Auth is enforced using your project API keys. CORS is handled automatically. Nothing to set up.</p>
 
 <div class="callout callout-info">
   <div class="callout-title">Request flow</div>
-  Client → Gateway (auth · route · rate-limit · CORS · x-request-id) → Runtime (your function) → Response
+  Client → flux-server (auth · route · rate-limit · CORS · x-request-id) → flux-runtime (your function) → Response
 </div>
 
 <h2>Authentication</h2>
-<p>Every request to a deployed function must carry a valid credential. The gateway supports two modes:</p>
+<p>Every request to a deployed function must carry a valid credential. The server supports two modes:</p>
 
 <h3>Project API keys</h3>
 <p>The primary authentication method for server-to-server and client-to-server calls. Generate keys in the dashboard or CLI.</p>
@@ -47,7 +47,7 @@ export default function Page() {
 <span class="shell-prompt">$</span> flux api-keys revoke production-server</code></pre>
 
 <h2>Routing</h2>
-<p>The gateway builds its routing table from the <code>flux.json</code> files of all deployed functions in your project. Each function declares its own route and HTTP method.</p>
+<p>The Server builds its routing table from the <code>flux.json</code> files of all deployed functions in your project. Each function declares its own route and HTTP method.</p>
 
 <pre><code><span class="cm">// functions/create_order/flux.json</span>
 {
@@ -71,7 +71,7 @@ export default function Page() {
 </table>
 
 <h2>Rate limiting</h2>
-<p>The gateway enforces per-project rate limits to protect your functions from traffic spikes and abuse. Limits are applied per API key.</p>
+<p>The Server enforces per-project rate limits to protect your functions from traffic spikes and abuse. Limits are applied per API key.</p>
 
 <table>
   <thead><tr><th>Plan</th><th>Requests / minute</th><th>Burst</th></tr></thead>
@@ -82,12 +82,12 @@ export default function Page() {
   </tbody>
 </table>
 
-<p>When a rate limit is exceeded, the gateway returns:</p>
+<p>When a rate limit is exceeded, the server returns:</p>
 <pre><code>HTTP 429 Too Many Requests
 Retry-After: 15</code></pre>
 
 <h2>CORS</h2>
-<p>CORS is handled automatically at the gateway level. By default, all origins are allowed for GET requests. For POST/PUT/DELETE, restrict origins in your project settings.</p>
+<p>CORS is handled automatically at the server level. By default, all origins are allowed for GET requests. For POST/PUT/DELETE, restrict origins in your project settings.</p>
 
 <p>To configure allowed origins:</p>
 <pre><code><span class="cm"># Allow only your frontend domain</span>
@@ -95,14 +95,14 @@ Retry-After: 15</code></pre>
 
 <div class="callout callout-info">
   <div class="callout-title">Preflight requests</div>
-  The gateway handles <code>OPTIONS</code> preflight requests automatically. You do not need to write a preflight handler function.
+  The server handles <code>OPTIONS</code> preflight requests automatically. You do not need to write a preflight handler function.
 </div>
 
 <h2>Request tracing</h2>
-<p>The gateway stamps every inbound request with:</p>
+<p>The Server stamps every inbound request with:</p>
 <ul>
-  <li><code>x-request-id</code> — a unique ID for the request, propagated to the runtime and data engine</li>
-  <li>Gateway auth result, rate-limit check outcome, and routing decision are all recorded as the first span in the trace</li>
+  <li><code>x-request-id</code> — a unique ID for the request, propagated to the runtime</li>
+  <li>Server auth result, rate-limit check outcome, and routing decision are all recorded as the first span in the trace</li>
 </ul>
 
 <p>The trace ID is also returned in the HTTP response:</p>
@@ -116,7 +116,7 @@ content-type: application/json
 <pre><code><span class="shell-prompt">$</span> flux trace 9c3e7f1a</code></pre>
 
 <h2>Middleware pipeline</h2>
-<p>The gateway processes middleware in a fixed order. Each step either passes the request forward or returns an error response:</p>
+<p>The Server processes middleware in a fixed order. Each step either passes the request forward or returns an error response:</p>
 <ol>
   <li><strong>API key authentication</strong> — validates the <code>Authorization</code> header</li>
   <li><strong>Rate limit check</strong> — counts against the key's quota</li>

@@ -109,7 +109,7 @@ STRIPE_SECRET_KEY=sk_test_xyz</code></pre>
 
 <hr>
 <p style="display:flex;gap:16px;font-size:.875rem;">
-  <a href="/docs/gateway">← API Gateway</a>
+  <a href="/docs/server">← Server</a>
   <a href="/docs/cli">Next: CLI Reference →</a>
 </p>` }}
     />

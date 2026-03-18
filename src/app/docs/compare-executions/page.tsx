@@ -19,7 +19,7 @@ export default function Page() {
 
   SPAN              REQUEST A         REQUEST B
   ──────────────────────────────────────────────────────
-  gateway           2ms               2ms               —
+  server            2ms               2ms               —
   create_order      81ms              44ms              faster
   ├─ db.insert      4ms               4ms               —
   ├─ stripe.charge  68ms              → timeout (10s)   ✗ changed

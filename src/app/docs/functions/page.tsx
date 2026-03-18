@@ -13,7 +13,7 @@ export default function Page() {
 
 <h2>Overview</h2>
 <p>A Flux function is a TypeScript module that exports a single handler via <code>defineFunction()</code>.
-Functions are deployed as isolated serverless units, auto-scaled on demand, and exposed as HTTP endpoints via the API Gateway.</p>
+Functions are deployed as isolated serverless units, auto-scaled on demand, and exposed as HTTP endpoints via the Server.</p>
 
 <h2>Defining a function</h2>
 <pre><code><span class="kw">import</span> { <span class="fn">defineFunction</span> } <span class="kw">from</span> <span class="str">"@flux/functions"</span>;

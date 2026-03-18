@@ -32,7 +32,7 @@ export default function Page() {
   </div>
     <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border:1px solid var(--accent);border-radius:8px;background:var(--accent-dim)">
       <div>
-        <div style="font-size:.88rem;font-weight:700;color:var(--text)">Gateway</div>
+        <div style="font-size:.88rem;font-weight:700;color:var(--text)">Server</div>
         <div style="font-size:.74rem;color:var(--muted);margin-top:2px;">captures request + metadata</div>
       </div>
       <span style="font-family:var(--font-mono);font-size:.68rem;color:var(--accent);background:var(--accent-dim);border:1px solid var(--accent);padding:2px 10px;border-radius:20px;white-space:nowrap;">trace_requests</span>
@@ -54,8 +54,8 @@ export default function Page() {
   </div>
     <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border:1px solid var(--accent);border-radius:8px;background:var(--accent-dim)">
       <div>
-        <div style="font-size:.88rem;font-weight:700;color:var(--text)">Data Engine</div>
-        <div style="font-size:.74rem;color:var(--muted);margin-top:2px;">intercepts DB writes</div>
+        <div style="font-size:.88rem;font-weight:700;color:var(--text)">Execution Store</div>
+        <div style="font-size:.74rem;color:var(--muted);margin-top:2px;">records mutations</div>
       </div>
       <span style="font-family:var(--font-mono);font-size:.68rem;color:var(--accent);background:var(--accent-dim);border:1px solid var(--accent);padding:2px 10px;border-radius:20px;white-space:nowrap;">state_mutations</span>
     </div>
@@ -125,7 +125,7 @@ export default function Page() {
         <span style="font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);">Requests are executions</span>
       </div>
       <h2 style="font-size:1.5rem;font-weight:800;margin-bottom:16px;">Every HTTP request is a recorded execution</h2>
-      <p style="color:var(--muted);line-height:1.8;margin-bottom:16px;">When a request hits Flux, the gateway captures it and the runtime executes your function inside a V8 isolate. That entire round-trip — inputs, outputs, spans, tool calls, DB queries — is stored as a single <strong style="color:var(--text);">execution record</strong>.</p>
+      <p style="color:var(--muted);line-height:1.8;margin-bottom:16px;">When a request hits Flux, the server captures it and the runtime executes your function inside a V8 isolate. That entire round-trip — inputs, outputs, spans, tool calls, DB queries — is stored as a single <strong style="color:var(--text);">execution record</strong>.</p>
 <p style="color:var(--muted);line-height:1.8;margin-bottom:20px;">The execution record is identified by a <code>request_id</code>. Every CLI command that debugs a request takes this ID.</p>
 <div style="background:var(--accent-dim);border:1px solid var(--accent);border-radius:8px;padding:16px 18px;">
   <div style="font-size:.78rem;font-weight:700;color:var(--accent);margin-bottom:10px;text-transform:uppercase;letter-spacing:.08em;">CLI commands that use request_id</div>
@@ -177,7 +177,7 @@ export default function Page() {
         <span style="font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);">Data changes are mutations</span>
       </div>
       <h2 style="font-size:1.5rem;font-weight:800;margin-bottom:16px;">Every database write is a logged mutation</h2>
-      <p style="color:var(--muted);line-height:1.8;margin-bottom:16px;">When your function writes to PostgreSQL, Flux's Data Engine intercepts the write and records it in the <strong style="color:var(--text);">mutation log</strong>. Each entry carries the row that changed, the old value, the new value, and — critically — the <code>request_id</code> that caused it.</p>
+      <p style="color:var(--muted);line-height:1.8;margin-bottom:16px;">When your function writes to PostgreSQL, Flux's Server intercepts the write and records it in the <strong style="color:var(--text);">mutation log</strong>. Each entry carries the row that changed, the old value, the new value, and — critically — the <code>request_id</code> that caused it.</p>
 <p style="color:var(--muted);line-height:1.8;margin-bottom:20px;">This makes your database auditable by default. You never need to write <code>audit_log</code> tables manually.</p>
 <div style="background:var(--accent-dim);border:1px solid var(--accent);border-radius:8px;padding:16px 18px;">
   <div style="font-size:.78rem;font-weight:700;color:var(--accent);margin-bottom:10px;text-transform:uppercase;letter-spacing:.08em;">CLI commands that query mutations</div>
@@ -229,7 +229,7 @@ export default function Page() {
         <span style="font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);">Everything is traceable</span>
       </div>
       <h2 style="font-size:1.5rem;font-weight:800;margin-bottom:16px;">Every layer emits spans — automatically</h2>
-      <p style="color:var(--muted);line-height:1.8;margin-bottom:16px;">The gateway, runtime, data engine, tool calls, async jobs — every layer in Flux emits spans without any instrumentation from you. Those spans are assembled into a <strong style="color:var(--text);">trace graph</strong> keyed by <code>request_id</code>.</p>
+      <p style="color:var(--muted);line-height:1.8;margin-bottom:16px;">The server, runtime, tool calls, async jobs — every layer in Flux emits spans without any instrumentation from you. Those spans are assembled into a <strong style="color:var(--text);">trace graph</strong> keyed by <code>request_id</code>.</p>
 <p style="color:var(--muted);line-height:1.8;margin-bottom:20px;">The trace graph is not just for reading. You can replay it, diff it against a different request, bisect your commit history with it, or step through it interactively.</p>
 <div style="background:var(--accent-dim);border:1px solid var(--accent);border-radius:8px;padding:16px 18px;">
   <div style="font-size:.78rem;font-weight:700;color:var(--accent);margin-bottom:10px;text-transform:uppercase;letter-spacing:.08em;">CLI commands that use the trace graph</div>
@@ -262,7 +262,7 @@ export default function Page() {
   <span style="color:#f8f8f2;">Trace Graph</span>  <span style="color:var(--accent);">91a3f</span>
   <span style="color:var(--muted);">POST /create_order · 200 OK · 194ms</span>
 
-  <span style="color:#f9a8d4;">gateway</span>                         <span style="color:var(--yellow);">2ms</span>
+  <span style="color:#f9a8d4;">server</span>                          <span style="color:var(--yellow);">2ms</span>
   <span style="color:#f9a8d4;">└─ create_order</span>                 <span style="color:var(--yellow);">8ms</span>
   <span style="color:#60a5fa;">   ├─ db.insert(orders)</span>          <span style="color:var(--yellow);">4ms</span>
   <span style="color:#f9a8d4;">   ├─</span> <span style="color:#a78bfa;">stripe.charge</span>             <span style="color:var(--yellow);">180ms</span>

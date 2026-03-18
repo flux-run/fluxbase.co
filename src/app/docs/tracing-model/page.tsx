@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: 'Tracing Model — Flux Docs',
-  description: 'How Flux builds a span tree for every request: gateway spans, runtime spans, database spans, tool calls, and async job hand-offs.',
+  description: 'How Flux builds a span tree for every request: server spans, runtime spans, database spans, tool calls, and async job hand-offs.',
 }
 
 export default function Page() {
@@ -13,12 +13,12 @@ export default function Page() {
 
 <h2>What is a span?</h2>
 
-<p>A span is a single unit of work with a name, a start time, a duration, and an outcome. Every step a request takes — from arriving at the gateway to the last database write — produces a span.</p>
+<p>A span is a single unit of work with a name, a start time, a duration, and an outcome. Every step a request takes — from arriving at the server to the last database write — produces a span.</p>
 
-<p>Spans are hierarchical: each span has a parent. The root span is always the gateway receiving the request. Everything that happens downstream is a child or grandchild of that root. This tree of spans is called the <strong>span tree</strong>, and it is the core of every execution record.</p>
+<p>Spans are hierarchical: each span has a parent. The root span is always the server receiving the request. Everything that happens downstream is a child or grandchild of that root. This tree of spans is called the <strong>span tree</strong>, and it is the core of every execution record.</p>
 
 <pre><code>root
-└─ gateway                       ← root span (request arrived)
+└─ server                        ← root span (request arrived)
    └─ create_user                ← function execution span
       ├─ db.insert(users)        ← database span
       ├─ stripe.charge           ← outbound HTTP span
@@ -28,9 +28,9 @@ export default function Page() {
 
 <p>Flux emits five categories of spans automatically — no instrumentation required.</p>
 
-<h3>1. Gateway spans</h3>
-<p>Emitted by the API gateway when a request arrives. Contains: auth result, tenant resolution, rate limit check outcome, and the injected <code>request_id</code>. Every other span in the tree descends from this one.</p>
-<pre><code>gateway  2ms
+<h3>1. Server spans</h3>
+<p>Emitted by the server when a request arrives. Contains: auth result, tenant resolution, rate limit check outcome, and the injected <code>request_id</code>. Every other span in the tree descends from this one.</p>
+<pre><code>server   2ms
   auth_check    0.4ms  ✔ API key valid
   rate_limit    0.1ms  ✔ 18/100 req/min used
   route_match   0.3ms  → create_user</code></pre>
@@ -42,7 +42,7 @@ export default function Page() {
   [output]  { id: 42 }  201</code></pre>
 
 <h3>3. Database spans</h3>
-<p>Emitted by the Data Engine for every <code>ctx.db.query()</code> call. Contains: the compiled SQL, parameters, execution time, rows affected, and — for INSERT/UPDATE/DELETE — the before and after row values.</p>
+<p>Emitted by the runtime for every <code>ctx.db.query()</code> call. Contains: the compiled SQL, parameters, execution time, rows affected, and — for INSERT/UPDATE/DELETE — the before and after row values.</p>
 <pre><code>db.insert(users)  4ms
   [sql]    INSERT INTO users (email, name) VALUES ($1, $2) RETURNING *
   [rows]   1 inserted  id=42</code></pre>
@@ -65,12 +65,12 @@ export default function Page() {
 
 <h2>How the span tree is assembled</h2>
 
-<p>Each component — gateway, runtime, Data Engine — emits spans independently and writes them to the <code>execution_spans</code> table keyed by <code>request_id</code>. At query time (e.g. <code>flux trace</code>) the Data Engine reads all spans for that <code>request_id</code> and assembles them into the tree using parent span IDs.</p>
+<p>Each component — server, runtime — emits spans independently and writes them to the <code>execution_spans</code> table keyed by <code>request_id</code>. At query time (e.g. <code>flux trace</code>) the server reads all spans for that <code>request_id</code> and assembles them into the tree using parent span IDs.</p>
 
 <pre><code>Client
-  → Gateway          emits: root span + sub-spans
-  → Runtime          emits: function span + tool-call spans
-  → Data Engine      emits: db query spans + mutation records
+  → Server           emits: root span + sub-spans
+  → Runtime          emits: function span + tool-call spans + db queries
+  → Postgres         mutation records generated
   → Response         span tree assembled and stored atomically
 
 request_id: 550e8400

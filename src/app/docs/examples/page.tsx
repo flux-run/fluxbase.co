@@ -52,7 +52,7 @@ export default function Page() {
 
 <pre><code>$ flux trace debug 7c8d9e0f
 
-  Step 1/3  gateway
+  Step 1/3  server
     Input:   POST /stripe_webhook
     Output:  { tenant_id: 't_123', event_type: 'payment_intent.succeeded' }
     Time:    2ms

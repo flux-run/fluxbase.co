@@ -20,7 +20,7 @@ export default function Page() {
 </div>
 
 <h2>Distributed traces</h2>
-<p>Every request gets a unique <code>x-request-id</code> that is propagated across the gateway, runtime, and data-engine. All spans for a request are correlated under this ID.</p>
+<p>Every request gets a unique <code>x-request-id</code> that is propagated across the server, runtime, and postgres. All spans for a request are correlated under this ID.</p>
 
 <p>View a trace in your terminal:</p>
 <pre><code><span class="shell-prompt">$</span> flux trace &lt;trace-id&gt;
@@ -52,7 +52,7 @@ export default function Page() {
   <tbody>
     <tr><td><code>function</code></td><td>Total function execution time</td></tr>
     <tr><td><code>db:query</code></td><td>Individual database queries — table, operation, duration, cache status</td></tr>
-    <tr><td><code>gateway</code></td><td>Auth, routing, rate-limit checks</td></tr>
+    <tr><td><code>server</code></td><td>Auth, routing, rate-limit checks</td></tr>
   </tbody>
 </table>
 

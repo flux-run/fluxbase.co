@@ -31,11 +31,11 @@ export default function HomePage() {
           mutations, traces, timing. When something breaks, you don&apos;t grep logs. You run <code>flux why</code>.
         </p>
         <p style={{ maxWidth: 520, margin: '0 auto 36px', fontSize: '.9rem', color: 'var(--mg-muted)' }}>
-          One binary. One port. One Postgres database. <strong style={{ color: 'var(--mg-text)' }}>No cloud account required.</strong>
+          Stand-alone Rust binaries. One Postgres database. <strong style={{ color: 'var(--mg-text)' }}>No cloud account required.</strong>
         </p>
         <div style={{ maxWidth: 660, margin: '0 auto 40px' }}>
           <CodeWindow label="from zero to debugging in 60 seconds">{
-            `<span style="color:var(--mg-green);">$</span> flux init my-app && cd my-app\n<span style="color:var(--mg-green);">$</span> flux dev\n\n  <span style="color:var(--mg-green);">✔</span> Postgres started at .flux/pgdata/\n  <span style="color:var(--mg-green);">✔</span> Flux running at <span style="color:var(--mg-accent);">http://localhost:4000</span>\n\n<span style="color:var(--mg-green);">$</span> curl -X POST localhost:4000/hello -d '{"name":"world"}'\n  <span style="color:var(--mg-muted);">→ {"message":"hello world"}  req:4f9a3b2c</span>\n\n<span style="color:var(--mg-green);">$</span> flux trace <span style="color:var(--mg-accent);">4f9a3b2c</span>\n\n  <span style="color:#f9a8d4;">gateway.route_match</span>          <span style="color:var(--mg-yellow);">+0ms</span>\n  <span style="color:#c4b5fd;">runtime.execution</span>            <span style="color:var(--mg-yellow);">+2ms</span>\n    <span style="color:#60a5fa;">db.query.users</span>             <span style="color:var(--mg-yellow);">+4ms</span>  <span style="color:var(--mg-muted);">(before/after captured)</span>\n  <span style="color:var(--mg-green);">✔</span> 200 OK                       <span style="color:var(--mg-yellow);">12ms total</span>`
+            `<span style="color:var(--mg-green);">$</span> flux init my-app && cd my-app\n<span style="color:var(--mg-green);">$</span> flux dev\n\n  <span style="color:var(--mg-green);">✔</span> Postgres started at .flux/pgdata/\n  <span style="color:var(--mg-green);">✔</span> Flux running at <span style="color:var(--mg-accent);">http://localhost:4000</span>\n\n<span style="color:var(--mg-green);">$</span> curl -X POST localhost:4000/hello -d '{"name":"world"}'\n  <span style="color:var(--mg-muted);">→ {"message":"hello world"}  req:4f9a3b2c</span>\n\n<span style="color:var(--mg-green);">$</span> flux trace <span style="color:var(--mg-accent);">4f9a3b2c</span>\n\n  <span style="color:#f9a8d4;">server.route_match</span>          <span style="color:var(--mg-yellow);">+0ms</span>\n  <span style="color:#c4b5fd;">runtime.execution</span>            <span style="color:var(--mg-yellow);">+2ms</span>\n    <span style="color:#60a5fa;">db.query.users</span>             <span style="color:var(--mg-yellow);">+4ms</span>  <span style="color:var(--mg-muted);">(before/after captured)</span>\n  <span style="color:var(--mg-green);">✔</span> 200 OK                       <span style="color:var(--mg-yellow);">12ms total</span>`
           }</CodeWindow>
         </div>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 28 }}>
@@ -157,7 +157,7 @@ export default function HomePage() {
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginBottom: 40 }}>
             {[
-              { impossible: 'Record DB mutations in the same transaction', why: 'An SDK sits outside the database driver. Flux\'s data engine wraps the query — mutation logging happens inside the same Postgres transaction as your write. Zero extra round-trips.' },
+              { impossible: 'Record DB mutations in the same transaction', why: 'An SDK sits outside the database driver. Flux\'s server wraps the query — mutation logging happens inside the same Postgres transaction as your write. Zero extra round-trips.' },
               { impossible: 'Replay production traffic safely', why: 'Replay requires controlling side-effects (email, webhooks, Stripe). Only a runtime can intercept outbound calls and disable them during replay.' },
               { impossible: 'Link every span to the exact code version', why: 'Flux knows which code SHA is running because it deployed it. An SDK sees function names, not deploy history.' },
               { impossible: 'Bisect across git history', why: 'flux bug bisect replays a request against each commit. This requires the runtime to re-deploy and re-execute — an SDK can\'t do that.' },
@@ -209,7 +209,7 @@ export default function HomePage() {
               </p>
             </div>
             <div>
-              <CodeWindow label="what Flux records automatically">{`<span style="color:#f8f8f2;">ExecutionRecord</span> <span style="color:var(--mg-accent);">req:a3f9d2b1</span>\n\n  <span style="color:#f8f8f2;">function</span>    create_user\n  <span style="color:#f8f8f2;">input</span>       { name: "Alice", email: "alice@..." }\n  <span style="color:#f8f8f2;">output</span>      { id: "usr_7f3a" }\n  <span style="color:#f8f8f2;">duration</span>    22ms\n  <span style="color:#f8f8f2;">code_sha</span>    <span style="color:var(--mg-muted);">a1b2c3d</span>\n\n  <span style="color:#60a5fa;">spans</span>\n    gateway.route_match         +0ms\n    runtime.execution           +2ms\n    db.insert(users)            +4ms  <span style="color:var(--mg-green);">✔</span>\n    queue.push(send_welcome)    +12ms <span style="color:var(--mg-green);">✔</span>\n\n  <span style="color:#60a5fa;">db_mutations</span>\n    users INSERT  id=usr_7f3a\n      before: <span style="color:var(--mg-muted);">null</span>\n      after:  { name: "Alice", email: "alice@..." }`}</CodeWindow>
+              <CodeWindow label="what Flux records automatically">{`<span style="color:#f8f8f2;">ExecutionRecord</span> <span style="color:var(--mg-accent);">req:a3f9d2b1</span>\n\n  <span style="color:#f8f8f2;">function</span>    create_user\n  <span style="color:#f8f8f2;">input</span>       { name: "Alice", email: "alice@..." }\n  <span style="color:#f8f8f2;">output</span>      { id: "usr_7f3a" }\n  <span style="color:#f8f8f2;">duration</span>    22ms\n  <span style="color:#f8f8f2;">code_sha</span>    <span style="color:var(--mg-muted);">a1b2c3d</span>\n\n  <span style="color:#60a5fa;">spans</span>\n    server.route_match         +0ms\n    runtime.execution           +2ms\n    db.insert(users)            +4ms  <span style="color:var(--mg-green);">✔</span>\n    queue.push(send_welcome)    +12ms <span style="color:var(--mg-green);">✔</span>\n\n  <span style="color:#60a5fa;">db_mutations</span>\n    users INSERT  id=usr_7f3a\n      before: <span style="color:var(--mg-muted);">null</span>\n      after:  { name: "Alice", email: "alice@..." }`}</CodeWindow>
             </div>
           </div>
         </div>
@@ -253,18 +253,16 @@ export default function HomePage() {
       <section style={section('var(--mg-bg-surface)')}>
         <div style={inner}>
           <span className="section-label">Architecture</span>
-          <h2 className="section-h2">One binary. Five modules. Zero config.</h2>
+          <h2 className="section-h2">Three binaries. Zero operational complexity.</h2>
           <p style={{ ...muted, fontSize: '.95rem', maxWidth: 560, margin: '0 0 40px' }}>
-            Flux compiles to a single Rust binary. All modules run in-process on one port. Postgres holds all state. Scale horizontally by adding copies behind a load balancer.
+            Flux runs as three independent, highly-optimized Rust binaries. Postgres holds all state. Scale horizontally by adding copies behind a load balancer.
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 48, alignItems: 'center' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {[
-                { label: 'Gateway', desc: 'routing, rate limiting, auth, CORS' },
-                { label: 'Runtime', desc: 'Deno V8 + Wasmtime execution, secrets' },
-                { label: 'API', desc: 'function registry, logs, schema' },
-                { label: 'Data Engine', desc: 'DB queries, mutation recording, cron' },
-                { label: 'Queue', desc: 'async jobs, retries, dead-letter' },
+                { label: 'CLI', desc: 'developer debugging tools and deploy commands' },
+                { label: 'Server', desc: 'gRPC server, execution store, async jobs' },
+                { label: 'Runtime', desc: 'Deno V8 execution, Postgres queries, isolated state' },
               ].map(({ label, desc }) => (
                 <div key={label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', border: '1px solid var(--mg-border)', borderRadius: 8, background: 'var(--mg-bg-surface)' }}>
                   <span style={{ fontSize: '.9rem', fontWeight: 600 }}>{label}</span>
@@ -272,11 +270,11 @@ export default function HomePage() {
                 </div>
               ))}
               <div style={{ textAlign: 'center', padding: '10px', fontSize: '.8rem', color: 'var(--mg-muted)' }}>
-                ↓ all in-process, one port (:4000) ↓
+                ↓ backed by a single source of truth ↓
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', border: '1px solid var(--mg-accent)', borderRadius: 8, background: 'var(--mg-accent-dim)' }}>
                 <span style={{ fontSize: '.9rem', fontWeight: 600 }}>PostgreSQL</span>
-                <span style={{ fontSize: '.75rem', color: 'var(--mg-accent)' }}>all state lives here</span>
+                <span style={{ fontSize: '.75rem', color: 'var(--mg-accent)' }}>all database tables and execution state lives here</span>
               </div>
             </div>
             <div>
@@ -299,7 +297,7 @@ export default function HomePage() {
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 40 }}>
             {[
-              { title: 'In-process, not over the network', desc: 'All five modules run in a single process. Span data flows through in-memory channels, not HTTP calls. No serialization overhead between services.' },
+              { title: 'Rust architecture', desc: 'Flux runs across fast, compiled Rust binaries using a shared gRPC boundary.' },
               { title: 'Same-transaction mutation log', desc: 'Mutation records are written inside the same Postgres transaction as your data. One round-trip, not two. No eventual consistency.' },
               { title: 'Append-only writes', desc: 'Spans and mutations are INSERT-only into append-optimized tables. Postgres handles this at wire speed — no read-modify-write, no locking contention.' },
               { title: 'Cranelift AOT for WASM', desc: 'WebAssembly modules are compiled once via Cranelift and cached (LRU, 256 entries). Subsequent calls skip compilation entirely — instantiation takes microseconds.' },
@@ -317,7 +315,7 @@ export default function HomePage() {
             <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 20 }}>
               <div style={{ padding: '16px 20px', border: '1px solid var(--mg-border)', borderRadius: 8, background: 'var(--mg-bg-surface)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
-                  <span style={{ fontSize: '.82rem', fontWeight: 600 }}>Gateway routing</span>
+                  <span style={{ fontSize: '.82rem', fontWeight: 600 }}>Server routing</span>
                   <span style={{ fontSize: '.78rem', fontFamily: 'var(--font-geist-mono,monospace)', color: 'var(--mg-green)' }}>&lt;0.1ms</span>
                 </div>
                 <div style={{ fontSize: '.76rem', color: 'var(--mg-muted)' }}>DB-backed route table + LISTEN/NOTIFY cache invalidation</div>

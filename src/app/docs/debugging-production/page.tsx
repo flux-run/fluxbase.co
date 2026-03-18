@@ -160,7 +160,7 @@ export default function Page() {
   </div>
   <pre id="cw-14" style="margin:0;padding:24px 28px;font-family:var(--font-mono);font-size:.82rem;line-height:1.85;overflow-x:auto;white-space:pre-wrap;word-break:break-word;"><code><span style="color:var(--green);">$</span> flux trace debug <span style="color:var(--accent);">550e8400</span>
 
-  <span style="color:#f8f8f2;">Span 1/5</span>  <span style="color:#f9a8d4;">gateway</span>             <span style="color:var(--yellow);">2ms</span>
+  <span style="color:#f8f8f2;">Span 1/5</span>  <span style="color:#f9a8d4;">server</span>             <span style="color:var(--yellow);">2ms</span>
   in  : <span style="color:var(--muted);">POST /signup  {email, plan}</span>
   out : <span style="color:var(--muted);">→ runtime  request_id=550e8400</span>
 
