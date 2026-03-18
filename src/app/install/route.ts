@@ -65,8 +65,9 @@ echo ""
 echo "✓ flux \${TAG} installed to \${INSTALL_DIR}/\${BIN_NAME}"
 echo ""
 echo "Get started:"
-echo "  flux init my-app"
-echo "  cd my-app && flux dev"
+echo "  mkdir my-app && cd my-app"
+echo "  flux init"
+echo "  flux dev"
 `;
 
 export async function GET(request: Request) {

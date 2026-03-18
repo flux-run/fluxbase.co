@@ -37,8 +37,9 @@ const installCode = `<span style="color:var(--mg-green);">$</span> curl -fsSL ht
   <span style="color:var(--mg-green);">$</span> flux --version
   flux 1.0.0
 
-  <span style="color:var(--mg-green);">$</span> flux init my-app && cd my-app
-  <span style="color:var(--mg-green);">✔</span>  Created project at ./my-app`
+  <span style="color:var(--mg-green);">$</span> mkdir my-app && cd my-app
+  <span style="color:var(--mg-green);">$</span> flux init
+  <span style="color:var(--mg-green);">✔</span>  Created project at .`
 
 const deployCode = `<span style="color:var(--mg-green);">$</span> flux deploy
 

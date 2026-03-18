@@ -55,8 +55,9 @@ Write-Host ""
 Write-Host "v flux $Tag installed to $Dest"
 Write-Host ""
 Write-Host "Get started:"
-Write-Host "  flux init my-app"
-Write-Host "  cd my-app; flux dev"
+Write-Host "  mkdir my-app; cd my-app"
+Write-Host "  flux init"
+Write-Host "  flux dev"
 `;
 
 export async function GET(request: Request) {
