@@ -38,7 +38,7 @@ export default function HowItWorksPage() {
       <section style={{ borderTop: '1px solid var(--mg-border)', padding: '36px 0', background: 'var(--mg-bg-elevated)' }}>
         <div style={{ maxWidth: 760, margin: '0 auto', padding: '0 24px', display: 'flex', gap: 32, flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'center' }}>
           {[
-            { n: '1', text: 'Flux runs your code — TypeScript on Deno V8, or Rust/Go/Java/Python/PHP/AssemblyScript via Wasmtime.' },
+            { n: '1', text: 'Flux runs your code — TypeScript and JavaScript automatically run on isolated Deno V8 environments.' },
             { n: '2', text: 'While it runs, every request’s spans, mutations, and inputs are recorded automatically.' },
             { n: '3', text: 'Later, inspect, replay against new code, or diff against any other request.' },
           ].map(({ n, text }) => (
@@ -98,7 +98,7 @@ export default function HowItWorksPage() {
               },
               {
                 n: 2, title: 'Function execution', label: 'runtime → spans',
-                desc: 'The Runtime receives the request with the propagated request ID. It executes your function — TypeScript in a Deno V8 isolate, or compiled WebAssembly via Wasmtime. Both runtimes share the same host API. Every ctx.db, ctx.queue, and ctx.fetch call is intercepted and recorded as a child span.',
+                desc: 'The Runtime receives the request with the propagated request ID. It executes your function as TypeScript/JavaScript in a pre-warmed Deno V8 isolate. Every ctx.db, ctx.queue, and ctx.fetch call is intercepted and recorded as a child span.',
                 code: `<span style="color:var(--mg-muted);"># Runtime emits per call:</span>\n{\n  request_id: <span style="color:var(--mg-accent);">"4f9a3b2c"</span>,\n  span: <span style="color:var(--mg-green);">"create_user"</span>,\n  children: [\n    { span: <span style="color:#60a5fa;">"db:select(users)"</span>, <span style="color:var(--mg-yellow);">11ms</span> },\n    { span: <span style="color:#60a5fa;">"db:insert(users)"</span>, <span style="color:var(--mg-yellow);">14ms</span> }\n  ],\n  duration_ms: 81\n}`,
               },
               {

@@ -85,7 +85,7 @@ export default function HomePage() {
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginTop: 8 }}>
             {[
-              { icon: '⚡', label: 'Functions', hint: 'TypeScript via Deno V8. Rust, Go, Java, Python, PHP, AssemblyScript via WebAssembly (Wasmtime).' },
+              { icon: '⚡', label: 'Functions', hint: 'TypeScript and JavaScript via Deno V8.' },
               { icon: '🗄️', label: 'Database', hint: 'Postgres with typed access via ctx.db. Every write recorded.' },
               { icon: '📬', label: 'Queue', hint: 'Async jobs with retries, delay, dead-letter. Built in.' },
               { icon: '⏰', label: 'Cron', hint: 'Schedule directly on a function. One line of config.' },
@@ -215,40 +215,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Multi-Language ─────────────────────────────────── */}
-      <section style={section()}>
-        <div style={inner}>
-          <span className="section-label">Write in Any Language</span>
-          <h2 className="section-h2">TypeScript by default. Any language via WebAssembly.</h2>
-          <p style={{ ...muted, fontSize: '.95rem', maxWidth: 600, margin: '0 0 40px' }}>
-            Write functions in TypeScript and they run on Deno V8. Need raw performance or a different language? Compile to WebAssembly and Flux runs it on Wasmtime — same tracing, same ctx API, same execution records.
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 12, marginBottom: 40 }}>
-            {[
-              { lang: 'TypeScript', runtime: 'Deno V8', color: '#3178c6' },
-              { lang: 'AssemblyScript', runtime: 'Wasmtime', color: '#007acc' },
-              { lang: 'Rust', runtime: 'Wasmtime', color: '#dea584' },
-              { lang: 'Java', runtime: 'TeaVM → Wasm', color: '#f89820' },
-              { lang: 'Go', runtime: 'wasip1', color: '#00ADD8' },
-              { lang: 'PHP', runtime: 'php-8.2-wasm', color: '#8892be' },
-              { lang: 'Python', runtime: 'py2wasm', color: '#3776ab' },
-            ].map(({ lang, runtime, color }) => (
-              <div key={lang} style={{ textAlign: 'center', padding: '20px 12px', border: '1px solid var(--mg-border)', borderRadius: 10, background: 'var(--mg-bg-surface)' }}>
-                <div style={{ fontSize: '1rem', fontWeight: 700, color, marginBottom: 4 }}>{lang}</div>
-                <div style={{ fontSize: '.7rem', color: 'var(--mg-muted)' }}>{runtime}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-            <CodeWindow label="functions/hello/flux.json (TypeScript)">{`{\n  "name": "hello",\n  "runtime": "deno"\n}\n\n<span style="color:var(--mg-muted);">// Drop index.ts \u2014 runs on V8 automatically</span>`}</CodeWindow>
-            <CodeWindow label="functions/process/flux.json (Rust \u2192 Wasm)">{`{\n  "name": "process_image",\n  "runtime": "wasm",\n  "entry": "handler.wasm",\n  "build": "cargo build --target wasm32-wasip1\\n     --release && cp target/.../process.wasm\\n     handler.wasm",\n  "memory_mb": 64\n}\n\n<span style="color:var(--mg-muted);">// Same ctx.db, ctx.queue, ctx.fetch</span>\n<span style="color:var(--mg-muted);">// Same execution recording</span>`}</CodeWindow>
-          </div>
-          <p style={{ fontSize: '.82rem', color: 'var(--mg-muted)', marginTop: 20, textAlign: 'center' }}>
-            Both runtimes share the same host API. Execution records, spans, and debugging commands work identically regardless of language.
-          </p>
-        </div>
-      </section>
-
       {/* ── Architecture ───────────────────────────────────── */}
       <section style={section('var(--mg-bg-surface)')}>
         <div style={inner}>
@@ -300,7 +266,6 @@ export default function HomePage() {
               { title: 'Rust architecture', desc: 'Flux runs across fast, compiled Rust binaries using a shared gRPC boundary.' },
               { title: 'Same-transaction mutation log', desc: 'Mutation records are written inside the same Postgres transaction as your data. One round-trip, not two. No eventual consistency.' },
               { title: 'Append-only writes', desc: 'Spans and mutations are INSERT-only into append-optimized tables. Postgres handles this at wire speed — no read-modify-write, no locking contention.' },
-              { title: 'Cranelift AOT for WASM', desc: 'WebAssembly modules are compiled once via Cranelift and cached (LRU, 256 entries). Subsequent calls skip compilation entirely — instantiation takes microseconds.' },
               { title: 'Warm V8 isolates', desc: 'TypeScript functions run in pre-warmed Deno V8 isolates. Cold start only happens on first invocation after deploy. Subsequent calls reuse the warm isolate.' },
               { title: 'Configurable retention', desc: 'Execution records are auto-pruned after TRACE_RETENTION_DAYS (default 30). Old data is DELETE\'d, not archived. Your database stays lean.' },
             ].map(({ title, desc }) => (
@@ -320,13 +285,7 @@ export default function HomePage() {
                 </div>
                 <div style={{ fontSize: '.76rem', color: 'var(--mg-muted)' }}>DB-backed route table + LISTEN/NOTIFY cache invalidation</div>
               </div>
-              <div style={{ padding: '16px 20px', border: '1px solid var(--mg-border)', borderRadius: 8, background: 'var(--mg-bg-surface)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
-                  <span style={{ fontSize: '.82rem', fontWeight: 600 }}>WASM cold start</span>
-                  <span style={{ fontSize: '.78rem', fontFamily: 'var(--font-geist-mono,monospace)', color: 'var(--mg-yellow)' }}>5–50ms</span>
-                </div>
-                <div style={{ fontSize: '.76rem', color: 'var(--mg-muted)' }}>Cranelift AOT compile (once). Cached after first call. Instantiation: ~10µs.</div>
-              </div>
+
               <div style={{ padding: '16px 20px', border: '1px solid var(--mg-border)', borderRadius: 8, background: 'var(--mg-bg-surface)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
                   <span style={{ fontSize: '.82rem', fontWeight: 600 }}>V8 cold start</span>

@@ -45,7 +45,7 @@ export default function Page() {
   <a href="/docs/functions" style="display:block;padding:20px 24px;border:1px solid var(--border);border-radius:10px;background:var(--bg-surface);color:var(--text);text-decoration:none;" onmouseenter="this.style.borderColor='var(--accent)'" onmouseleave="this.style.borderColor='var(--border)'">
     <div style="font-size:1.2rem;margin-bottom:8px;">⚡</div>
     <div style="font-weight:700;margin-bottom:4px;">Functions</div>
-    <div style="font-size:.85rem;color:var(--muted);">TypeScript or any language via WebAssembly. ctx.db, ctx.queue.</div>
+    <div style="font-size:.85rem;color:var(--muted);">TypeScript or JavaScript via Deno V8 isolates. ctx.db, ctx.queue.</div>
   </a>
   <a href="/docs/database" style="display:block;padding:20px 24px;border:1px solid var(--border);border-radius:10px;background:var(--bg-surface);color:var(--text);text-decoration:none;" onmouseenter="this.style.borderColor='var(--accent)'" onmouseleave="this.style.borderColor='var(--border)'">
     <div style="font-size:1.2rem;margin-bottom:8px;">🗄️</div>
@@ -102,7 +102,7 @@ export default function Page() {
     </tr>
     <tr>
       <td>Runtime</td>
-      <td>Deno V8 + Wasmtime execution, secrets</td>
+      <td>Deno V8 execution, secrets</td>
       <td><a href="/docs/runtime">docs/runtime</a></td>
     </tr>
   </tbody>

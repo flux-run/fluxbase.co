@@ -122,7 +122,7 @@ export default function ProductPage() {
               <span className="section-label">Deterministic Execution</span>
               <h3 style={{ fontSize: '1.4rem', fontWeight: 800, letterSpacing: '-.02em', marginBottom: 12, color: 'var(--mg-text)' }}>Every request is recorded automatically.</h3>
               <p style={{ ...muted, fontSize: '.95rem', lineHeight: 1.7 }}>
-                The Flux runtime captures a complete record of every request as it happens — server auth, function spans, every database query, tool latencies, async job hand-offs. Whether your function runs on Deno V8 (TypeScript) or Wasmtime (Rust, Go, Java, Python, PHP, AssemblyScript) — same recording, same traces.
+                The Flux runtime captures a complete record of every request as it happens — server auth, function spans, every database query, tool latencies, async job hand-offs. Your function runs securely on Deno V8 (TypeScript) with zero-configuration automatic tracing.
               </p>
             </div>
             <CodeWindow label="automatic recording">{`<span style="color:var(--mg-muted);"># Every request produces:</span>\n\n  trace_requests      <span style="color:var(--mg-green);">→</span> span tree (server to db)\n  state_mutations     <span style="color:var(--mg-green);">→</span> every row change + request link\n  execution_spans     <span style="color:var(--mg-green);">→</span> timing, errors, tool calls\n\n<span style="color:var(--mg-muted);"># Nothing to configure. Zero SDK changes.</span>\n<span style="color:var(--mg-muted);"># The runtime records it all.</span>`}</CodeWindow>
@@ -240,7 +240,7 @@ export default function ProductPage() {
               {[
                 { metric: '<0.1ms', label: 'Server routing', detail: 'DB route table cached in memory, invalidated via LISTEN/NOTIFY' },
                 { metric: '<0.4ms', label: 'Recording overhead per request', detail: 'Span creation + mutation log INSERT inside the same transaction' },
-                { metric: '~10µs', label: 'WASM instantiation (cached)', detail: 'Cranelift AOT compiles modules once, LRU cache of 256 entries' },
+
                 { metric: '0ms', label: 'V8 warm start', detail: 'Deno isolates stay warm between requests. Cold start ~5ms on first deploy.' },
               ].map(({ metric, label, detail }) => (
                 <div key={label} style={{ display: 'flex', gap: 16, padding: '14px 18px', border: '1px solid var(--mg-border)', borderRadius: 8, background: 'var(--mg-bg-surface)' }}>
