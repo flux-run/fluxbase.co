@@ -47,6 +47,7 @@ const NAV = [
       { href: '/docs/architecture',         label: 'Architecture'          },
       { href: '/docs/server',               label: 'Server'                },
       { href: '/docs/runtime',              label: 'Runtime'               },
+      { href: '/docs/compatibility',        label: 'Compatibility'         },
       { href: '/docs/secrets',              label: 'Secrets'               },
     ],
   },
