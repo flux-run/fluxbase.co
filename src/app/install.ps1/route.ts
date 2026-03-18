@@ -58,6 +58,20 @@ Write-Host "Get started:"
 Write-Host "  mkdir my-app; cd my-app"
 Write-Host "  flux init"
 Write-Host "  flux dev"
+
+Write-Host ""
+$SetupServer = Read-Host "Would you like to set up a local Flux server using Docker? (y/N)"
+if ($SetupServer -match "^[Yy]$") {
+  Write-Host "Downloading docker-compose.yml..."
+  Invoke-WebRequest -Uri "https://raw.githubusercontent.com/flux-run/flux/main/docker-compose.yml" -OutFile "docker-compose.yml"
+  if (Get-Command docker -ErrorAction SilentlyContinue) {
+    Write-Host "Starting Flux server and Postgres..."
+    Start-Process -NoNewWindow -Wait docker -ArgumentList "compose","up","-d"
+    Write-Host "v Flux server is running in the background!"
+  } else {
+    Write-Host "Docker is not installed. You can start the server later by running 'docker compose up -d' in this directory."
+  }
+}
 `;
 
 export async function GET(request: Request) {

@@ -68,6 +68,32 @@ echo "Get started:"
 echo "  mkdir my-app && cd my-app"
 echo "  flux init"
 echo "  flux dev"
+
+echo ""
+echo -n "Would you like to set up a local Flux server using Docker? (y/N) "
+if [ -t 0 ] || [ -c /dev/tty ]; then
+  exec < /dev/tty || true
+  read -r SETUP_SERVER || true
+fi
+
+if [[ "\${SETUP_SERVER:-}" =~ ^[Yy]$ ]]; then
+  echo "Downloading docker-compose.yml..."
+  if curl -fsSL "https://raw.githubusercontent.com/flux-run/flux/main/docker-compose.yml" -o docker-compose.yml; then
+    if command -v docker >/dev/null 2>&1; then
+      echo "Starting Flux server and Postgres..."
+      if docker compose version >/dev/null 2>&1; then
+        docker compose up -d
+      else
+        docker-compose up -d
+      fi
+      echo "✓ Flux server is running in the background!"
+    else
+      echo "Docker is not installed. You can start the server later by running 'docker compose up -d' in this directory."
+    fi
+  else
+    echo "Failed to download docker-compose.yml"
+  fi
+fi
 `;
 
 export async function GET(request: Request) {

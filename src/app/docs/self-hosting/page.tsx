@@ -39,7 +39,7 @@ export default function Page() {
 
 <h3>1. Download the compose file</h3>
 
-<pre><code><span class="shell-prompt">$</span> curl -fsSL https://flux.sh/docker-compose.yml -o docker-compose.yml</code></pre>
+<pre><code><span class="shell-prompt">$</span> curl -fsSL https://raw.githubusercontent.com/flux-run/flux/main/docker-compose.yml -o docker-compose.yml</code></pre>
 
 <h3>2. Start everything</h3>
 
