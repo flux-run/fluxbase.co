@@ -72,8 +72,7 @@ echo "  flux dev"
 echo ""
 echo -n "Would you like to set up a local Flux server using Docker? (y/N) "
 if [ -t 0 ] || [ -c /dev/tty ]; then
-  exec < /dev/tty || true
-  read -r SETUP_SERVER || true
+  read -r SETUP_SERVER </dev/tty || true
 fi
 
 if [[ "\${SETUP_SERVER:-}" =~ ^[Yy]$ ]]; then
