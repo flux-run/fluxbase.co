@@ -5,8 +5,8 @@ import { CodeWindow } from '@/components/marketing/CodeWindow'
 import { WaitlistForm } from '@/components/marketing/WaitlistForm'
 
 export const metadata: Metadata = {
-  title: 'Flux — Reproduce Any Production Bug in One Command',
-  description: 'Flux is an open-source backend runtime that records every execution automatically. Replay production traffic, diff two requests, root-cause any failure. One binary, one command: flux why.',
+  title: 'Flux — Deterministic Replay for Backend Systems · Public Beta',
+  description: 'Flux records every backend request and replays it deterministically. Debug production bugs in one command: flux why. Open-source, self-hosted, Postgres-backed. Public beta available now.',
 }
 
 const inner: React.CSSProperties = { maxWidth: 1040, margin: '0 auto', padding: '0 24px' }
@@ -21,7 +21,7 @@ export default function HomePage() {
     <MarketingLayout>
       {/* ── Hero ─────────────────────────────────────────────── */}
       <section className="hero" style={{ paddingBottom: 60 }}>
-        <span className="eyebrow">Open Source · Self-Hosted · Postgres</span>
+        <span className="eyebrow">Open Source · <strong style={{ color: 'var(--mg-accent)' }}>Public Beta</strong> · Self-Hosted · Postgres</span>
         <h1>
           Reproduce any production bug<br />
           <span className="gradient-text">in one command.</span>
@@ -354,33 +354,54 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Early Access / Waitlist ─────────────────────────── */}
-      <section id="waitlist" style={section()}>
+      {/* ── Public Beta CTA ──────────────────────────────────────── */}
+      <section id="beta" style={section()}>
         <div style={inner}>
-          <span className="section-label">Early Access</span>
-          <h2 className="section-h2">Get notified when stable v1 ships.</h2>
-          <p style={{ ...muted, fontSize: '.95rem', maxWidth: 560, margin: '0 0 10px' }}>
-            The CLI and runtime are in active development. Join the waitlist — we&apos;ll send one email when the stable release is ready.
+          <span className="section-label">Public Beta</span>
+          <h2 className="section-h2">Flux is now in public beta. Start today.</h2>
+          <p style={{ ...muted, fontSize: '.95rem', maxWidth: 600, margin: '0 0 32px' }}>
+            The execution model is stable. The contract test suite passes. The guarantees hold.
+            We&apos;re ready for real backends.
           </p>
-          <div style={{ display: 'flex', gap: 40, alignItems: 'flex-start', flexWrap: 'wrap', marginTop: 32 }}>
-            <div style={{ flex: '1 1 300px' }}>
-              <WaitlistForm source="homepage" />
+
+          {/* Install */}
+          <div style={{ marginBottom: 40 }}>
+            <div style={{ fontSize: '.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--mg-muted)', marginBottom: 12 }}>Install</div>
+            <div className="install-hint" style={{ marginTop: 0 }}>
+              <span className="prompt">$</span>
+              curl -fsSL https://fluxbase.co/install | bash
             </div>
-            <div style={{ flex: '1 1 260px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {[
-                { icon: '⚡', label: 'Alpha CLI available now', hint: 'Install and experiment today — flux init, flux dev, flux deploy all work.' },
-                { icon: '🔒', label: 'Stable release coming', hint: 'Full flux.toml hot-reload, production hardening, and signed binaries.' },
-                { icon: '📣', label: 'One email, no spam', hint: "We'll notify you when it's ready. That's it." },
-              ].map(({ icon, label, hint }) => (
-                <div key={label} style={{ display: 'flex', gap: 12, fontSize: '.85rem' }}>
-                  <span style={{ fontSize: '1rem', flexShrink: 0, marginTop: 1 }}>{icon}</span>
-                  <div>
-                    <span style={{ fontWeight: 600, color: 'var(--mg-text)' }}>{label}</span>
-                    <span style={{ color: 'var(--mg-muted)' }}> — {hint}</span>
-                  </div>
+          </div>
+
+          {/* Golden Path */}
+          <div style={{ marginBottom: 40 }}>
+            <div style={{ fontSize: '.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--mg-muted)', marginBottom: 12 }}>The safe stack &mdash; fully tested, fully replay-safe</div>
+            <div style={{ background: 'var(--mg-bg-elevated)', border: '1px solid var(--mg-border)', borderRadius: 10, padding: '20px 24px', fontFamily: 'var(--font-geist-mono, monospace)', fontSize: '.82rem', lineHeight: 2, color: 'var(--mg-muted)' }}>
+              <div><span style={{ color: 'var(--mg-muted)' }}>import</span> {'{ Hono }'} <span style={{ color: 'var(--mg-muted)' }}>from</span> <span style={{ color: 'var(--mg-green)' }}>&quot;npm:hono&quot;</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style={{ color: 'rgba(255,255,255,.25)' }}>// ✅ router</span></div>
+              <div><span style={{ color: 'var(--mg-muted)' }}>import</span> pg <span style={{ color: 'var(--mg-muted)' }}>from</span> <span style={{ color: 'var(--mg-accent)' }}>&quot;flux:pg&quot;</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style={{ color: 'rgba(255,255,255,.25)' }}>// ✅ postgres — Flux-native</span></div>
+              <div><span style={{ color: 'var(--mg-muted)' }}>import</span> {'{ createClient }'} <span style={{ color: 'var(--mg-muted)' }}>from</span> <span style={{ color: 'var(--mg-accent)' }}>&quot;flux:redis&quot;</span>&nbsp;&nbsp;<span style={{ color: 'rgba(255,255,255,.25)' }}>// ✅ redis — Flux-native</span></div>
+              <div><span style={{ color: 'var(--mg-muted)' }}>import</span> {'{ z }'} <span style={{ color: 'var(--mg-muted)' }}>from</span> <span style={{ color: 'var(--mg-green)' }}>&quot;npm:zod&quot;</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style={{ color: 'rgba(255,255,255,.25)' }}>// ✅ validation</span></div>
+              <div><span style={{ color: 'var(--mg-muted)' }}>import</span> * as jose <span style={{ color: 'var(--mg-muted)' }}>from</span> <span style={{ color: 'var(--mg-green)' }}>&quot;npm:jose&quot;</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style={{ color: 'rgba(255,255,255,.25)' }}>// ✅ JWT / crypto</span></div>
+              <div style={{ marginTop: 4, color: 'rgba(255,255,255,.25)' }}>{'// fetch() and crypto.subtle are globally available'}</div>
+            </div>
+          </div>
+
+          {/* What beta means */}
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            {[
+              { icon: '✅', label: 'Contract suite passes', hint: 'All 6 execution laws verified on every release.' },
+              { icon: '✅', label: 'Guarantees documented', hint: 'GUARANTEES.md maps every test to the law it proves.' },
+              { icon: '⚠️', label: 'Golden path only', hint: 'Start with Hono + fetch + pg + zod + jose. Extensions may have caveats.' },
+              { icon: '⚠️', label: 'Infra-aware devs first', hint: 'Backend engineers who understand execution tradeoffs.' },
+            ].map(({ icon, label, hint }) => (
+              <div key={label} style={{ flex: '1 1 220px', display: 'flex', gap: 12, padding: '16px 18px', border: '1px solid var(--mg-border)', borderRadius: 10, background: 'var(--mg-bg-surface)', fontSize: '.83rem' }}>
+                <span style={{ flexShrink: 0 }}>{icon}</span>
+                <div>
+                  <div style={{ fontWeight: 700, marginBottom: 2, color: 'var(--mg-text)' }}>{label}</div>
+                  <div style={{ color: 'var(--mg-muted)', lineHeight: 1.5 }}>{hint}</div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
