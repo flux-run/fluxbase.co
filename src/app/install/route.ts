@@ -32,14 +32,12 @@ case "$ARCH" in
     ;;
 esac
 
-ASSET="\${BIN_NAME}-\${OS_LABEL}-\${ARCH_LABEL}"
-
 # ── Resolve latest release tag ─────────────────────────────────────────────
 echo "Fetching latest flux release..."
-API_RESPONSE="$(curl -sSL "https://api.github.com/repos/\${REPO}/releases/latest")"
-TAG="$(echo "\$API_RESPONSE" | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": "\\(.*\\)".*/\\1/')"
+API_RESPONSE="\$(curl -sSL "https://api.github.com/repos/\${REPO}/releases/latest")"
+TAG="\$(echo "\$API_RESPONSE" | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": "\\(.*\\)".*/\\1/')"
 
-if [ -z "$TAG" ]; then
+if [ -z "\$TAG" ]; then
   echo "" >&2
   echo "Error: no published release found for \${REPO}." >&2
   echo "Check https://github.com/\${REPO}/releases or try again shortly." >&2
@@ -48,21 +46,37 @@ fi
 
 echo "Installing flux \${TAG} (\${OS_LABEL}/\${ARCH_LABEL})..."
 
-# ── Download ───────────────────────────────────────────────────────────────
+# ── Download and Install Flux CLI ──────────────────────────────────────────
+ASSET="flux-\${OS_LABEL}-\${ARCH_LABEL}"
 URL="https://github.com/\${REPO}/releases/download/\${TAG}/\${ASSET}"
-TMP="$(mktemp)"
+TMP="\$(mktemp)"
 curl -fsSL "\$URL" -o "\$TMP"
 chmod +x "\$TMP"
 
-# ── Install ────────────────────────────────────────────────────────────────
 if [ -w "\$INSTALL_DIR" ]; then
   mv "\$TMP" "\${INSTALL_DIR}/\${BIN_NAME}"
 else
   sudo mv "\$TMP" "\${INSTALL_DIR}/\${BIN_NAME}"
 fi
 
+# ── Download and Install Flux Runtime ──────────────────────────────────────
+RUNTIME_ASSET="flux-runtime-\${OS_LABEL}-\${ARCH_LABEL}"
+RUNTIME_URL="https://github.com/\${REPO}/releases/download/\${TAG}/\${RUNTIME_ASSET}"
+RUNTIME_TMP="\$(mktemp)"
+if curl -fsSL "\$RUNTIME_URL" -o "\$RUNTIME_TMP"; then
+  chmod +x "\$RUNTIME_TMP"
+  if [ -w "\$INSTALL_DIR" ]; then
+    mv "\$RUNTIME_TMP" "\${INSTALL_DIR}/flux-runtime"
+  else
+    sudo mv "\$RUNTIME_TMP" "\${INSTALL_DIR}/flux-runtime"
+  fi
+else
+  echo "Warning: failed to download flux-runtime asset."
+fi
+
 echo ""
 echo "✓ flux \${TAG} installed to \${INSTALL_DIR}/\${BIN_NAME}"
+echo "✓ flux-runtime installed to \${INSTALL_DIR}/flux-runtime"
 echo ""
 echo "Get started:"
 echo "  mkdir my-app && cd my-app"
@@ -85,6 +99,19 @@ if [[ "\${SETUP_SERVER:-}" =~ ^[Yy]$ ]]; then
       else
         docker-compose up -d
       fi
+      
+      echo "Configuring local authentication..."
+      mkdir -p "\$HOME/.flux"
+      if [ ! -f "\$HOME/.flux/config.toml" ]; then
+        cat > "\$HOME/.flux/config.toml" <<EOF
+url = "http://localhost:4000"
+token = "local-development-token"
+EOF
+        echo "✓ CLI authenticated to local server!"
+      else
+        echo "Note: ~/.flux/config.toml already exists. Skipping auto-authentication."
+      fi
+      
       echo "✓ Flux server is running in the background!"
     else
       echo "Docker is not installed. You can start the server later by running 'docker compose up -d' in this directory."
