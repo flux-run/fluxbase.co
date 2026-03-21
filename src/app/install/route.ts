@@ -104,7 +104,7 @@ if [[ "\${SETUP_SERVER:-}" =~ ^[Yy]$ ]]; then
       mkdir -p "\$HOME/.flux"
       if [ ! -f "\$HOME/.flux/config.toml" ]; then
         cat > "\$HOME/.flux/config.toml" <<EOF
-url = "http://localhost:4000"
+url = "http://localhost:50051"
 token = "local-development-token"
 EOF
         echo "✓ CLI authenticated to local server!"
