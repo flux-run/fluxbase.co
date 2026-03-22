@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { FluxIcon, FluxWordmark } from '@/components/FluxLogo'
 import { useLatestVersion } from '@/lib/use-latest-version'
 
 function GitHubStarButton() {
@@ -21,7 +20,7 @@ function GitHubStarButton() {
   }, [])
 
   return (
-    <div style={{ display: 'flex', alignItems: 'stretch', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--mg-border)', fontSize: '.8rem', fontWeight: 500 }}>
+    <div className="nav-github" style={{ display: 'flex', alignItems: 'stretch', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--mg-border)', fontSize: '.8rem', fontWeight: 500 }}>
       <Link
         href="https://github.com/flux-run/flux"
         target="_blank"
@@ -63,9 +62,9 @@ function GitHubStarButton() {
 }
 
 const links = [
-  { href: '/docs',          label: 'Docs'          },
-  { href: '/docs/cli',      label: 'CLI Reference'  },
-  { href: '/docs/quickstart', label: 'Quickstart'   },
+  { href: '/docs',            label: 'Docs'          },
+  { href: '/docs/cli',        label: 'CLI Reference'  },
+  { href: '/docs/quickstart', label: 'Quickstart'     },
 ]
 
 export function NavBar() {
@@ -85,11 +84,13 @@ export function NavBar() {
       <Link href="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
         <span style={{ fontWeight: 700, fontSize: '1.1rem', letterSpacing: '-0.02em', color: '#fff' }}>flux</span>
       </Link>
+
       {version && (
         <Link
           href="https://github.com/flux-run/flux/releases/latest"
           target="_blank"
           rel="noopener noreferrer"
+          className="nav-version"
           style={{
             fontSize: '.7rem', fontWeight: 600,
             padding: '2px 7px', borderRadius: 99,
@@ -105,7 +106,8 @@ export function NavBar() {
         </Link>
       )}
 
-      <div style={{ display: 'flex', gap: 24 }}>
+      {/* Nav links — hidden on mobile via CSS */}
+      <div className="nav-links" style={{ display: 'flex', gap: 24 }}>
         {links.map(({ href, label }) => (
           <Link key={href} href={href} style={{
             color: pathname === href || (href !== '/' && pathname?.startsWith(href))
@@ -120,17 +122,18 @@ export function NavBar() {
         ))}
       </div>
 
-      <div style={{ marginLeft: 'auto' }}>
+      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
         <GitHubStarButton />
+        <Link href="/docs/quickstart" style={{
+          background: '#fff',
+          color: '#000', fontSize: '.82rem', fontWeight: 600,
+          padding: '7px 16px', borderRadius: 6,
+          textDecoration: 'none',
+          whiteSpace: 'nowrap',
+        }}>
+          Get Started →
+        </Link>
       </div>
-      <Link href="/docs/quickstart" style={{
-        background: '#fff',
-        color: '#000', fontSize: '.82rem', fontWeight: 600,
-        padding: '7px 16px', borderRadius: 6,
-        textDecoration: 'none',
-      }}>
-        Get Started →
-      </Link>
     </nav>
   )
 }

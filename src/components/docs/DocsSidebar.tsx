@@ -28,7 +28,12 @@ const NAV = [
   },
 ]
 
-export function DocsSidebar() {
+interface DocsSidebarProps {
+  isOpen?: boolean
+  onClose?: () => void
+}
+
+export function DocsSidebar({ isOpen, onClose }: DocsSidebarProps) {
   const pathname = usePathname()
   const version = useLatestVersion()
 
@@ -36,18 +41,22 @@ export function DocsSidebar() {
     href === '/docs' ? pathname === '/docs' : pathname === href
 
   return (
-    <nav style={{
-      width: 240,
-      flexShrink: 0,
-      position: 'fixed',
-      top: 56,
-      left: 0,
-      bottom: 0,
-      overflowY: 'auto',
-      padding: '28px 0 48px',
-      borderRight: '1px solid rgba(255,255,255,0.06)',
-      background: '#0a0a0a',
-    }}>
+    <nav
+      className={`docs-sidebar${isOpen ? ' docs-sidebar--open' : ''}`}
+      style={{
+        width: 240,
+        flexShrink: 0,
+        position: 'fixed',
+        top: 56,
+        left: 0,
+        bottom: 0,
+        overflowY: 'auto',
+        padding: '28px 0 48px',
+        borderRight: '1px solid rgba(255,255,255,0.06)',
+        background: '#0a0a0a',
+        zIndex: 40,
+      }}
+    >
       <div style={{ padding: '0 16px', marginBottom: 28 }} title="Search coming soon">
         <div style={{
           display: 'flex', alignItems: 'center', gap: 6,
@@ -87,6 +96,7 @@ export function DocsSidebar() {
             <Link
               key={href}
               href={href}
+              onClick={onClose}
               style={{
                 display: 'block',
                 padding: '5px 8px',

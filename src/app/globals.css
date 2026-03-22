@@ -514,9 +514,73 @@ pre:hover .copy-btn { opacity: 1; }
   display: flex; align-items: center; justify-content: center;
 }
 
-/* Responsive docs layout */
-@media (max-width: 900px) {
-  .docs-sidebar-fixed { display: none; }
-  .docs-main { margin-left: 0 !important; }
+/* ── Docs responsive layout ── */
+
+/* Mobile menu bar (hamburger) — hidden on desktop */
+.docs-mobile-bar {
+  display: none;
+  position: sticky;
+  top: 56px;
+  z-index: 38;
+  background: #0a0a0a;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding: 8px 16px;
 }
 
+/* docs main content */
+.docs-main {
+  flex: 1;
+  margin-left: 240px;
+  padding: 48px 48px 80px;
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  /* Show hamburger bar on mobile */
+  .docs-mobile-bar { display: flex; align-items: center; }
+
+  /* Sidebar slides in from left as a drawer */
+  .docs-sidebar {
+    transform: translateX(-100%);
+    transition: transform .25s ease;
+    box-shadow: none;
+  }
+  .docs-sidebar--open {
+    transform: translateX(0);
+    box-shadow: 4px 0 32px rgba(0,0,0,0.6);
+  }
+
+  /* Main takes full width */
+  .docs-main {
+    margin-left: 0;
+    padding: 24px 20px 60px;
+  }
+
+  /* Tighten docs content on small screens */
+  .docs-content pre {
+    font-size: .78rem;
+    padding: 14px 16px;
+  }
+  .docs-content h1 { font-size: 1.6rem; }
+  .docs-content h2 { font-size: 1.15rem; }
+  .docs-content table { font-size: .78rem; }
+  .docs-content table th,
+  .docs-content table td { padding: 6px 8px; }
+}
+
+@media (min-width: 769px) {
+  /* Desktop — always show sidebar, hide hamburger */
+  .docs-mobile-bar { display: none !important; }
+  .docs-sidebar {
+    transform: translateX(0) !important;
+    transition: none !important;
+  }
+}
+
+/* ── NavBar responsive ── */
+@media (max-width: 768px) {
+  /* Hide nav links, GitHub star, and version badge on mobile */
+  .nav-links  { display: none !important; }
+  .nav-github { display: none !important; }
+  .nav-version { display: none !important; }
+}
