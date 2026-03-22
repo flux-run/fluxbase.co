@@ -2,190 +2,139 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: 'Quickstart — Flux',
-  description: 'Deploy your first Flux function, trigger a request, and debug it end to end with flux why, flux trace, and flux state history. Takes 5 minutes.',
+  description: 'Get Flux running in 5 minutes. Install the CLI, start your app, and debug your first failure with flux why and flux replay.',
 }
 
 export default function Page() {
   return (
-    <div
-      dangerouslySetInnerHTML={{ __html: `<h1>Quickstart</h1>
-<p class="page-subtitle">Deploy a function and debug a production bug in 5 minutes.</p>
+    <div dangerouslySetInnerHTML={{ __html: `
+<h1>Quickstart</h1>
+<p class="page-subtitle">Install Flux and debug your first production failure in 5 minutes.</p>
 
-<div class="callout callout-info">
-  <div class="callout-title">What you'll build</div>
-  A user signup function that writes to Postgres, sends an email, and charges Stripe. You'll introduce a deliberate failure, spot it with <code>flux tail</code>, and root-cause it with <code>flux why</code>.
-</div>
+<h2>1. Install</h2>
 
-<div class="callout callout-success">
-  <div class="callout-title">Coming from Express / FastAPI / Rails?</div>
-  Flux is a runtime — your code runs inside it. That's what makes automatic recording possible. But your business logic stays the same: <code>req.body</code> becomes <code>input</code>, <code>res.json()</code> becomes <code>return</code>, <code>db.query()</code> becomes <code>ctx.db.query()</code>. You can start with one endpoint and keep your existing backend running alongside Flux.
-</div>
+<pre><code><span class="shell-prompt">$</span> curl -fsSL https://fluxbase.co/install | bash</code></pre>
 
-<h2>1. Install the CLI</h2>
+<p>This installs three binaries: <code>flux</code> (CLI), <code>flux-server</code>, and <code>flux-runtime</code>.</p>
 
-<pre><code><span class="shell-prompt">$</span> curl -fsSL https://fluxbase.co/install | bash
+<h2>2. Start the server</h2>
 
-  <span class="str">✔</span>  flux 1.0.0 installed to /usr/local/bin/flux</code></pre>
+<p>The server stores execution records in Postgres. Point it at any Postgres database:</p>
 
-<h2>2. Initialise a project</h2>
+<pre><code><span class="shell-prompt">$</span> flux server start --database-url postgres://user:pass@localhost:5432/flux</code></pre>
 
-<pre><code><span class="shell-prompt">$</span> flux init my-backend
-<span class="shell-prompt">$</span> cd my-backend
-<span class="shell-prompt">$</span> ls
+<h2>3. Write your app</h2>
 
-  functions/
-    create_user.ts
-    send_welcome.ts
-  flux.toml</code></pre>
+<p>Flux works with standard TypeScript using <strong>Hono</strong> as the HTTP framework and <code>flux:pg</code> for Postgres. Create <code>index.ts</code>:</p>
 
-<h2>3. Look at the function</h2>
+<pre><code><span class="kw">import</span> { Hono } <span class="kw">from</span> <span class="str">"npm:hono"</span>
+<span class="kw">import</span> pg <span class="kw">from</span> <span class="str">"flux:pg"</span>
 
-<p>Open <code>functions/create_user.ts</code>:</p>
+<span class="kw">const</span> app = <span class="kw">new</span> Hono()
+<span class="kw">const</span> pool = <span class="kw">new</span> pg.Pool({
+  connectionString: Deno.env.get(<span class="str">"DATABASE_URL"</span>)
+})
 
-<pre><code><span class="kw">export default</span> <span class="fn">defineFunction</span>({
-  name: <span class="str">"create_user"</span>,
+app.post(<span class="str">"/orders"</span>, <span class="kw">async</span> (c) => {
+  <span class="kw">const</span> body = <span class="kw">await</span> c.req.json()
+  console.log(<span class="str">"Incoming:"</span>, body)
 
-  handler: <span class="kw">async</span> ({ input, ctx }) =&gt; {
-    <span class="cm">// validate</span>
-    <span class="kw">if</span> (!input.email) <span class="kw">throw new</span> <span class="type">Error</span>(<span class="str">"email required"</span>);
+  <span class="kw">const</span> result = <span class="kw">await</span> pool.query(
+    <span class="str">"INSERT INTO orders (email, product_id) VALUES ($1, $2) RETURNING *"</span>,
+    [body.email, body.productId]
+  )
+  <span class="kw">return</span> c.json(result.rows[0])
+})
 
-    <span class="cm">// write to database</span>
-    <span class="kw">const</span> [user] = <span class="kw">await</span> ctx.db.<span class="fn">query</span>({
-      table: <span class="str">"users"</span>,
-      operation: <span class="str">"insert"</span>,
-      data: { email: input.email, plan: <span class="str">"free"</span> },
-    });
+<span class="kw">export default</span> app</code></pre>
 
-    <span class="cm">// trigger async welcome email</span>
-    <span class="kw">await</span> ctx.queue.<span class="fn">push</span>(<span class="str">"send_welcome"</span>, { userId: user.id });
+<h2>4. Serve</h2>
 
-    <span class="kw">return</span> { userId: user.id, status: <span class="str">"ok"</span> };
-  },
-});</code></pre>
+<pre><code><span class="shell-prompt">$</span> flux serve index.ts
 
-<p>Notice: no logging setup, no trace SDK, no middleware. The runtime instruments everything automatically.</p>
+  [ready] listening on http://localhost:8000</code></pre>
 
-<h2>4. Deploy</h2>
+<h2>5. Watch live traffic</h2>
 
-<pre><code><span class="shell-prompt">$</span> flux deploy
-
-  Deploying 2 functions…
-
-  <span class="str">✔</span>  create_user   → localhost:4000/create_user
-  <span class="str">✔</span>  send_welcome  (async)
-
-  <span class="str">✔</span>  Deployed in 18s  deploy:d_7f3a9</code></pre>
-
-<h2>5. Trigger a request</h2>
-
-<p>In a second terminal, run <code>flux tail</code> to watch live:</p>
+<p>In a second terminal:</p>
 
 <pre><code><span class="shell-prompt">$</span> flux tail
 
-  Streaming requests…</code></pre>
+  streaming live requests — ctrl+c to stop
 
-<p>In your original terminal:</p>
+  ✓  ok     POST /orders   88ms  a1b2c3d4
+  ✗  error  POST /orders   21ms  e9f66586
+     └─ HTTP Internal Server Error (500)</code></pre>
 
-<pre><code><span class="shell-prompt">$</span> curl -X POST https://localhost:4000/create_user     -H "Content-Type: application/json"     -d '{"email":"alice@example.com"}'
+<h2>6. Understand the failure</h2>
 
-  {"userId":"u_42","status":"ok"}
-  <span class="cm">x-request-id: 4f9a3b2c</span></code></pre>
+<pre><code><span class="shell-prompt">$</span> flux why e9f66586
 
-<p>Your <code>flux tail</code> terminal shows:</p>
+  POST /orders  ✗ error  21ms  e9f66586
 
-<pre><code>  <span class="str">✔</span>  POST /create_user  201  88ms  req:4f9a3b2c</code></pre>
+  function threw before any IO
+  error   Internal Server Error
 
-<h2>6. Introduce a failure (deliberate)</h2>
+  console
+    › Incoming: {"email":"test@example.com","productId":"101"}
+    ✗ Error: productId must be a number
 
-<p>Simulate what happens when Stripe is down. Add a timeout to <code>create_user.ts</code>:</p>
+  check input validation and early-exit logic</code></pre>
 
-<pre><code><span class="cm">// add before return:</span>
-<span class="kw">await</span> ctx.tools.<span class="fn">call</span>(<span class="str">"stripe.charge"</span>, {
-  amount: <span class="num">0</span>,  <span class="cm">// &lt;— this will timeout (demo)</span>
-  currency: <span class="str">"usd"</span>,
-});</code></pre>
+<h2>7. Fix &amp; replay (safe — no real IO)</h2>
 
-<pre><code><span class="shell-prompt">$</span> flux deploy</code></pre>
+<p>Edit your code. Then replay the original request against your fix:</p>
 
-<p>Call it again:</p>
+<pre><code><span class="shell-prompt">$</span> flux replay e9f66586
 
-<pre><code><span class="shell-prompt">$</span> curl -X POST https://localhost:4000/create_user     -d '{"email":"bob@example.com"}'
+  replaying e9f66586
+  ✓ using updated code
 
-  {"error":"internal_error"}</code></pre>
+  STEP 0 — POST /orders
 
-<p><code>flux tail</code> shows:</p>
+  execution
+    ✗ original execution failed before reaching external IO
+    ✓ replay progressed beyond original failure point
 
-<pre><code>  <span class="type">✗</span>  POST /create_user  500  10044ms  req:550e8400
-     └─ stripe.charge timeout</code></pre>
+  ⏸ stopped at external boundary: POSTGRES
 
-<h2>7. Root-cause it</h2>
+  reason
+    no recorded checkpoint available for this postgres call
+    replay never touches the real world
 
-<pre><code><span class="shell-prompt">$</span> flux why 550e8400
+  ✓ your code fix is working — replay progressed further than the original
 
-  ROOT CAUSE
-  stripe.charge timed out after 10s
+  next
+    → run flux resume e9f66586 to continue with real IO</code></pre>
 
-  LOCATION
-  functions/create_user.ts:18
-
-  SPAN
-  stripe.charge  POST /v1/charges  10002ms  ✗ timeout
-
-  DATABASE CHANGES
-  users email=bob@example.com, plan=free  (inserted, then rolled back)
-
-  SUGGESTION
-  → Add a 5s timeout and retry with idempotency key</code></pre>
-
-<div class="callout callout-success">
-  <div class="callout-title">You just debugged a production failure in one command.</div>
-  Root cause, exact file and line, data changes, an actionable suggestion. Without looking at any logs.
+<div class="callout callout-info">
+  <div class="callout-title">Why did replay stop at POSTGRES?</div>
+  <p>Replay is deterministic and safe — it never makes live external calls. When the original request had no recorded DB checkpoint (it failed before reaching the DB), replay stops cleanly at the boundary. This confirms your code fix works without touching your database.</p>
 </div>
 
-<h2>8. Go deeper</h2>
+<h2>8. Resume with real IO</h2>
 
-<p>See the full span tree:</p>
+<pre><code><span class="shell-prompt">$</span> flux resume e9f66586
 
-<pre><code><span class="shell-prompt">$</span> flux trace 550e8400
+  resuming e9f66586…
 
-  Trace 550e8400  POST /create_user  500
+  ✓ database write applied (43ms)
 
-  ▸ server                    4ms
-    auth ✔  rate_limit ✔
-  ▸ create_user              10044ms
-    ▸ db:insert(users)          14ms
-    ▸ stripe.charge          10002ms  ✗ timeout
-  ▸ send_welcome  SKIP  <span class="cm">(not queued — request failed)</span>
+  ✓ request succeeded (200)
 
-  ── total: 10052ms ───────────────────</code></pre>
+  output
+    id:     9b887ab1
+    email:  test@example.com
 
-<p>Compare the failing request to the passing one:</p>
-
-<pre><code><span class="shell-prompt">$</span> flux trace diff 4f9a3b2c 550e8400
-
-  SPAN             BEFORE   AFTER     DELTA
-  server              3ms     4ms      +1ms
-  create_user        81ms  10044ms  +9963ms  ✗
-  stripe.charge      12ms  10002ms  +9990ms  ✗</code></pre>
-
-<p>See what the failed request wrote to the database before it was rolled back:</p>
-
-<pre><code><span class="shell-prompt">$</span> flux state history users --id 43
-
-  users id=43  (2 mutations)
-
-  2026-03-10 14:25:00  INSERT  email=bob@example.com, plan=free   req:550e8400
-  2026-03-10 14:25:01  DELETE  <span class="cm">(rolled back)</span>                        req:550e8400</code></pre>
+  ✓ original failure recovered</code></pre>
 
 <h2>Next steps</h2>
 
 <ul>
-  <li><a href="/cli">Full CLI reference</a> — every command with examples</li>
-  <li><a href="/product#incident-replay">Incident replay</a> — test your fix against the real incident</li>
-  <li><a href="/product#regression-detection">Bug bisect</a> — find which commit introduced a regression</li>
-  <li><a href="/how-it-works">Architecture</a> — how the recording layer works</li>
-  <li><a href="/examples/">Example projects</a> — Todo API, Webhook Worker, AI Backend</li>
-</ul>` }}
+  <li><a href="/docs/install">Full install guide</a> — server setup, auth, environment variables</li>
+  <li><a href="/cli">CLI reference</a> — every command with examples</li>
+</ul>
+` }}
     />
   )
 }

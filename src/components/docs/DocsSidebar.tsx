@@ -8,55 +8,21 @@ const NAV = [
   {
     title: 'Getting Started',
     links: [
-      { href: '/docs',                      label: 'Introduction'          },
-      { href: '/docs/why',                  label: 'Why Flux'              },
-      { href: '/docs/install',              label: 'Install CLI'           },
-      { href: '/docs/quickstart',           label: 'Quickstart'            },
-      { href: '/docs/concepts',             label: 'Core Concepts'         },
-      { href: '/docs/execution-record',     label: 'Execution Record'      },
-      { href: '/docs/tracing-model',        label: 'Tracing Model'         },
+      { href: '/docs',              label: 'Introduction'  },
+      { href: '/docs/install',      label: 'Install'       },
+      { href: '/docs/quickstart',   label: 'Quickstart'    },
     ],
   },
   {
-    title: 'Primitives',
+    title: 'CLI Commands',
     links: [
-      { href: '/docs/functions',            label: 'Functions'             },
-      { href: '/docs/database',             label: 'Database'              },
-      { href: '/docs/queue',                label: 'Queue & Async Jobs'    },
-      { href: '/docs/cron',                 label: 'Cron'                  },
-      { href: '/docs/wasm',                 label: 'WebAssembly'           },
-    ],
-  },
-  {
-    title: 'Debugging',
-    links: [
-      { href: '/docs/debugging-production', label: 'Production Debugging'  },
-      { href: '/docs/observability',        label: 'Observability'         },
-      { href: '/docs/common-tasks',         label: 'Common Tasks'          },
-      { href: '/docs/debug-incident',       label: 'Debug an incident'     },
-      { href: '/docs/replay-incident',      label: 'Replay a request'      },
-      { href: '/docs/inspect-mutations',    label: 'Inspect mutations'     },
-      { href: '/docs/compare-executions',   label: 'Compare executions'    },
-      { href: '/docs/find-regression',      label: 'Find a regression'     },
-      { href: '/docs/cli',                  label: 'CLI Reference'         },
+      { href: '/docs/cli',          label: 'CLI Reference' },
     ],
   },
   {
     title: 'Architecture',
     links: [
-      { href: '/docs/architecture',         label: 'Architecture'          },
-      { href: '/docs/server',               label: 'Server'                },
-      { href: '/docs/runtime',              label: 'Runtime'               },
-      { href: '/docs/compatibility',        label: 'Compatibility'         },
-      { href: '/docs/secrets',              label: 'Secrets'               },
-    ],
-  },
-  {
-    title: 'Production',
-    links: [
-      { href: '/docs/production',           label: 'Production Guide'      },
-      { href: '/docs/self-hosting',         label: 'Self-Hosting'          },
-      { href: '/docs/examples',             label: 'Examples'              },
+      { href: '/docs/architecture', label: 'Architecture'  },
     ],
   },
 ]
