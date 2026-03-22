@@ -58,32 +58,34 @@ export default function HomePage() {
 
         <p style={{
           fontSize: 'clamp(.95rem, 2vw, 1.1rem)',
-          color: 'rgba(255,255,255,0.55)',
-          maxWidth: 520, margin: '0 auto 16px',
+          color: 'rgba(255,255,255,0.6)',
+          maxWidth: 540, margin: '0 auto 12px',
           lineHeight: 1.6,
         }}>
           Replay production failures locally. Fix them. Resume execution.
         </p>
 
         <p style={{
-          fontSize: '.88rem',
-          color: 'rgba(255,255,255,0.3)',
-          maxWidth: 480, margin: '0 auto 48px',
+          fontSize: '.92rem',
+          color: 'rgba(255,255,255,0.35)',
+          maxWidth: 480, margin: '0 auto 10px',
           lineHeight: 1.6,
         }}>
-          Every request is recorded — inputs, outputs, and external calls.
+          Same request. Same IO. Same outcome.
+        </p>
+
+        <p style={{
+          fontSize: '.88rem',
+          color: 'rgba(255,255,255,0.25)',
+          maxWidth: 500, margin: '0 auto 52px',
+          lineHeight: 1.6,
+        }}>
+          Fix the bug. Resume the same execution. No duplicate side effects.
         </p>
 
         {/* Video cue */}
         <p style={{
-          fontSize: '.82rem', color: 'rgba(255,255,255,0.25)',
-          marginBottom: 6, letterSpacing: '.01em',
-          fontStyle: 'italic',
-        }}>
-          Real debugging. No mocks. No staging.
-        </p>
-        <p style={{
-          fontSize: '.82rem', color: 'rgba(255,255,255,0.2)',
+          fontSize: '.8rem', color: 'rgba(255,255,255,0.2)',
           marginBottom: 16, letterSpacing: '.01em',
         }}>
           Watch a real debugging session ↓
