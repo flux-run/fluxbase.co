@@ -181,11 +181,11 @@ export default function HomePage() {
           borderRadius: 8, padding: '16px 32px',
           fontFamily: '"SF Mono", "Fira Code", monospace', fontSize: '1rem',
           color: 'rgba(255,255,255,0.75)',
-          cursor: 'text', userSelect: 'all',
+          cursor: 'text',
           marginBottom: 64,
         }}>
-          <span style={{ color: 'rgba(255,255,255,0.3)' }}>$</span>
-          curl -fsSL https://fluxbase.co/install | bash
+          <span style={{ color: 'rgba(255,255,255,0.3)', userSelect: 'none' }}>$</span>
+          <span style={{ userSelect: 'all' }}>curl -fsSL https://fluxbase.co/install | bash</span>
         </div>
       </section>
 
