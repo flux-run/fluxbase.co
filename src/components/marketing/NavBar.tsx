@@ -63,11 +63,9 @@ function GitHubStarButton() {
 }
 
 const links = [
-  { href: '/product', label: 'Product' },
-  { href: '/how-it-works', label: 'How It Works' },
-  { href: '/pricing', label: 'Open Source' },
-  { href: '/cli', label: 'CLI' },
-  { href: '/docs', label: 'Docs' },
+  { href: '/docs',          label: 'Docs'          },
+  { href: '/docs/cli',      label: 'CLI Reference'  },
+  { href: '/docs/quickstart', label: 'Quickstart'   },
 ]
 
 export function NavBar() {
@@ -80,9 +78,9 @@ export function NavBar() {
       height: 56,
       display: 'flex', alignItems: 'center', gap: 32,
       padding: '0 24px',
-      background: 'rgba(14,14,16,.92)',
-      backdropFilter: 'blur(10px)',
-      borderBottom: '1px solid var(--mg-border)',
+      background: 'rgba(10,10,10,0.92)',
+      backdropFilter: 'blur(12px)',
+      borderBottom: '1px solid rgba(255,255,255,0.06)',
     }}>
       <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
         <FluxIcon size={24} />

@@ -99,12 +99,12 @@
 
 /* ─── Marketing pages theme (scoped to .marketing wrapper) ───── */
 .marketing {
-  --mg-bg:          #0e0e10;
-  --mg-bg-surface:  #17171a;
-  --mg-bg-elevated: #1f1f24;
-  --mg-border:      #2a2a30;
-  --mg-text:        #e4e4e8;
-  --mg-muted:       #888890;
+  --mg-bg:          #0a0a0a;
+  --mg-bg-surface:  #111;
+  --mg-bg-elevated: #161616;
+  --mg-border:      rgba(255,255,255,0.08);
+  --mg-text:        #f0f0f0;
+  --mg-muted:       rgba(255,255,255,0.45);
   /* Accent tied to the global brand token */
   --mg-accent:      hsl(var(--brand-accent));
   --mg-accent-dim:  hsl(var(--brand-accent-dim));
@@ -113,7 +113,7 @@
   --mg-red:         #f87171;
   background: var(--mg-bg);
   color: var(--mg-text);
-  font-family: var(--font-geist-sans), -apple-system, sans-serif;
+  font-family: system-ui, -apple-system, sans-serif;
   min-height: 100dvh;
 }
 
@@ -304,7 +304,8 @@
   max-width: var(--max-content);
   color: var(--mg-text);
   font-size: 1rem;
-  line-height: 1.7;
+  line-height: 1.75;
+  font-family: system-ui, -apple-system, sans-serif;
 }
 
 /* Typography */

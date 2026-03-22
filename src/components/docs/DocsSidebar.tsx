@@ -44,8 +44,8 @@ export function DocsSidebar() {
       bottom: 0,
       overflowY: 'auto',
       padding: '28px 0 48px',
-      borderRight: '1px solid var(--mg-border)',
-      background: 'var(--mg-bg-surface)',
+      borderRight: '1px solid rgba(255,255,255,0.06)',
+      background: '#0a0a0a',
     }}>
       <div style={{ padding: '0 16px', marginBottom: 28 }} title="Search coming soon">
         <div style={{
