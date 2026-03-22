@@ -5,9 +5,9 @@ import { useRef, useEffect } from 'react'
 import { CopyCodeBlocks } from '@/components/CopyCodeBlocks'
 
 const COMMANDS = [
-  { cmd: 'flux why', arg: '<execution_id>', desc: 'understand what failed and why' },
-  { cmd: 'flux replay', arg: '<execution_id>', desc: 'test your fix without touching the world' },
-  { cmd: 'flux resume', arg: '<execution_id>', desc: 'apply the fix with real IO' },
+  { cmd: 'flux why',    arg: '<id>', desc: 'understand what failed and why'     },
+  { cmd: 'flux replay', arg: '<id>', desc: 'test your fix safely, no real IO'   },
+  { cmd: 'flux resume', arg: '<id>', desc: 'apply the fix with real IO'          },
 ]
 
 export default function HomePage() {
@@ -58,11 +58,20 @@ export default function HomePage() {
 
         <p style={{
           fontSize: 'clamp(.95rem, 2vw, 1.1rem)',
-          color: 'rgba(255,255,255,0.5)',
-          maxWidth: 520, margin: '0 auto 48px',
+          color: 'rgba(255,255,255,0.55)',
+          maxWidth: 520, margin: '0 auto 16px',
           lineHeight: 1.6,
         }}>
-          Debug production failures by replaying them locally.
+          Replay production failures locally. Fix them. Resume execution.
+        </p>
+
+        <p style={{
+          fontSize: '.88rem',
+          color: 'rgba(255,255,255,0.3)',
+          maxWidth: 480, margin: '0 auto 48px',
+          lineHeight: 1.6,
+        }}>
+          Every request is recorded — inputs, outputs, and external calls.
         </p>
 
         {/* Video cue */}
@@ -109,6 +118,16 @@ export default function HomePage() {
         </div>
 
         {/* ── CLI Block ── */}
+        <p style={{
+          fontSize: '.78rem',
+          color: 'rgba(255,255,255,0.25)',
+          textTransform: 'uppercase',
+          letterSpacing: '.1em',
+          marginBottom: 14,
+          fontFamily: 'monospace',
+        }}>
+          The debugging loop:
+        </p>
         <div style={{
           background: '#0d0d0d',
           border: '1px solid rgba(255,255,255,0.08)',
@@ -129,13 +148,13 @@ export default function HomePage() {
             <span style={{ marginLeft: 8, fontSize: '.72rem', color: 'rgba(255,255,255,0.25)', fontFamily: 'monospace' }}>flux — bash</span>
           </div>
 
-          <div style={{ padding: '28px 28px 32px', fontFamily: '"SF Mono", "Fira Code", "Cascadia Code", monospace', fontSize: '.88rem', lineHeight: 2 }}>
+          <div style={{ padding: '28px 28px 32px', fontFamily: '"SF Mono", "Fira Code", "Cascadia Code", monospace', fontSize: '.88rem', lineHeight: 2.1 }}>
             {COMMANDS.map(({ cmd, arg, desc }) => (
-              <div key={cmd} style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
-                <span style={{ color: 'rgba(255,255,255,0.25)', userSelect: 'none' }}>$</span>
-                <span style={{ color: '#7dd3fc' }}>{cmd}</span>
-                <span style={{ color: 'rgba(255,255,255,0.45)' }}>{arg}</span>
-                <span style={{ color: 'rgba(255,255,255,0.2)', marginLeft: 8, fontSize: '.78rem' }}>— {desc}</span>
+              <div key={cmd} style={{ display: 'flex', alignItems: 'baseline', gap: 0, marginBottom: 4 }}>
+                <span style={{ color: 'rgba(255,255,255,0.25)', userSelect: 'none', marginRight: 10 }}>$</span>
+                <span style={{ color: '#7dd3fc', minWidth: 120 }}>{cmd}</span>
+                <span style={{ color: 'rgba(255,255,255,0.4)' }}>{arg}</span>
+                <span style={{ color: 'rgba(255,255,255,0.2)', marginLeft: 24, fontSize: '.78rem' }}>— {desc}</span>
               </div>
             ))}
           </div>
@@ -155,11 +174,13 @@ export default function HomePage() {
 
         {/* ── Install ── */}
         <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: 12,
-          background: '#111', border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: 8, padding: '14px 28px',
-          fontFamily: 'monospace', fontSize: '.92rem',
-          color: 'rgba(255,255,255,0.7)',
+          display: 'inline-flex', alignItems: 'center', gap: 14,
+          background: '#111',
+          border: '1px solid rgba(255,255,255,0.12)',
+          boxShadow: '0 0 0 1px rgba(255,255,255,0.04), 0 8px 24px rgba(0,0,0,0.4)',
+          borderRadius: 8, padding: '16px 32px',
+          fontFamily: '"SF Mono", "Fira Code", monospace', fontSize: '1rem',
+          color: 'rgba(255,255,255,0.75)',
           cursor: 'text', userSelect: 'all',
           marginBottom: 64,
         }}>
