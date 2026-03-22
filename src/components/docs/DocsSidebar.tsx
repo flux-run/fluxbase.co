@@ -8,21 +8,22 @@ const NAV = [
   {
     title: 'Getting Started',
     links: [
-      { href: '/docs',              label: 'Introduction'  },
-      { href: '/docs/install',      label: 'Install'       },
-      { href: '/docs/quickstart',   label: 'Quickstart'    },
+      { href: '/docs',              label: 'Introduction'   },
+      { href: '/docs/install',      label: 'Install'        },
+      { href: '/docs/quickstart',   label: 'Quickstart'     },
     ],
   },
   {
     title: 'CLI Commands',
     links: [
-      { href: '/docs/cli',          label: 'CLI Reference' },
+      { href: '/docs/cli',          label: 'CLI Reference'  },
     ],
   },
   {
-    title: 'Architecture',
+    title: 'Runtime',
     links: [
-      { href: '/docs/architecture', label: 'Architecture'  },
+      { href: '/docs/compatibility', label: 'Compatibility' },
+      { href: '/docs/architecture',  label: 'Architecture'  },
     ],
   },
 ]

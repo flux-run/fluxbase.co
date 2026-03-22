@@ -27,6 +27,8 @@ export default function Page() {
     <tr><td><code>flux replay &lt;id&gt;</code></td><td>Re-run with recorded checkpoints — no real IO</td></tr>
     <tr><td><code>flux resume &lt;id&gt;</code></td><td>Re-run with real IO — commits to database</td></tr>
     <tr><td><code>flux config</code></td><td>Read/write CLI config (url, token)</td></tr>
+    <tr><td><code>flux add &lt;pkg&gt;</code></td><td>Add npm packages to deno.json</td></tr>
+    <tr><td><code>flux check</code></td><td>Check code compatibility with the Flux runtime</td></tr>
     <tr><td><code>flux status</code></td><td>Overall Flux health check</td></tr>
     <tr><td><code>flux ps</code></td><td>Show managed Flux processes</td></tr>
   </tbody>
@@ -397,6 +399,50 @@ saved config value</code></pre>
 <h2>flux ps</h2>
 <p>Show managed Flux processes (server, runtimes).</p>
 <pre><code><span class="shell-prompt">$</span> flux ps</code></pre>
+
+<hr>
+
+<h2>flux add</h2>
+<p>Add npm packages to your project's <code>deno.json</code> import map.</p>
+<pre><code><span class="shell-prompt">$</span> flux add hono zod
+
+  adding   hono as npm:hono
+  adding   zod as npm:zod
+  updated  /Users/me/my-app/deno.json
+
+<span class="cm"># Specific version</span>
+<span class="shell-prompt">$</span> flux add hono@4.0.0
+
+  adding   hono as npm:hono@4.0.0
+  updated  /Users/me/my-app/deno.json</code></pre>
+
+<p>Packages can be referenced as <code>npm:package</code> or <code>https://</code> URLs. After adding, import via the short name:</p>
+<pre><code>import { Hono } from 'hono'   <span class="cm">// resolves from deno.json import map</span></code></pre>
+
+<hr>
+
+<h2>flux check</h2>
+<p>Scan your TypeScript/JavaScript project for compatibility issues with the Flux runtime before running or deploying.</p>
+<pre><code><span class="shell-prompt">$</span> flux check index.ts
+
+  checked   /Users/me/my-app/index.ts
+  modules   12
+  artifact  a3f9c8...
+
+<span class="cm"># With an error:</span>
+  error [node_import] index.ts: node: imports are not supported: node:crypto
+
+<span class="cm"># With a warning:</span>
+  warning [unsupported_global] index.ts: Buffer may not be available in Flux runtime</code></pre>
+
+<p>Exit code 1 = errors found. Exit code 0 = compatible. See <a href="/docs/compatibility">Compatibility</a> for the full list of diagnostic codes.</p>
+
+<table>
+  <thead><tr><th>Flag</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>[ENTRY]</code></td><td>Entry file to check (auto-detected if omitted)</td></tr>
+  </tbody>
+</table>
 
 <hr>
 
