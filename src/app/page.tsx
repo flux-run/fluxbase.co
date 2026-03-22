@@ -6,7 +6,7 @@ import { CopyCodeBlocks } from '@/components/CopyCodeBlocks'
 
 const COMMANDS = [
   { cmd: 'flux why',    arg: '<id>', desc: 'understand what failed and why'     },
-  { cmd: 'flux replay', arg: '<id>', desc: 'test your fix safely, no real IO'   },
+  { cmd: 'flux replay', arg: '<id>', desc: 'test your fix safely (no real IO)'  },
   { cmd: 'flux resume', arg: '<id>', desc: 'apply the fix with real IO'          },
 ]
 
@@ -76,7 +76,14 @@ export default function HomePage() {
 
         {/* Video cue */}
         <p style={{
-          fontSize: '.82rem', color: 'rgba(255,255,255,0.3)',
+          fontSize: '.82rem', color: 'rgba(255,255,255,0.25)',
+          marginBottom: 6, letterSpacing: '.01em',
+          fontStyle: 'italic',
+        }}>
+          Real debugging. No mocks. No staging.
+        </p>
+        <p style={{
+          fontSize: '.82rem', color: 'rgba(255,255,255,0.2)',
           marginBottom: 16, letterSpacing: '.01em',
         }}>
           Watch a real debugging session ↓
@@ -126,7 +133,7 @@ export default function HomePage() {
           marginBottom: 14,
           fontFamily: 'monospace',
         }}>
-          The debugging loop:
+          The debugging loop
         </p>
         <div style={{
           background: '#0d0d0d',
@@ -148,13 +155,13 @@ export default function HomePage() {
             <span style={{ marginLeft: 8, fontSize: '.72rem', color: 'rgba(255,255,255,0.25)', fontFamily: 'monospace' }}>flux — bash</span>
           </div>
 
-          <div style={{ padding: '28px 28px 32px', fontFamily: '"SF Mono", "Fira Code", "Cascadia Code", monospace', fontSize: '.88rem', lineHeight: 2.1 }}>
+          <div style={{ padding: '28px 28px 32px', fontFamily: '"SF Mono", "Fira Code", "Cascadia Code", monospace', fontSize: '.88rem', lineHeight: 2.2 }}>
             {COMMANDS.map(({ cmd, arg, desc }) => (
-              <div key={cmd} style={{ display: 'flex', alignItems: 'baseline', gap: 0, marginBottom: 4 }}>
-                <span style={{ color: 'rgba(255,255,255,0.25)', userSelect: 'none', marginRight: 10 }}>$</span>
-                <span style={{ color: '#7dd3fc', minWidth: 120 }}>{cmd}</span>
-                <span style={{ color: 'rgba(255,255,255,0.4)' }}>{arg}</span>
-                <span style={{ color: 'rgba(255,255,255,0.2)', marginLeft: 24, fontSize: '.78rem' }}>— {desc}</span>
+              <div key={cmd} style={{ display: 'flex', alignItems: 'baseline' }}>
+                <span style={{ color: 'rgba(255,255,255,0.25)', userSelect: 'none', marginRight: 8 }}>$</span>
+                <span style={{ color: '#7dd3fc', display: 'inline-block', width: '7.5rem' }}>{cmd}</span>
+                <span style={{ color: 'rgba(255,255,255,0.4)', marginRight: 24 }}>{arg}</span>
+                <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '.78rem' }}>&mdash; {desc}</span>
               </div>
             ))}
           </div>
