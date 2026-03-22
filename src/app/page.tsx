@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useRef, useEffect } from 'react'
+import { CopyCodeBlocks } from '@/components/CopyCodeBlocks'
 
 const COMMANDS = [
   { cmd: 'flux why', arg: '<execution_id>', desc: 'understand what failed and why' },
@@ -23,6 +24,7 @@ export default function HomePage() {
 
   return (
     <div style={{ background: '#0a0a0a', color: '#f0f0f0', minHeight: '100vh', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+      <CopyCodeBlocks />
 
       {/* ── Nav ── */}
       <nav style={{

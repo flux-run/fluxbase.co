@@ -412,6 +412,32 @@
   border-radius: 0;
 }
 
+/* ── Copy button (added by CopyCodeBlocks component) ── */
+.copy-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 5px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.4);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .15s, color .15s, background .15s;
+  z-index: 2;
+}
+pre:hover .copy-btn { opacity: 1; }
+.copy-btn:hover {
+  background: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.9);
+}
+
 /* Tables */
 .docs-content table {
   width: 100%;
