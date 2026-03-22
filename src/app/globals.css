@@ -148,23 +148,23 @@
 /* buttons */
 .marketing .btn-primary {
   display: inline-flex; align-items: center; gap: 8px;
-  background: var(--mg-accent); color: #fff;
+  background: #fff; color: #000;
   padding: 11px 22px; border-radius: 8px;
   font-weight: 600; font-size: .9rem;
   text-decoration: none;
   transition: opacity .15s;
 }
-.marketing .btn-primary:hover { opacity: .85; }
+.marketing .btn-primary:hover { opacity: .88; }
 .marketing .btn-secondary {
   display: inline-flex; align-items: center; gap: 8px;
-  background: var(--mg-bg-elevated); color: var(--mg-text);
-  border: 1px solid var(--mg-border);
+  background: rgba(255,255,255,0.06); color: #fff;
+  border: 1px solid rgba(255,255,255,0.1);
   padding: 11px 22px; border-radius: 8px;
   font-weight: 500; font-size: .9rem;
   text-decoration: none;
   transition: background .15s;
 }
-.marketing .btn-secondary:hover { background: #25252c; }
+.marketing .btn-secondary:hover { background: rgba(255,255,255,0.1); }
 
 /* install hint */
 .marketing .install-hint {

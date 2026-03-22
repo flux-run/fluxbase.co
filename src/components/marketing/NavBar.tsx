@@ -82,9 +82,8 @@ export function NavBar() {
       backdropFilter: 'blur(12px)',
       borderBottom: '1px solid rgba(255,255,255,0.06)',
     }}>
-      <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
-        <FluxIcon size={24} />
-        <FluxWordmark fontSize={15} baseColor="rgba(255,255,255,0.9)" />
+      <Link href="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+        <span style={{ fontWeight: 700, fontSize: '1.1rem', letterSpacing: '-0.02em', color: '#fff' }}>flux</span>
       </Link>
       {version && (
         <Link
@@ -125,11 +124,10 @@ export function NavBar() {
         <GitHubStarButton />
       </div>
       <Link href="/docs/quickstart" style={{
-        background: 'var(--mg-accent)',
-        color: '#fff', fontSize: '.8rem', fontWeight: 600,
-        padding: '6px 14px', borderRadius: 6,
+        background: '#fff',
+        color: '#000', fontSize: '.82rem', fontWeight: 600,
+        padding: '7px 16px', borderRadius: 6,
         textDecoration: 'none',
-        transition: 'opacity .15s',
       }}>
         Get Started →
       </Link>
