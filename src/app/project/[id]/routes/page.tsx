@@ -13,11 +13,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Route } from "@/types/api";
 
 export default function RoutesPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const api = useFluxApi(id);
-  const [routes, setRoutes] = useState<any[]>([]);
+  const [routes, setRoutes] = useState<Route[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -65,7 +66,7 @@ export default function RoutesPage({ params }: { params: Promise<{ id: string }>
                     <div className="flex items-center gap-2 text-blue-500/80 font-bold text-sm">
                        <Zap className="w-3.5 h-3.5" />
                        <span className="truncate max-w-[200px] hover:underline cursor-pointer">
-                          func_{r.function_id?.split('-')[0] || "unbound"}
+                          func_{r.function_id ? r.function_id.split('-')[0] : "unbound"}
                        </span>
                     </div>
                  </TableCell>

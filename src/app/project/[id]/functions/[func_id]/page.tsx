@@ -2,13 +2,14 @@
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { useFluxApi } from "@/lib/api";
-import { Zap, Activity, AlertCircle, Clock, Globe, Terminal, Save, Play, ArrowUpRight } from "lucide-react";
+import { Zap, Activity, AlertCircle, Clock, Globe, Terminal, Save, Play, ArrowUpRight, LucideIcon } from "lucide-react";
+import { Function, Execution, Route } from "@/types/api";
 
 export default function FunctionDetail({ params }: { params: Promise<{ id: string, func_id: string }> }) {
   const { id, func_id } = use(params);
   const api = useFluxApi(id);
-  const [data, setData] = useState<any>(null);
-  const [executions, setExecutions] = useState<any[]>([]);
+  const [data, setData] = useState<Function | null>(null);
+  const [executions, setExecutions] = useState<Execution[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
@@ -27,9 +28,9 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
   if (!data) return <div className="animate-pulse text-sm font-mono text-neutral-500">Loading function orchestration...</div>;
 
   const stats = [
-    { name: "Executions", value: data.stats?.total_execs || 0, icon: Activity },
-    { name: "Error Rate", value: `${data.stats?.total_execs > 0 ? ((data.stats.errors / data.stats.total_execs) * 100).toFixed(1) : 0}%`, icon: AlertCircle, color: data.stats?.errors > 0 ? "text-red-500" : "text-neutral-500" },
-    { name: "Avg Duration", value: `${Math.round(data.stats?.avg_duration || 0)}ms`, icon: Clock },
+    { name: "Executions", value: data.stats?.total_execs || 0, icon: Activity as LucideIcon },
+    { name: "Error Rate", value: `${(data.stats?.total_execs ?? 0) > 0 ? (((data.stats?.errors ?? 0) / (data.stats?.total_execs ?? 1)) * 100).toFixed(1) : 0}%`, icon: AlertCircle as LucideIcon, color: (data.stats?.errors ?? 0) > 0 ? "text-red-500" : "text-neutral-500" },
+    { name: "Avg Duration", value: `${Math.round(data.stats?.avg_duration || 0)}ms`, icon: Clock as LucideIcon },
   ];
 
   return (
@@ -101,8 +102,8 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                       <td className="px-4 py-3">
                         <span className={`font-bold ${exec.status === 'ok' ? 'text-green-500' : 'text-red-500'}`}>{exec.status.toUpperCase()}</span>
                       </td>
-                      <td className="px-4 py-3 text-neutral-500">{exec.duration_ms}ms</td>
-                      <td className="px-4 py-3 text-right text-neutral-600">{new Date(exec.started_at).toLocaleTimeString()}</td>
+                       <td className="px-4 py-3 text-neutral-500">{exec.duration_ms}ms</td>
+                       <td className="px-4 py-3 text-right text-neutral-600">{new Date(exec.started_at ?? new Date().toISOString()).toLocaleTimeString()}</td>
                     </tr>
                   ))}
                   {executions.length === 0 && (
@@ -118,8 +119,8 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                <Globe className="w-4 h-4" />
                Mapped Routes
              </h3>
-             <div className="flex flex-col gap-2">
-                {data.routes?.map((r: any) => (
+              <div className="flex flex-col gap-2">
+                 {data.routes?.map((r: Route) => (
                   <div key={r.id} className="bg-[#111] border border-neutral-800 px-4 py-3 rounded-lg flex items-center justify-between font-mono text-sm">
                     <div className="flex items-center gap-3">
                       <span className="px-1.5 py-0.5 bg-neutral-900 rounded border border-neutral-800 text-[10px] font-bold text-neutral-400">{r.method}</span>

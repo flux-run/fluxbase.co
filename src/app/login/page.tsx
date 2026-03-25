@@ -27,8 +27,9 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await signIn(provider, { callbackUrl: "/dashboard" });
-    } catch (err: any) {
-      setError("Authentication failed");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Invalid credentials");
+    } finally {
       setLoading(false);
     }
   };

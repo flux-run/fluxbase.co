@@ -13,11 +13,12 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Execution } from "@/types/api";
 
 export default function ExecutionsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const api = useFluxApi(id);
-  const [executions, setExecutions] = useState<any[]>([]);
+  const [executions, setExecutions] = useState<Execution[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
 
@@ -93,7 +94,7 @@ export default function ExecutionsPage({ params }: { params: Promise<{ id: strin
                  </TableCell>
                  <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2 text-xs text-neutral-600 font-mono group-hover:text-neutral-400 transition-colors">
-                      {new Date(exec.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      {new Date(exec.started_at ?? new Date().toISOString()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                       <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-all -translate-x-1 group-hover:translate-x-0" />
                     </div>
                  </TableCell>

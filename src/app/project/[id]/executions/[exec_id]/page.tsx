@@ -5,11 +5,12 @@ import { Activity, Terminal, ExternalLink, Copy, Check, ChevronRight, Zap, Globe
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ExecutionDetail as ExecutionDetailType, Checkpoint, LogEntry } from "@/types/api";
 
 export default function ExecutionDetail({ params }: { params: Promise<{ id: string, exec_id: string }> }) {
   const { id, exec_id } = use(params);
   const api = useFluxApi(id);
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<ExecutionDetailType | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -46,7 +47,7 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
              <span className="w-1.5 h-1.5 bg-neutral-900 rounded-full" />
              <span className="flex items-center gap-1.5"><Activity className="w-3.5 h-3.5" /> {data.duration_ms}ms</span>
              <span className="w-1.5 h-1.5 bg-neutral-900 rounded-full" />
-             <span>{new Date(data.started_at).toUTCString()}</span>
+             <span>{new Date(data.started_at ?? new Date().toISOString()).toUTCString()}</span>
           </div>
         </div>
         <Button variant="outline" size="sm" className="bg-neutral-900 border-neutral-800 text-xs font-bold hover:bg-neutral-800 hover:text-white h-9">
@@ -112,14 +113,14 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
          </section>
       </div>
 
-      {data.checkpoints?.length > 0 && (
+      {(data.checkpoints?.length ?? 0) > 0 && (
         <section className="space-y-6">
            <h3 className="text-[11px] font-black uppercase tracking-widest text-neutral-600 flex items-center gap-2">
               <Activity className="w-3.5 h-3.5 text-indigo-500/60" />
               Determinism Trace (Step-by-Step)
            </h3>
            <div className="space-y-3 relative before:absolute before:left-[19px] before:top-2 before:bottom-2 before:w-[2px] before:bg-neutral-900">
-              {data.checkpoints.map((cp: any, i: number) => (
+              {data.checkpoints?.map((cp: Checkpoint, i: number) => (
                 <div key={i} className="flex gap-6 items-center group relative">
                    <div className="w-10 h-10 rounded-full bg-black border-2 border-neutral-900 flex items-center justify-center z-10 group-hover:border-blue-500 transition-colors shadow-xl">
                       {cp.boundary === 'db' ? <Database className="w-4 h-4 text-purple-500" /> : <Globe className="w-4 h-4 text-blue-500" />}
@@ -140,14 +141,14 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
         </section>
       )}
 
-      {data.logs?.length > 0 && (
+      {((data.logs?.length ?? 0) > 0 || (data.console_logs?.length ?? 0) > 0) && (
         <section className="space-y-4">
            <h3 className="text-[11px] font-black uppercase tracking-widest text-neutral-600 flex items-center gap-2">
               <Terminal className="w-3.5 h-3.5 text-zinc-500" />
               Isolate Console Output
            </h3>
            <Card className="bg-black border-neutral-900 p-6 font-mono text-[13px] space-y-2 shadow-2xl">
-              {data.logs.map((log: any) => (
+              {(data.logs ?? data.console_logs ?? []).map((log: LogEntry) => (
                 <div key={log.seq} className="flex gap-6 border-l-2 border-neutral-900 pl-4 py-1 hover:bg-neutral-900/30 transition-colors rounded-r">
                    <span className="text-neutral-700 w-20 flex-shrink-0">+{log.seq}s</span>
                    <span className={log.level === 'error' ? 'text-red-400' : 'text-neutral-400'}>{log.message ?? log.args_json}</span>

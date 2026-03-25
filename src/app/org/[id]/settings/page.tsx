@@ -8,11 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Org, OrgMember } from "@/types/api";
 
 export default function OrgSettings({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const [org, setOrg] = useState<any>(null);
-  const [members, setMembers] = useState<any[]>([]);
+  const [org, setOrg] = useState<Org | null>(null);
+  const [members, setMembers] = useState<OrgMember[]>([]);
   const [loading, setLoading] = useState(true);
   const api = useFluxApi();
 
@@ -20,7 +21,7 @@ export default function OrgSettings({ params }: { params: Promise<{ id: string }
     const loadOrgData = async () => {
       try {
         const orgs = await api.getOrgs();
-        const found = orgs.find((o: any) => o.id === id);
+        const found = orgs.find((o: Org) => o.id === id) || null;
         setOrg(found);
         
         const memberData = await api.getOrgMembers(id);
@@ -105,11 +106,11 @@ export default function OrgSettings({ params }: { params: Promise<{ id: string }
                   <TableCell className="px-8 py-5">
                     <div className="flex items-center gap-4">
                       <div className="w-9 h-9 rounded-full bg-gradient-to-br from-neutral-800 to-neutral-950 flex items-center justify-center text-xs font-bold text-neutral-500 border border-neutral-800 shadow-inner">
-                         {m.email[0].toUpperCase()}
+                         {(m.email || 'U')[0].toUpperCase()}
                       </div>
                       <div className="flex flex-col">
                          <span className="text-neutral-200 font-bold text-sm tracking-tight">{m.email}</span>
-                         <span className="text-[10px] text-neutral-600 font-mono mt-0.5">{m.id.slice(0, 8)}...</span>
+                        <span className="text-[10px] text-neutral-600 font-mono mt-0.5">{(m.id || m.user_id).slice(0, 8)}...</span>
                       </div>
                     </div>
                   </TableCell>

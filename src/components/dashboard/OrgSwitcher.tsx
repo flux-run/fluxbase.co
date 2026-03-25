@@ -1,14 +1,15 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useFluxApi } from "@/lib/api";
+import { Org } from "@/types/api";
 import { ChevronDown, Plus, Building } from "lucide-react";
 import { useSession } from "next-auth/react";
 
 export function OrgSwitcher() {
   const { data: session, status } = useSession();
   const api = useFluxApi();
-  const [orgs, setOrgs] = useState<any[]>([]);
-  const [currentOrg, setCurrentOrg] = useState<any>(null);
+  const [orgs, setOrgs] = useState<Org[]>([]);
+  const [currentOrg, setCurrentOrg] = useState<Org | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -18,7 +19,7 @@ export function OrgSwitcher() {
       setOrgs(data);
       if (data && data.length > 0) {
         const stored = localStorage.getItem("current_org_id") || session?.org_id;
-        const found = data.find((o: any) => o.id === stored) || data[0];
+        const found = data.find((o: Org) => o.id === stored) || data[0];
         if (found && found.id) {
           setCurrentOrg(found);
           localStorage.setItem("current_org_id", found.id);
@@ -31,7 +32,7 @@ export function OrgSwitcher() {
     });
   }, [session, status]);
 
-  const switchOrg = (org: any) => {
+  const switchOrg = (org: Org) => {
     setCurrentOrg(org);
     if (org.id) localStorage.setItem("current_org_id", org.id);
     setIsOpen(false);

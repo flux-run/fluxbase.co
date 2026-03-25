@@ -66,8 +66,8 @@ export interface Checkpoint {
   boundary: string;
   url: string | null;
   method: string | null;
-  request: any | null;
-  response: any | null;
+  request: Record<string, unknown> | null;
+  response: Record<string, unknown> | null;
   duration_ms: number | null;
   created_at: string | null;
 }
@@ -87,8 +87,8 @@ export interface Execution {
   method: string;
   path: string;
   status: string;
-  request: any | null;
-  response: any | null;
+  request: Record<string, unknown> | null;
+  response: Record<string, unknown> | null;
   error: string | null;
   code_sha: string;
   started_at: string | null;

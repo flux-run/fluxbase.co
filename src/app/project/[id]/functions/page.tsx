@@ -13,11 +13,12 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Function } from "@/types/api";
 
 export default function FunctionsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const api = useFluxApi(id);
-  const [functions, setFunctions] = useState<any[]>([]);
+  const [functions, setFunctions] = useState<Function[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -70,9 +71,9 @@ export default function FunctionsPage({ params }: { params: Promise<{ id: string
                     </div>
                  </TableCell>
                  <TableCell className="text-center">
-                    <div className={`flex items-center justify-center gap-1.5 text-xs font-mono ${f.total_errors > 0 ? "text-red-500" : "text-neutral-600"}`}>
+                    <div className={`flex items-center justify-center gap-1.5 text-xs font-mono ${(f.total_errors ?? 0) > 0 ? "text-red-500" : "text-neutral-600"}`}>
                       <AlertCircle className="w-3 h-3" />
-                      {f.total_execs > 0 ? ((f.total_errors / f.total_execs) * 100).toFixed(1) : 0}%
+                      {f.total_execs && f.total_execs > 0 ? (((f.total_errors ?? 0) / f.total_execs) * 100).toFixed(1) : 0}%
                     </div>
                  </TableCell>
                  <TableCell>

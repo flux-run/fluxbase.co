@@ -6,11 +6,12 @@ import { useFluxApi } from "@/lib/api";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { ExecutionDetail, LogEntry } from "@/types/api";
 
 export default function RealExecutionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { data: session, status } = useSession();
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<ExecutionDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const router = useRouter();
@@ -117,7 +118,7 @@ export default function RealExecutionPage({ params }: { params: Promise<{ id: st
                 {/* Real CLI Output from Logs */}
                 {data.logs && data.logs.length > 0 ? (
                   <div className="space-y-2">
-                    {data.logs.map((log: any, i: number) => (
+                    {data.logs.map((log: LogEntry, i: number) => (
                       <div key={i} className="flex gap-4">
                         <span className="text-neutral-600 shrink-0 w-24">
                           {log.created_at ? new Date(log.created_at).toISOString().split('T')[1].slice(0,-1) : '00:00:00.000'}
@@ -166,7 +167,7 @@ export default function RealExecutionPage({ params }: { params: Promise<{ id: st
             )}
             
             {/* Install Prompt (Success State) */}
-            {data.status === 'success' && (
+            {data.status === 'ok' && (
               <div className="mt-16 bg-blue-600/10 border border-blue-500/20 p-8 rounded-3xl flex flex-col items-center justify-center text-center space-y-6 shadow-[0_0_50px_rgba(37,99,235,0.05)] relative overflow-hidden">
                  <div className="absolute inset-0 bg-blue-600/5 blur-3xl pointer-events-none" />
                  <h2 className="text-2xl font-black text-white relative flex items-center gap-3">

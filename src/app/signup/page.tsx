@@ -16,8 +16,9 @@ export default function SignupPage() {
     setLoading(true);
     try {
       await signIn(provider, { callbackUrl: "/dashboard" });
-    } catch (err: any) {
-      setError("Authentication failed");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to create account");
+    } finally {
       setLoading(false);
     }
   };

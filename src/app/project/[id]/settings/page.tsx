@@ -6,14 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Webhook } from "@/types/api";
 
 export default function ProjectSettings({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const [webhooks, setWebhooks] = useState<any[]>([]);
+  const [webhooks, setWebhooks] = useState<Webhook[]>([]);
 
   useEffect(() => {
     setWebhooks([
-      { id: 'wh_1', url: 'https://api.example.com/webhooks/flux', events: ['execution.failed'], status: 'active' }
+      { id: 'wh_1', url: 'https://api.example.com/webhooks/flux', events: ['execution.failed'], status: 'active', project_id: id, created_at: null }
     ]);
   }, [id]);
 
@@ -55,17 +56,17 @@ export default function ProjectSettings({ params }: { params: Promise<{ id: stri
                    <div className="flex flex-col">
                       <span className="text-xs font-mono text-neutral-300 truncate max-w-[300px]">{wh.url}</span>
                       <div className="flex items-center gap-2 mt-1.5">
-                         {wh.events.map((e: string) => (
+                         {wh.events?.map((e: string) => (
                            <Badge key={e} variant="outline" className="text-[9px] font-bold text-blue-500 border-blue-500/20 bg-blue-500/5 px-2 py-0 uppercase">
                              {e}
                            </Badge>
                          ))}
                       </div>
                    </div>
-                </div>
-                <Button variant="ghost" size="icon" onClick={() => deleteWebhook(wh.id)} className="h-8 w-8 text-neutral-800 hover:text-red-500 lg:opacity-0 group-hover:opacity-100 transition-opacity">
-                   <Trash2 className="w-4 h-4" />
-                </Button>
+                 </div>
+                 <Button variant="ghost" size="icon" onClick={() => deleteWebhook(wh.id ?? "")} className="h-8 w-8 text-neutral-800 hover:text-red-500 lg:opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Trash2 className="w-4 h-4" />
+                 </Button>
              </div>
            ))}
            {webhooks.length === 0 && (

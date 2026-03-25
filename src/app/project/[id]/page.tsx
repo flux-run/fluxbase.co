@@ -23,9 +23,11 @@ import {
   Cpu,
   Globe,
   Code2,
+  LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useFluxApi } from "@/lib/api";
+import { Project, Execution, Function, LogEntry } from "@/types/api";
 
 function timeAgo(d: string) {
   const m = Math.floor((Date.now() - new Date(d).getTime()) / 60000);
@@ -52,7 +54,7 @@ function PipelineStep({
   done,
   color = "blue",
 }: {
-  icon: any;
+  icon: LucideIcon;
   label: string;
   sublabel: string;
   active?: boolean;
@@ -120,10 +122,10 @@ export default function ProjectOverview({
   const { data: session } = useSession();
   const router = useRouter();
 
-  const [project, setProject] = useState<any>(null);
-  const [executions, setExecs] = useState<any[]>([]);
-  const [functions, setFuncs] = useState<any[]>([]);
-  const [heroLogs, setHeroLogs] = useState<any[]>([]);
+  const [project, setProject] = useState<Project | null>(null);
+  const [executions, setExecs] = useState<Execution[]>([]);
+  const [functions, setFuncs] = useState<Function[]>([]);
+  const [heroLogs, setHeroLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
 
@@ -145,24 +147,25 @@ export default function ProjectOverview({
         const funcArr = Array.isArray(funcs) ? funcs : [];
         setProject(
           Array.isArray(projects)
-            ? projects.find((p: any) => p.id === id)
+            ? projects.find((p: Project) => p.id === id) ?? null
             : null
         );
         setExecs(execArr);
         setFuncs(funcArr);
 
         const hero =
-          execArr.find((e: any) => e.status === "error") ?? execArr[0];
+          execArr.find((e: Execution) => e.status === "error") ?? execArr[0];
         if (hero) {
           const detail = await api.getExecution(hero.id).catch(() => null);
           setHeroLogs(detail?.logs ?? detail?.console_logs ?? []);
         }
-      } catch (e: any) {
-        if (e?.message?.includes("Unauthorized") || e?.message?.includes("401")) {
+      } catch (e: unknown) {
+        const err = e instanceof Error ? e : new Error(String(e));
+        if (err.message.includes("Unauthorized") || err.message.includes("401")) {
           localStorage.removeItem("flux_token");
           router.push("/signup");
         } else {
-          console.error("API Load Error:", e instanceof Error ? e.message : e);
+          console.error("API Load Error:", err.message);
         }
       } finally {
         setLoading(false);
@@ -195,7 +198,7 @@ export default function ProjectOverview({
   const hero = executions.find((e) => e.status === "error") ?? executions[0] ?? null;
   const rest = executions.filter((e) => e.id !== hero?.id).slice(0, 5);
   const hasFailed = hero?.status === "error";
-  const errorLog = heroLogs.find((l: any) => l.level === "error");
+  const errorLog = heroLogs.find((l: LogEntry) => l.level === "error");
   const errorMsg = errorLog?.message ?? (hasFailed ? "Execution failed" : null);
 
   // Stats
@@ -308,7 +311,7 @@ export default function ProjectOverview({
                   {hero.duration_ms}ms
                 </span>
                 <span className="text-[10px] text-neutral-700 font-mono">
-                  {timeAgo(hero.started_at)}
+                  {timeAgo(hero.started_at ?? new Date().toISOString())}
                 </span>
               </div>
             </div>
@@ -328,7 +331,7 @@ export default function ProjectOverview({
                 {(() => {
                   // Try to extract "failed at" from error message or logs
                   const failedAtLog = heroLogs.find(
-                    (l: any) => l.level === "error" && l.message?.includes("at ")
+                    (l: LogEntry) => l.level === "error" && l.message?.includes("at ")
                   );
                   const rawAt =
                     failedAtLog?.message?.split("at ")?.[1]
@@ -338,7 +341,7 @@ export default function ProjectOverview({
                       ? errorMsg?.split("at ")?.[1]?.split("\n")?.[0]?.trim()
                       : null);
                   const externalCalls = heroLogs.filter(
-                    (l: any) =>
+                    (l: LogEntry) =>
                       l.message?.toLowerCase().includes("fetch") ||
                       l.message?.toLowerCase().includes("http") ||
                       l.message?.toLowerCase().includes("request")
@@ -384,7 +387,7 @@ export default function ProjectOverview({
             {/* log preview */}
             {heroLogs.length > 0 && (
               <div className="bg-black/50 border border-neutral-900/80 rounded-lg p-3 space-y-1.5 max-h-[88px] overflow-hidden">
-                {heroLogs.slice(0, 4).map((log: any, i: number) => (
+                {heroLogs.slice(0, 4).map((log: LogEntry, i: number) => (
                   <div key={i} className="flex items-start gap-2">
                     <span
                       className={`text-[8px] font-black uppercase shrink-0 mt-0.5 w-6 ${
@@ -606,7 +609,7 @@ export default function ProjectOverview({
                       {exec.duration_ms}ms
                     </span>
                     <span className="text-[10px] text-neutral-800 font-mono">
-                      {timeAgo(exec.started_at)}
+                      {timeAgo(exec.started_at ?? new Date().toISOString())}
                     </span>
                     <ChevronRight className="w-3 h-3 text-neutral-800 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>

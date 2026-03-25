@@ -13,7 +13,7 @@ import type {
 const API_URL = process.env.NEXT_PUBLIC_CONTROL_URL || "http://localhost:3001";
 
 // Raw HTTP helper — always reads token from localStorage as fallback
-async function request<T = any>(endpoint: string, token: string | null, options: RequestInit = {}): Promise<T> {
+async function request<T = unknown>(endpoint: string, token: string | null, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers);
   if (token) headers.set("Authorization", `Bearer ${token}`);
   if (!headers.has("Content-Type") && options.method !== "DELETE") {
@@ -22,12 +22,12 @@ async function request<T = any>(endpoint: string, token: string | null, options:
   const res = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error((err as any).error || `Request failed: ${res.status}`);
+    throw new Error((err as { error?: string }).error || `Request failed: ${res.status}`);
   }
   return res.json();
 }
 
-export async function fetchApi<T = any>(endpoint: string, options: RequestInit & { token?: string } = {}): Promise<T> {
+export async function fetchApi<T = unknown>(endpoint: string, options: RequestInit & { token?: string } = {}): Promise<T> {
   const token = options.token || (typeof window !== "undefined" ? localStorage.getItem("flux_token") : null);
   return request<T>(endpoint, token, options);
 }
@@ -50,7 +50,7 @@ export function useFluxApi(projectId?: string) {
 
   return {
     /* General */
-    request: <T = any>(endpoint: string, options?: RequestInit) => request<T>(endpoint, token(), options),
+    request: <T = unknown>(endpoint: string, options?: RequestInit) => request<T>(endpoint, token(), options),
 
     /* Projects */
     getProjects: () => request<Project[]>("/projects", token()),
@@ -77,7 +77,7 @@ export function useFluxApi(projectId?: string) {
 
     /* Stats */
     getProjectStats: (id?: string) =>
-      request<any>(`/stats/project?project_id=${id ?? projectId}`, token()).catch(() => null),
+      request<Record<string, unknown>>(`/stats/project?project_id=${id ?? projectId}`, token()).catch(() => null),
 
     /* Routes */
     getRoutes: (id?: string) =>
