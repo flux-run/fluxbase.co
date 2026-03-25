@@ -3,51 +3,92 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { fetchApi } from "@/lib/api";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 
-export default function Login() {
-  const [email, setEmail] = useState("dev@fluxbase.co");
-  const [error, setError] = useState("");
+export default function LoginPage() {
   const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  async function handleLogin(e: React.FormEvent) {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
+    setError("");
+
     try {
-      const res = await fetchApi("/auth/login", { method: "POST", body: JSON.stringify({ email }) });
+      const res = await fetchApi("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
       localStorage.setItem("flux_token", res.token);
+      localStorage.setItem("flux_user", JSON.stringify(res.user));
       router.push("/dashboard");
-    } catch(err: any) {
-      setError(err.message);
+    } catch (err: any) {
+      setError(err.message || "Failed to log in");
+    } finally {
+      setLoading(false);
     }
-  }
+  };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-white flex items-center justify-center font-mono">
-      <form onSubmit={handleLogin} className="p-8 border border-neutral-800 rounded-lg flex flex-col gap-4 w-96 bg-neutral-900 shadow-2xl">
-        <div className="mb-6">
-          <Link href="/" className="inline-block hover:opacity-80 transition-opacity mb-4">
-            <h1 className="text-2xl font-black tracking-tighter text-white">flux</h1>
-          </Link>
-          <p className="text-xs text-neutral-500 uppercase tracking-widest leading-relaxed">
-            Authentication Required<br/>
-            <span className="opacity-40">Production Observability</span>
-          </p>
-        </div>
-        <input 
-          className="bg-black border border-neutral-800 text-sm focus:border-neutral-500 outline-none p-3 rounded" 
-          value={email} onChange={e => setEmail(e.target.value)} placeholder="Email"
-        />
-        {error && <div className="text-red-500 text-sm">{error}</div>}
-        <button className="bg-white text-black font-semibold py-2.5 rounded mt-2 hover:bg-neutral-200 transition">
-          Authenticate
-        </button>
-        {/* Replaced CardFooter with a div to maintain syntactic correctness */}
-        <div className="flex flex-col gap-4 text-center pb-8"> 
-          <div className="text-sm text-neutral-500">
-            Don&apos;t have an account?{" "}
-            <Link href="/signup" className="text-white hover:underline font-medium">Sign up</Link>
-          </div>
-        </div>
-      </form>
+    <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center justify-center p-4">
+      <Link href="/" className="mb-8 flex items-center hover:opacity-80 transition-opacity">
+        <span className="text-xl font-bold tracking-tighter text-white">flux</span>
+      </Link>
+
+      <Card className="w-full max-w-md bg-[#111] border-neutral-800 shadow-2xl">
+        <CardHeader className="space-y-1 text-center">
+          <CardTitle className="text-2xl font-bold tracking-tight text-white">Log in</CardTitle>
+          <CardDescription className="text-neutral-500">
+            Welcome back to the production observability era.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-xs font-bold uppercase tracking-widest text-neutral-500">Email Address</Label>
+              <Input 
+                id="email" 
+                type="email" 
+                placeholder="name@company.com" 
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="bg-black border-neutral-800 text-white placeholder:text-neutral-700 h-11"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-xs font-bold uppercase tracking-widest text-neutral-500">Password</Label>
+              <Input 
+                id="password" 
+                type="password" 
+                placeholder="••••••••" 
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="bg-black border-neutral-800 text-white placeholder:text-neutral-700 h-11"
+              />
+            </div>
+            {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
+            <Button 
+              type="submit" 
+              className="w-full bg-white text-black hover:bg-neutral-200 font-bold h-11" 
+              disabled={loading}
+            >
+              {loading ? "Logging in..." : "Continue →"}
+            </Button>
+          </form>
+        </CardContent>
+        <CardFooter className="flex justify-center text-sm text-neutral-500">
+          Don&apos;t have an account?{" "}
+          <Link href="/signup" className="text-white hover:underline font-medium ml-1">Sign up</Link>
+        </CardFooter>
+      </Card>
     </div>
   );
 }

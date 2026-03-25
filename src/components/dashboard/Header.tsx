@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Search, Bell, User } from "lucide-react";
 import { FluxLogo } from "@/components/FluxLogo";
 import { OrgSwitcher } from "./OrgSwitcher";
+import { UserNav } from "./UserNav";
 
 export function Header() {
   return (
@@ -24,9 +25,7 @@ export function Header() {
         <button className="p-2 text-neutral-500 hover:text-white transition">
           <Bell className="w-5 h-5" />
         </button>
-        <div className="w-8 h-8 rounded-full bg-neutral-800 border border-neutral-700 flex items-center justify-center text-neutral-400">
-          <User className="w-4 h-4" />
-        </div>
+        <UserNav />
       </div>
     </header>
   );

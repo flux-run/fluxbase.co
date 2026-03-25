@@ -13,6 +13,7 @@ export default function SignupPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -24,10 +25,11 @@ export default function SignupPage() {
     try {
       const res = await fetchApi("/auth/register", {
         method: "POST",
-        body: JSON.stringify({ email, name }),
+        body: JSON.stringify({ email, name, password }),
       });
       localStorage.setItem("flux_token", res.token);
       localStorage.setItem("current_org_id", res.org_id);
+      localStorage.setItem("flux_user", JSON.stringify(res.user));
       router.push("/dashboard");
     } catch (err: any) {
       setError(err.message || "Failed to sign up");
@@ -70,6 +72,18 @@ export default function SignupPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                className="bg-black border-neutral-800 text-white placeholder:text-neutral-700 h-11"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-xs font-bold uppercase tracking-widest text-neutral-500">Password</Label>
+              <Input 
+                id="password" 
+                type="password" 
+                placeholder="••••••••" 
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 className="bg-black border-neutral-800 text-white placeholder:text-neutral-700 h-11"
               />
             </div>
