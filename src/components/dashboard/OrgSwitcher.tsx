@@ -19,7 +19,7 @@ export function OrgSwitcher() {
       if (data && data.length > 0) {
         const stored = localStorage.getItem("current_org_id") || session?.org_id;
         const found = data.find((o: any) => o.id === stored) || data[0];
-        if (found) {
+        if (found && found.id) {
           setCurrentOrg(found);
           localStorage.setItem("current_org_id", found.id);
         }
@@ -33,7 +33,7 @@ export function OrgSwitcher() {
 
   const switchOrg = (org: any) => {
     setCurrentOrg(org);
-    localStorage.setItem("current_org_id", org.id);
+    if (org.id) localStorage.setItem("current_org_id", org.id);
     setIsOpen(false);
     window.location.reload(); // Context refresh
   };
