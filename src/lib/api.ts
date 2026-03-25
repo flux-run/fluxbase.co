@@ -1,5 +1,14 @@
 import { useSession } from "next-auth/react";
 import { useCallback } from "react";
+import type { 
+  Project, 
+  Execution, 
+  ExecutionDetail, 
+  Function, 
+  Org, 
+  OrgMember, 
+  Route 
+} from "@/types/api";
 
 const API_URL = process.env.NEXT_PUBLIC_CONTROL_URL || "http://localhost:3001";
 
@@ -18,7 +27,6 @@ async function request<T = any>(endpoint: string, token: string | null, options:
   return res.json();
 }
 
-// Legacy export — reads from localStorage only (kept for backward compat)
 export async function fetchApi<T = any>(endpoint: string, options: RequestInit & { token?: string } = {}): Promise<T> {
   const token = options.token || (typeof window !== "undefined" ? localStorage.getItem("flux_token") : null);
   return request<T>(endpoint, token, options);
@@ -34,8 +42,6 @@ export function getStoredUser() {
 }
 
 // ─── Central API hook ──────────────────────────────────────────────────────
-// Every page should use this instead of calling fetchApi directly.
-// Token is resolved once from session → localStorage, injected into every call.
 export function useFluxApi(projectId?: string) {
   const { data: session } = useSession();
   const token = useCallback(() => {
@@ -43,39 +49,42 @@ export function useFluxApi(projectId?: string) {
   }, [session]);
 
   return {
+    /* General */
+    request: <T = any>(endpoint: string, options?: RequestInit) => request<T>(endpoint, token(), options),
+
     /* Projects */
-    getProjects: () => request("/projects", token()),
+    getProjects: () => request<Project[]>("/projects", token()),
     seedProject: (id?: string) =>
-      request(`/projects/${id ?? projectId}/seed`, token(), { method: "POST" }),
+      request<{ success: boolean; projectId: string }>(`/projects/${id ?? projectId}/seed`, token(), { method: "POST" }),
 
     /* Functions */
     getFunctions: (id?: string) =>
-      request(`/functions?project_id=${id ?? projectId}`, token()),
+      request<Function[]>(`/functions?project_id=${id ?? projectId}`, token()),
     getFunction: (funcId: string) =>
-      request(`/functions/${funcId}`, token()),
+      request<Function>(`/functions/${funcId}`, token()),
 
     /* Executions */
     getExecutions: (id?: string, extra = "") =>
-      request(`/executions?project_id=${id ?? projectId}${extra}`, token()),
+      request<Execution[]>(`/executions?project_id=${id ?? projectId}${extra}`, token()),
     getExecution: (execId: string) =>
-      request(`/executions/${execId}`, token()),
+      request<ExecutionDetail>(`/executions/${execId}`, token()),
     getFunctionExecutions: (funcId: string) =>
-      request(`/executions?function_id=${funcId}`, token()),
+      request<Execution[]>(`/executions?function_id=${funcId}`, token()),
     replayExecution: (execId: string) =>
-      request(`/executions/${execId}/replay`, token(), { method: "POST" }),
+      request<Execution>(`/executions/${execId}/replay`, token(), { method: "POST" }),
     resumeExecution: (execId: string) =>
-      request(`/executions/${execId}/resume`, token(), { method: "POST" }),
+      request<{ success: boolean }>(`/executions/${execId}/resume`, token(), { method: "POST" }),
 
     /* Stats */
     getProjectStats: (id?: string) =>
-      request(`/stats/project?project_id=${id ?? projectId}`, token()).catch(() => null),
+      request<any>(`/stats/project?project_id=${id ?? projectId}`, token()).catch(() => null),
 
     /* Routes */
     getRoutes: (id?: string) =>
-      request(`/routes?project_id=${id ?? projectId}`, token()),
+      request<Route[]>(`/routes?project_id=${id ?? projectId}`, token()),
 
     /* Orgs */
-    getOrgs: () => request("/orgs", token()),
-    getOrgMembers: (orgId: string) => request(`/orgs/${orgId}/members`, token()),
+    getOrgs: () => request<Org[]>("/orgs", token()),
+    getOrgMembers: (orgId: string) => request<OrgMember[]>(`/orgs/${orgId}/members`, token()),
   };
 }

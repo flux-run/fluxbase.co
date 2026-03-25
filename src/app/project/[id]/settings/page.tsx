@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useState, use } from "react";
-import { fetchApi } from "@/lib/api";
 import { Bell, Globe, Plus, Trash2, Key, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

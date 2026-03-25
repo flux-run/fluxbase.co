@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useState, use } from "react";
 import { Header } from "@/components/dashboard/Header";
-import { ChevronLeft, Info, AlertTriangle, XCircle, Activity, Play, TerminalSquare, Check, Copy } from "lucide-react";
-import { fetchApi } from "@/lib/api";
+import { ChevronLeft, Info, AlertTriangle, XCircle, Activity, Play, TerminalSquare, Check, Copy, Zap } from "lucide-react";
+import { useFluxApi } from "@/lib/api";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -14,6 +14,7 @@ export default function RealExecutionPage({ params }: { params: Promise<{ id: st
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const router = useRouter();
+  const api = useFluxApi();
 
   useEffect(() => {
     if (status === "loading") return;
@@ -23,20 +24,20 @@ export default function RealExecutionPage({ params }: { params: Promise<{ id: st
         return;
     }
 
-    fetchApi(`/executions/${id}`, { token }).then(res => {
+    api.getExecution(id).then(res => {
       setData(res);
       setLoading(false);
     }).catch(err => {
       console.error(err);
       setLoading(false);
     });
-  }, [id, session, status]);
+  }, [id, session, status, api]);
 
   const handleReplay = async () => {
     setActionLoading("replay");
     const token = session?.flux_token || localStorage.getItem("flux_token");
     try {
-      const res = await fetchApi(`/executions/${id}/replay`, { method: 'POST', token });
+      const res = await api.replayExecution(id);
       if (res.id) {
         // Navigate to the newly cloned execution
         router.push(`/exec/${res.id}`);
@@ -55,7 +56,7 @@ export default function RealExecutionPage({ params }: { params: Promise<{ id: st
     setActionLoading("resume");
     const token = session?.flux_token || localStorage.getItem("flux_token");
     try {
-      await fetchApi(`/executions/${id}/resume`, { method: 'POST', token });
+      await api.resumeExecution(id);
       alert("Execution patched and resumed. Refreshing...");
       window.location.reload();
     } catch (err) {

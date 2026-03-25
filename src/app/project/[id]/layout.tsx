@@ -2,8 +2,6 @@
 import { useEffect, useState, use } from "react";
 import dynamic from "next/dynamic";
 import { Sidebar } from "@/components/dashboard/Sidebar";
-import { fetchApi } from "@/lib/api";
-
 const Header = dynamic(() => import("@/components/dashboard/Header").then(m => m.Header), { ssr: false });
 
 export default function ProjectLayout({ children, params }: { children: React.ReactNode, params: Promise<{ id: string }> }) {

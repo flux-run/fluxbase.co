@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, use } from "react";
-import { fetchApi } from "@/lib/api";
+import { useFluxApi } from "@/lib/api";
 import { Building, Users, CreditCard, Shield, UserPlus, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,15 +14,16 @@ export default function OrgSettings({ params }: { params: Promise<{ id: string }
   const [org, setOrg] = useState<any>(null);
   const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const api = useFluxApi();
 
   useEffect(() => {
     const loadOrgData = async () => {
       try {
-        const orgs = await fetchApi(`/orgs`);
+        const orgs = await api.getOrgs();
         const found = orgs.find((o: any) => o.id === id);
         setOrg(found);
         
-        const memberData = await fetchApi(`/orgs/${id}/members`);
+        const memberData = await api.getOrgMembers(id);
         setMembers(memberData);
       } catch (err) {
         console.error("Failed to load org settings:", err);
@@ -32,7 +33,7 @@ export default function OrgSettings({ params }: { params: Promise<{ id: string }
     };
 
     loadOrgData();
-  }, [id]);
+  }, [id, api]);
 
   if (loading) return <div className="animate-pulse text-sm font-mono text-neutral-500 p-12 text-center mt-20">Loading organization context...</div>;
 
