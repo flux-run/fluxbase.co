@@ -34,61 +34,64 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center justify-center p-8 selection:bg-blue-500/30 selection:text-white">
-      {/* Centered Minimal Header */}
-      <div className="mb-12 animate-in fade-in slide-in-from-top-4 duration-1000">
-        <Link href="/" className="flex flex-col items-center gap-2 hover:opacity-80 transition-opacity">
-          <span className="text-2xl font-black tracking-tighter text-white">flux</span>
-        </Link>
-      </div>
+    <div className="min-h-screen bg-[#0A0A0A] relative flex flex-col items-center justify-center p-8 selection:bg-blue-500/30 selection:text-white overflow-hidden">
+      {/* High-fidelity background depth */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(30,60,120,0.15)_0%,_transparent_60%)] pointer-events-none" />
+      
+      <main className="w-full max-w-md relative z-10 animate-in fade-in slide-in-from-bottom-8 duration-500">
+        
+        {/* Logo - Grouped tightly for unified system feel */}
+        <div className="mb-6 flex flex-col items-center">
+          <Link href="/" className="flex flex-col items-center hover:opacity-80 transition-opacity">
+            <span className="text-3xl font-black tracking-tighter text-white">flux</span>
+          </Link>
+        </div>
 
-      <main className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-1000">
-        <Card className="bg-[#0D0D0D] border-neutral-900 shadow-2xl relative overflow-hidden group">
-          {/* Subtle accent line */}
-          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-blue-500/50 to-transparent opacity-50" />
+        <Card className="bg-[#0D0D0D]/80 backdrop-blur-3xl border-white/[0.12] shadow-[0_0_80px_rgba(0,0,0,0.4)] relative overflow-hidden group">
+          {/* Elite accent lines */}
+          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-blue-500/40 to-transparent" />
+          <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-20" />
           
-          <CardHeader className="space-y-4 text-center pb-6 pt-12">
-            <CardTitle className="text-2xl font-black tracking-tight text-white leading-tight">Login to Flux</CardTitle>
+          <CardHeader className="space-y-4 text-center pb-8 pt-12">
+            <CardTitle className="text-3xl font-black tracking-tight text-white leading-tight">Fix production <br/> bugs instantly</CardTitle>
             <div className="space-y-1">
-               <p className="text-[11px] text-neutral-500 uppercase tracking-[0.2em] font-black">
-                  Debug real production systems, not logs
-               </p>
-               <p className="text-[10px] text-blue-500/80 font-bold tracking-tight">
-                  Replay production failures instantly
+               <p className="text-[14px] text-neutral-300 font-medium tracking-tight">
+                  Replay failures. Apply fixes. Resume execution.
                </p>
             </div>
           </CardHeader>
 
-          <CardContent className="space-y-6 px-10 pb-12">
-            <div className="space-y-3">
+          <CardContent className="space-y-10 px-10 pb-12">
+            <div className="space-y-4">
               <Button 
                 onClick={() => handleOAuth("github")}
-                className="w-full bg-[#1A1A1A] text-white hover:bg-white hover:text-black transition-all font-black h-12 flex items-center justify-center gap-4 border border-neutral-800 active:scale-[0.98] duration-200 text-xs uppercase tracking-widest"
+                className="w-full bg-[#EAEAEA] text-black hover:bg-white transition-all font-black h-14 flex items-center justify-center gap-4 shadow-xl hover:shadow-[0_0_30px_rgba(255,255,255,0.15)] hover:-translate-y-1 active:scale-[0.98] duration-300 text-xs uppercase tracking-[0.2em] border-none group/btn"
                 disabled={loading}
               >
-                <GitHubIcon className="w-5 h-5 fill-current" />
-                Continue with GitHub
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/[0.05] to-blue-500/0 opacity-0 group-hover/btn:opacity-100 transition-opacity" />
+                <GitHubIcon className="w-5 h-5 fill-current relative z-10" />
+                <span className="relative z-10">Continue with GitHub</span>
               </Button>
               <Button 
                 onClick={() => handleOAuth("google")}
-                className="w-full bg-transparent text-neutral-400 hover:text-white hover:bg-white/5 transition-all font-bold h-12 flex items-center justify-center gap-4 border border-white/5 active:scale-[0.98] duration-200 text-xs uppercase tracking-widest"
+                className="w-full bg-transparent text-neutral-600 hover:text-neutral-400 hover:bg-white/5 transition-all font-bold h-12 flex items-center justify-center gap-4 border border-white/5 opacity-40 hover:opacity-100 active:scale-[0.98] duration-200 text-[10px] uppercase tracking-widest"
                 disabled={loading}
               >
-                <GoogleIcon className="w-5 h-5 grayscale opacity-50 contrast-125" />
+                <GoogleIcon className="w-3.5 h-3.5 grayscale opacity-50 contrast-125" />
                 Continue with Google
               </Button>
             </div>
 
-            <div className="text-center">
-               <p className="text-[10px] text-neutral-700 font-bold uppercase tracking-widest leading-relaxed">
-                  No setup required. <br />
-                  <span className="text-neutral-800 italic">Works with your existing backend.</span>
+            <div className="space-y-6 text-center pt-2">
+               <p className="text-[11px] text-neutral-500 font-black uppercase tracking-tight leading-relaxed opacity-100">
+                  Works with your backend. <br />
+                  <span className="text-neutral-600 italic">No complex setup required.</span>
                </p>
             </div>
             
             {error && (
               <div className="pt-2 animate-in fade-in slide-in-from-top-1">
-                <p className="text-xs text-red-500 font-bold text-center border border-red-500/20 bg-red-500/5 py-2 rounded-sm uppercase tracking-tighter">
+                <p className="text-[10px] text-red-500 font-bold text-center border border-red-500/20 bg-red-500/5 py-2 rounded-sm uppercase tracking-tighter">
                    {error}
                 </p>
               </div>
@@ -97,15 +100,15 @@ export default function LoginPage() {
         </Card>
 
         {/* Minimal Footer Links */}
-        <div className="mt-12 text-center space-y-6 opacity-30 hover:opacity-100 transition-opacity duration-500">
+        <div className="mt-12 text-center space-y-6 opacity-20 hover:opacity-100 transition-opacity duration-700">
           <p className="text-neutral-500 text-[9px] uppercase tracking-[0.3em] font-black italic">
              Zero logs. Zero friction. Total visibility.
           </p>
           <div className="flex items-center justify-center gap-8">
-            <Link href="/" className="text-neutral-500 hover:text-white transition text-[10px] font-black uppercase tracking-widest">
+            <Link href="/" className="text-neutral-600 hover:text-white transition text-[10px] font-black uppercase tracking-widest">
               Landing Page
             </Link>
-            <Link href="/docs" className="text-neutral-500 hover:text-white transition text-[10px] font-black uppercase tracking-widest">
+            <Link href="/docs" className="text-neutral-600 hover:text-white transition text-[10px] font-black uppercase tracking-widest">
               Docs
             </Link>
           </div>
