@@ -23,11 +23,13 @@ export default function ExecutionsPage({ params }: { params: Promise<{ id: strin
   const [filter, setFilter] = useState("all");
 
   useEffect(() => {
+    if (!api.ready) return;
+    
     api.getExecutions().then(data => {
       setExecutions(data);
       setLoading(false);
     }).catch(console.error);
-  }, [id]);
+  }, [id, api]);
 
   const filtered = filter === "all" ? executions : executions.filter(e => e.status === filter);
 

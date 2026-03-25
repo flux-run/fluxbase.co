@@ -133,9 +133,7 @@ export default function ProjectOverview({
 
   const load = useCallback(
     async (silent = false) => {
-      const token =
-        session?.flux_token || localStorage.getItem("flux_token");
-      if (!token) return;
+      if (!api.ready) return;
       if (!silent) setLoading(true);
       try {
         const [projects, execs, funcs] = await Promise.all([

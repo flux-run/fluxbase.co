@@ -19,16 +19,18 @@ export default function RealExecutionPage({ params }: { params: Promise<{ id: st
 
   useEffect(() => {
     if (status === "loading") return;
+    if (!api.ready) return;
+
     const token = session?.flux_token || localStorage.getItem("flux_token");
-    if (!token) {
+    if (!token && status === "unauthenticated") {
         window.location.href = "/login";
         return;
     }
 
-    api.getExecution(id).then(res => {
+    api.getExecution(id).then((res: ExecutionDetail) => {
       setData(res);
       setLoading(false);
-    }).catch(err => {
+    }).catch((err: unknown) => {
       console.error(err);
       setLoading(false);
     });

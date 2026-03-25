@@ -12,10 +12,19 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
   const api = useFluxApi(id);
   const [data, setData] = useState<ExecutionDetailType | null>(null);
   const [copied, setCopied] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.getExecution(exec_id).then(setData).catch(console.error);
-  }, [exec_id]);
+    if (!api.ready) return;
+
+    api.getExecution(exec_id).then(res => {
+      setData(res);
+      setLoading(false);
+    }).catch((err: unknown) => {
+      console.error(err);
+      setLoading(false);
+    });
+  }, [exec_id, api]);
 
   const copyReplay = () => {
     navigator.clipboard.writeText(`flux replay ${exec_id}`);

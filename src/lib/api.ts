@@ -1,5 +1,5 @@
 import { useSession } from "next-auth/react";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import type { 
   Project, 
   Execution, 
@@ -43,12 +43,14 @@ export function getStoredUser() {
 
 // ─── Central API hook ──────────────────────────────────────────────────────
 export function useFluxApi(projectId?: string) {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const token = useCallback(() => {
     return session?.flux_token || (typeof window !== "undefined" ? localStorage.getItem("flux_token") : null);
   }, [session]);
 
-  return {
+  return useMemo(() => ({
+    status,
+    ready: status !== "loading",
     /* General */
     request: <T = unknown>(endpoint: string, options?: RequestInit) => request<T>(endpoint, token(), options),
 
@@ -86,5 +88,5 @@ export function useFluxApi(projectId?: string) {
     /* Orgs */
     getOrgs: () => request<Org[]>("/orgs", token()),
     getOrgMembers: (orgId: string) => request<OrgMember[]>(`/orgs/${orgId}/members`, token()),
-  };
+  }), [token, status, projectId]);
 }

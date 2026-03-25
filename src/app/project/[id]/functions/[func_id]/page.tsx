@@ -13,17 +13,31 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
   const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
-    api.getFunction(func_id).then(setData).catch(console.error);
-    api.getFunctionExecutions(func_id).then(setExecutions).catch(console.error);
+    if (!api.ready) return;
+
+    try {
+      const [func, execs] = await Promise.all([
+        api.getFunction(func_id),
+        api.getFunctionExecutions(func_id)
+      ]);
+      setData(func);
+      setExecutions(execs);
+    } catch (err) {
+      console.error("Failed to load function details:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    loadData().then(() => setLoading(false));
+    loadData();
     const interval = setInterval(() => {
-      api.getFunctionExecutions(func_id).then(setExecutions).catch(console.error);
+      if (api.ready) {
+        api.getFunctionExecutions(func_id).then(setExecutions).catch(console.error);
+      }
     }, 3000);
     return () => clearInterval(interval);
-  }, [func_id]);
+  }, [func_id, api]);
 
   if (!data) return <div className="animate-pulse text-sm font-mono text-neutral-500">Loading function orchestration...</div>;
 

@@ -22,11 +22,13 @@ export default function FunctionsPage({ params }: { params: Promise<{ id: string
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!api.ready) return;
+
     api.getFunctions().then(data => {
       setFunctions(data);
       setLoading(false);
     }).catch(console.error);
-  }, [id]);
+  }, [id, api]);
 
   return (
     <div className="space-y-6">
