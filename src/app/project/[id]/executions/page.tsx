@@ -1,20 +1,21 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { fetchApi } from "@/lib/api";
 import { Activity, Search, Filter, ChevronRight, Clock } from "lucide-react";
 
-export default function ExecutionsPage({ params }: { params: { id: string } }) {
+export default function ExecutionsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const [executions, setExecutions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
 
   useEffect(() => {
-    fetchApi(`/executions?project_id=${params.id}`).then(data => {
+    fetchApi(`/executions?project_id=${id}`).then(data => {
       setExecutions(data);
       setLoading(false);
     }).catch(console.error);
-  }, [params.id]);
+  }, [id]);
 
   const filtered = filter === "all" ? executions : executions.filter(e => e.status === filter);
 
@@ -66,7 +67,7 @@ export default function ExecutionsPage({ params }: { params: { id: string } }) {
                    </div>
                  </td>
                  <td className="px-6 py-4">
-                   <Link href={`/project/${params.id}/executions/${exec.id}`} className="text-neutral-400 group-hover:text-blue-400 transition-colors">
+                   <Link href={`/project/${id}/executions/${exec.id}`} className="text-neutral-400 group-hover:text-blue-400 transition-colors">
                      {exec.id.slice(0, 12)}...
                    </Link>
                  </td>

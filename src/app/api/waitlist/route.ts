@@ -1,15 +1,23 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
-// Server-side only — secret key never reaches the browser
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SECRET_KEY!,
-)
+// Lazy initialization to prevent build-time crashes when env vars are missing
+const getSupabase = () => {
+  const url = process.env.SUPABASE_URL
+  const key = process.env.SUPABASE_SECRET_KEY
+  if (!url || !key) return null
+  return createClient(url, key)
+}
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 
 export async function POST(req: NextRequest) {
+  const supabase = getSupabase()
+  if (!supabase) {
+    console.error('[waitlist] Supabase environment variables missing')
+    return NextResponse.json({ error: 'Database configuration missing' }, { status: 500 })
+  }
+
   let body: unknown
   try {
     body = await req.json()

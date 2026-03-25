@@ -1,14 +1,15 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, use } from "react";
 import { fetchApi } from "@/lib/api";
 import { Activity, AlertCircle, Clock, Zap } from "lucide-react";
 
-export default function ProjectOverview({ params }: { params: { id: string } }) {
+export default function ProjectOverview({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const [stats, setStats] = useState<any>(null);
 
   useEffect(() => {
-    fetchApi(`/stats/project?project_id=${params.id}`).then(setStats).catch(console.error);
-  }, [params.id]);
+    fetchApi(`/stats/project?project_id=${id}`).then(setStats).catch(console.error);
+  }, [id]);
 
   if (!stats) return <div className="animate-pulse text-sm font-mono text-neutral-500">Calculating environment metrics...</div>;
 

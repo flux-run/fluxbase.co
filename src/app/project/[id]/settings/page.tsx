@@ -1,9 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, use } from "react";
 import { fetchApi } from "@/lib/api";
 import { Bell, Globe, Plus, Trash2, Key, ShieldCheck, Mail } from "lucide-react";
 
-export default function ProjectSettings({ params }: { params: { id: string } }) {
+export default function ProjectSettings({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const [webhooks, setWebhooks] = useState<any[]>([]);
 
   useEffect(() => {
@@ -11,7 +12,7 @@ export default function ProjectSettings({ params }: { params: { id: string } }) 
     setWebhooks([
       { id: 'wh_1', url: 'https://api.example.com/webhooks/flux', events: ['execution.failed'], status: 'active' }
     ]);
-  }, [params.id]);
+  }, [id]);
 
   const deleteWebhook = (id: string) => {
     setWebhooks(prev => prev.filter(w => w.id !== id));

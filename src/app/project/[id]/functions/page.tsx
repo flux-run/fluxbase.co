@@ -1,19 +1,20 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { fetchApi } from "@/lib/api";
 import { Zap, ArrowUpRight, Activity, AlertCircle } from "lucide-react";
 
-export default function FunctionsPage({ params }: { params: { id: string } }) {
+export default function FunctionsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const [functions, setFunctions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchApi(`/functions?project_id=${params.id}`).then(data => {
+    fetchApi(`/functions?project_id=${id}`).then(data => {
       setFunctions(data);
       setLoading(false);
     }).catch(console.error);
-  }, [params.id]);
+  }, [id]);
 
   return (
     <div className="space-y-8">
@@ -40,7 +41,7 @@ export default function FunctionsPage({ params }: { params: { id: string } }) {
             {functions.map(f => (
                <tr key={f.id} className="group hover:bg-[#141414] transition-colors cursor-pointer">
                  <td className="px-6 py-5">
-                   <Link href={`/project/${params.id}/functions/${f.id}`} className="flex flex-col">
+                   <Link href={`/project/${id}/functions/${f.id}`} className="flex flex-col">
                      <span className="text-neutral-100 font-bold group-hover:text-blue-400 transition-colors flex items-center gap-2">
                        <Zap className="w-3.5 h-3.5 text-blue-500" />
                        {f.name}

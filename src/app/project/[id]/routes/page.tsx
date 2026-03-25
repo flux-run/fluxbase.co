@@ -1,18 +1,19 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, use } from "react";
 import { fetchApi } from "@/lib/api";
 import { Globe, Plus, ArrowUpRight, Zap, MoreVertical } from "lucide-react";
 
-export default function RoutesPage({ params }: { params: { id: string } }) {
+export default function RoutesPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const [routes, setRoutes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchApi(`/routes?project_id=${params.id}`).then(data => {
+    fetchApi(`/routes?project_id=${id}`).then(data => {
       setRoutes(data);
       setLoading(false);
     }).catch(console.error);
-  }, [params.id]);
+  }, [id]);
 
   return (
     <div className="space-y-8">

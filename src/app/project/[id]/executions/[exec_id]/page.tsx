@@ -1,18 +1,19 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, use } from "react";
 import { fetchApi } from "@/lib/api";
 import { Activity, Terminal, ExternalLink, Copy, Check, ChevronDown, ChevronRight, Zap, Globe, Database, Server } from "lucide-react";
 
-export default function ExecutionDetail({ params }: { params: { id: string, exec_id: string } }) {
+export default function ExecutionDetail({ params }: { params: Promise<{ id: string, exec_id: string }> }) {
+  const { id, exec_id } = use(params);
   const [data, setData] = useState<any>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    fetchApi(`/executions/${params.exec_id}`).then(setData).catch(console.error);
-  }, [params.exec_id]);
+    fetchApi(`/executions/${exec_id}`).then(setData).catch(console.error);
+  }, [exec_id]);
 
   const copyReplay = () => {
-    navigator.clipboard.writeText(`flux replay ${params.exec_id}`);
+    navigator.clipboard.writeText(`flux replay ${exec_id}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -37,7 +38,7 @@ export default function ExecutionDetail({ params }: { params: { id: string, exec
              </h2>
           </div>
           <div className="flex items-center gap-4 text-neutral-500 font-mono text-[12px]">
-             <span>{params.exec_id}</span>
+             <span>{exec_id}</span>
              <span className="w-1 h-1 bg-neutral-800 rounded-full" />
              <span className="flex items-center gap-1.5"><Activity className="w-3.5 h-3.5" /> {data.duration_ms}ms</span>
              <span className="w-1 h-1 bg-neutral-800 rounded-full" />
@@ -58,18 +59,18 @@ export default function ExecutionDetail({ params }: { params: { id: string, exec
         <div className="relative bg-[#111] border border-blue-500/30 p-6 rounded-2xl shadow-2xl flex flex-col md:flex-row items-center justify-between gap-6 backdrop-blur-sm">
            <div className="flex items-center gap-5">
               <div className="w-12 h-12 bg-blue-600/20 rounded-xl flex items-center justify-center text-blue-500 shadow-[0_0_20px_rgba(37,99,235,0.2)]">
-                 <Repeat className="w-6 h-6" />
+                 <RepeatIcon className="w-6 h-6" />
               </div>
               <div>
                  <h4 className="text-white font-bold text-lg">Replay this execution locally</h4>
                  <p className="text-neutral-500 text-sm mt-0.5">Hydrate your local runtime with the exact state of this production call.</p>
               </div>
            </div>
-           <button 
+           <button
              onClick={copyReplay}
              className="w-full md:w-auto flex items-center justify-between gap-4 bg-black/50 border border-neutral-800 px-5 py-3 rounded-xl font-mono text-sm hover:border-blue-500/50 transition-all active:scale-95 group/btn"
            >
-              <code className="text-blue-400">flux replay {params.exec_id.slice(0, 8)}</code>
+              <code className="text-blue-400">flux replay {exec_id.slice(0, 8)}</code>
               {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4 text-neutral-600 group-hover/btn:text-white transition-colors" />}
            </button>
         </div>
@@ -157,7 +158,7 @@ export default function ExecutionDetail({ params }: { params: { id: string, exec
   );
 }
 
-function Repeat({ className }: { className?: string }) {
+function RepeatIcon({ className }: { className?: string }) {
   return (
     <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>

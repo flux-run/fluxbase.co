@@ -1,17 +1,18 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { fetchApi } from "@/lib/api";
-import { Zap, Activity, AlertCircle, Clock, Globe, Terminal, Save, Play } from "lucide-react";
+import { Zap, Activity, AlertCircle, Clock, Globe, Terminal, Save, Play, ArrowUpRight } from "lucide-react";
 
-export default function FunctionDetail({ params }: { params: { id: string, func_id: string } }) {
+export default function FunctionDetail({ params }: { params: Promise<{ id: string, func_id: string }> }) {
+  const { id, func_id } = use(params);
   const [data, setData] = useState<any>(null);
   const [executions, setExecutions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
-    fetchApi(`/functions/${params.func_id}`).then(setData).catch(console.error);
-    fetchApi(`/executions?function_id=${params.func_id}`).then(setExecutions).catch(console.error);
+    fetchApi(`/functions/${func_id}`).then(setData).catch(console.error);
+    fetchApi(`/executions?function_id=${func_id}`).then(setExecutions).catch(console.error);
   };
 
   useEffect(() => {
@@ -19,11 +20,11 @@ export default function FunctionDetail({ params }: { params: { id: string, func_
     
     // LIVE POLLING: Every 3 seconds
     const interval = setInterval(() => {
-      fetchApi(`/executions?function_id=${params.func_id}&limit=10`).then(setExecutions).catch(console.error);
+      fetchApi(`/executions?function_id=${func_id}&limit=10`).then(setExecutions).catch(console.error);
     }, 3000);
     
     return () => clearInterval(interval);
-  }, [params.func_id]);
+  }, [func_id]);
 
   if (!data) return <div className="animate-pulse text-sm font-mono text-neutral-500">Loading function orchestration...</div>;
 
@@ -97,7 +98,7 @@ export default function FunctionDetail({ params }: { params: { id: string, func_
                   {executions.map(exec => (
                     <tr key={exec.id} className="hover:bg-neutral-900/50 transition-colors">
                       <td className="px-4 py-3">
-                        <Link href={`/project/${params.id}/executions/${exec.id}`} className="text-blue-500 hover:underline">{exec.id.slice(0, 8)}</Link>
+                        <Link href={`/project/${id}/executions/${exec.id}`} className="text-blue-500 hover:underline">{exec.id.slice(0, 8)}</Link>
                       </td>
                       <td className="px-4 py-3">
                         <span className={`font-bold ${exec.status === 'ok' ? 'text-green-500' : 'text-red-500'}`}>{exec.status.toUpperCase()}</span>
