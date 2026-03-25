@@ -20,7 +20,7 @@ const STEPS: Step[] = [
       { text: "→ Stripe API returned 402", type: 'output' },
       { text: "→ Error: payment failed", type: 'error' },
     ],
-    pauseAfter: 1500,
+    pauseAfter: 800,
   },
   {
     command: "flux replay exec_123",
@@ -29,7 +29,7 @@ const STEPS: Step[] = [
       { text: "→ Applying patch...", type: 'warning' },
       { text: "→ Success: Environment synced", type: 'success' },
     ],
-    pauseAfter: 1500,
+    pauseAfter: 800,
   },
   {
     command: "flux resume exec_123",
@@ -37,7 +37,7 @@ const STEPS: Step[] = [
       { text: "→ Resuming request in production...", type: 'output' },
       { text: "→ Completed successfully", type: 'success' },
     ],
-    pauseAfter: 4000,
+    pauseAfter: 3000,
   }
 ];
 
@@ -60,19 +60,19 @@ export function FluxTerminalDemo() {
       
       const step = STEPS[index];
       
-      // Delay before typing command
-      await new Promise(r => setTimeout(r, 600));
+      // Snappy initial delay (reduced from 600ms)
+      await new Promise(r => setTimeout(r, 200));
       
       setIsTyping(true);
-      // Type command character by character
+      // Type command character by character - slightly faster
       for (let i = 0; i <= step.command.length; i++) {
         if (!active) return;
         setCurrentCommand(step.command.slice(0, i));
-        await new Promise(r => setTimeout(r, 30 + Math.random() * 50));
+        await new Promise(r => setTimeout(r, 20 + Math.random() * 40));
       }
       
       setIsTyping(false);
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 300));
 
       // Push command to history
       setVisibleLines(prev => [...prev, { text: step.command, type: 'command' }]);
@@ -81,12 +81,12 @@ export function FluxTerminalDemo() {
       // Reveal outputs line by line
       for (const output of step.outputs) {
         if (!active) return;
-        await new Promise(r => setTimeout(r, index === 0 && output.type === 'error' ? 400 : 100 + Math.random() * 100));
+        await new Promise(r => setTimeout(r, index === 0 && output.type === 'error' ? 300 : 80 + Math.random() * 80));
         setVisibleLines(prev => [...prev, output]);
       }
 
       // Pause before next step
-      await new Promise(r => setTimeout(r, step.pauseAfter || 1000));
+      await new Promise(r => setTimeout(r, step.pauseAfter || 800));
 
       // Next step or loop
       if (index < STEPS.length - 1) {
@@ -124,7 +124,7 @@ export function FluxTerminalDemo() {
           <div className="h-3 w-3 rounded-full bg-emerald-500/20 group-hover:bg-emerald-500/40 transition-colors" />
         </div>
         <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-neutral-600 font-mono">
-          flux-cli — debug session
+          flux-cli — session:exec_123
         </div>
         <div className="w-12" />
       </div>
@@ -167,7 +167,7 @@ export function FluxTerminalDemo() {
       {/* Terminal Footer */}
       <div className="border-t border-neutral-900 bg-[#080808] px-5 py-3 flex items-center justify-between">
          <div className="text-[10px] text-neutral-700 font-bold tracking-tight">
-            PID: 84920 · SESSION: <span className="text-blue-500/50 uppercase tracking-widest ml-1">Live</span>
+            PID: 84920 · STATUS: <span className="text-emerald-500/80 uppercase tracking-widest ml-1">Active</span>
          </div>
          <div className="flex items-center gap-2.5">
             <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping opacity-75" />

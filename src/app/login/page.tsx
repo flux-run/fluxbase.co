@@ -47,14 +47,19 @@ export default function LoginPage() {
           {/* Subtle accent line */}
           <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-blue-500/50 to-transparent opacity-50" />
           
-          <CardHeader className="space-y-2 text-center pb-6 pt-12">
-            <CardTitle className="text-2xl font-black tracking-tight text-white">Login to Flux</CardTitle>
-            <p className="text-[11px] text-neutral-500 uppercase tracking-[0.2em] font-bold">
-               Continue debugging production systems
-            </p>
+          <CardHeader className="space-y-4 text-center pb-6 pt-12">
+            <CardTitle className="text-2xl font-black tracking-tight text-white leading-tight">Login to Flux</CardTitle>
+            <div className="space-y-1">
+               <p className="text-[11px] text-neutral-500 uppercase tracking-[0.2em] font-black">
+                  Debug real production systems, not logs
+               </p>
+               <p className="text-[10px] text-blue-500/80 font-bold tracking-tight">
+                  Replay production failures instantly
+               </p>
+            </div>
           </CardHeader>
 
-          <CardContent className="space-y-4 px-10 pb-12">
+          <CardContent className="space-y-6 px-10 pb-12">
             <div className="space-y-3">
               <Button 
                 onClick={() => handleOAuth("github")}
@@ -66,12 +71,19 @@ export default function LoginPage() {
               </Button>
               <Button 
                 onClick={() => handleOAuth("google")}
-                className="w-full bg-white text-black hover:bg-neutral-200 transition-all font-black h-12 flex items-center justify-center gap-4 active:scale-[0.98] duration-200 text-xs uppercase tracking-widest"
+                className="w-full bg-transparent text-neutral-400 hover:text-white hover:bg-white/5 transition-all font-bold h-12 flex items-center justify-center gap-4 border border-white/5 active:scale-[0.98] duration-200 text-xs uppercase tracking-widest"
                 disabled={loading}
               >
-                <GoogleIcon className="w-5 h-5" />
+                <GoogleIcon className="w-5 h-5 grayscale opacity-50 contrast-125" />
                 Continue with Google
               </Button>
+            </div>
+
+            <div className="text-center">
+               <p className="text-[10px] text-neutral-700 font-bold uppercase tracking-widest leading-relaxed">
+                  No setup required. <br />
+                  <span className="text-neutral-800 italic">Works with your existing backend.</span>
+               </p>
             </div>
             
             {error && (
@@ -81,13 +93,6 @@ export default function LoginPage() {
                 </p>
               </div>
             )}
-
-            <div className="pt-8 text-center">
-               <p className="text-[10px] text-neutral-600 font-bold uppercase tracking-widest leading-relaxed">
-                  No setup. No config. <br />
-                  <span className="text-neutral-700 italic">Works with your existing backend.</span>
-               </p>
-            </div>
           </CardContent>
         </Card>
 
