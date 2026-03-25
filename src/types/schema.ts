@@ -37,6 +37,16 @@ export interface Route {
   created_at: string | null;
 }
 
+export interface ServiceToken {
+  id: string | null;
+  org_id: string;
+  project_id: string;
+  token_hash: string;
+  created_at: string | null;
+  revoked: boolean | null;
+  last_used_at: string | null;
+}
+
 export interface User {
   id: string | null;
   email: string;
@@ -70,6 +80,7 @@ export interface Checkpoint {
   response: Record<string, unknown> | null;
   duration_ms: number | null;
   created_at: string | null;
+  org_id: string | null;
 }
 
 export interface ExecutionConsoleLog {
@@ -78,6 +89,7 @@ export interface ExecutionConsoleLog {
   level: string;
   message: string;
   created_at: string | null;
+  org_id: string | null;
 }
 
 export interface Execution {
@@ -93,12 +105,5 @@ export interface Execution {
   code_sha: string;
   started_at: string | null;
   duration_ms: number | null;
-}
-
-export interface ServiceToken {
-  id: string | null;
-  service_name: string;
-  token_hash: string;
-  created_at: string | null;
-  revoked_at: string | null;
+  org_id: string | null;
 }
