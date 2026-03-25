@@ -1,71 +1,96 @@
 "use client";
-import { useEffect, useState, use } from "react";
-import { fetchApi } from "@/lib/api";
-import { Activity, AlertCircle, Clock, Zap } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-
-import { useSession } from "next-auth/react";
+import { useState, use } from "react";
+import { useRouter } from "next/navigation";
+import { Activity, Search, Zap, ArrowRight, PlayCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 
 export default function ProjectOverview({ params }: { params: Promise<{ id: string }> }) {
-  const { data: session, status } = useSession();
   const { id } = use(params);
-  const [stats, setStats] = useState<any>(null);
+  const router = useRouter();
+  const [execId, setExecId] = useState("");
 
-  useEffect(() => {
-    if (status !== "authenticated" || !id) return;
-    
-    const token = session?.flux_token || localStorage.getItem("flux_token");
-    if (!token) return;
+  const handleDebug = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!execId.trim()) return;
+    router.push(`/project/${id}/executions/${execId.trim()}`);
+  };
 
-    fetchApi(`/stats/project?project_id=${id}`, { token }).then(setStats).catch(console.error);
-  }, [id, session, status]);
-
-  if (!stats) return <div className="animate-pulse text-sm font-mono text-neutral-500 p-8">Calculating environment metrics...</div>;
-
-  const cards = [
-    { name: "Total Executions", value: stats.total || 0, icon: Activity, detail: "Total lifetime", color: "text-blue-500" },
-    { name: "Success Rate", value: `${stats.total > 0 ? ((stats.success / stats.total) * 100).toFixed(1) : 100}%`, icon: Zap, detail: "Across all functions", color: "text-emerald-500" },
-    { name: "Error Rate", value: `${stats.total > 0 ? ((stats.errors / stats.total) * 100).toFixed(1) : 0}%`, icon: AlertCircle, detail: "Last 24h", color: "text-red-500" },
-    { name: "Avg Duration", value: `${Math.round(stats.avg_duration || 0)}ms`, icon: Clock, detail: "Median latency", color: "text-amber-500" },
-  ];
+  const handleDemo = () => {
+    // Shared demo ID seeded in the backend
+    const demoId = "d3b07455-da1a-4ec1-9231-111111111111";
+    router.push(`/project/${id}/executions/${demoId}`);
+  };
 
   return (
-    <div className="space-y-8">
-      <header>
-        <h2 className="text-2xl font-bold text-white tracking-tight">Overview</h2>
-        <p className="text-sm text-neutral-500 mt-1">Real-time health of your infrastructure.</p>
-      </header>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {cards.map((card) => (
-          <Card key={card.name} className="bg-[#111] border-neutral-800 shadow-sm overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">
-                {card.name}
-              </CardTitle>
-              <card.icon className={`h-4 w-4 ${card.color}`} />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-neutral-100 font-mono tracking-tighter">{card.value}</div>
-              <p className="text-[10px] text-neutral-600 font-medium mt-1">
-                {card.detail}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
+    <div className="min-h-[70vh] flex flex-col items-center justify-center space-y-12 max-w-4xl mx-auto">
+      
+      {/* MOMENTUM HERO */}
+      <div className="text-center space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-700">
+        <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-600/10 border border-blue-500/20 rounded-3xl mb-4 shadow-[0_0_50px_rgba(37,99,235,0.1)]">
+           <Zap className="w-10 h-10 text-blue-500" />
+        </div>
+        <h1 className="text-4xl font-black tracking-tight text-white sm:text-5xl">
+          Debug a production failure
+        </h1>
+        <p className="text-lg text-neutral-500 max-w-xl mx-auto font-medium">
+          Replay failures. Apply fixes. Resume execution. <br/>
+          <span className="text-neutral-600">Enter an execution ID to instantly reconstruct the state.</span>
+        </p>
       </div>
 
-      <Card className="bg-[#111] border border-neutral-900 shadow-xl">
-        <CardContent className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-16 h-16 bg-[#0a0a0a] border border-neutral-900 rounded-full flex items-center justify-center mb-6 shadow-inner">
-            <Activity className="w-8 h-8 text-neutral-800" />
-          </div>
-          <CardTitle className="text-lg font-bold text-neutral-200">Execution Stream Coming Soon</CardTitle>
-          <CardDescription className="text-sm text-neutral-600 mt-2 max-w-sm">
-            We are building an interactive 3D flamegraph for your entire infrastructure execution flow.
-          </CardDescription>
-        </CardContent>
-      </Card>
+      {/* SEARCH / DEBUG INPUT */}
+      <form 
+        onSubmit={handleDebug}
+        className="w-full max-w-2xl relative group animate-in fade-in slide-in-from-bottom-12 duration-1000 delay-200"
+      >
+        <div className="absolute inset-0 bg-blue-600/20 blur-3xl opacity-0 group-focus-within:opacity-100 transition-opacity duration-1000" />
+        <Card className="relative bg-[#0D0D0D]/80 backdrop-blur-3xl border-white/[0.08] shadow-2xl overflow-hidden group-focus-within:border-blue-500/50 transition-colors">
+          <CardContent className="p-2 flex items-center gap-2">
+            <div className="pl-4 text-neutral-600 group-focus-within:text-blue-500 transition-colors">
+              <Search className="w-5 h-5" />
+            </div>
+            <Input 
+              placeholder="Paste execution ID or request ID..." 
+              value={execId}
+              onChange={(e) => setExecId(e.target.value)}
+              className="flex-1 bg-transparent border-none text-lg font-mono placeholder:text-neutral-700 focus-visible:ring-0 text-white h-14"
+            />
+            <Button 
+              type="submit"
+              disabled={!execId.trim()}
+              className="bg-white text-black hover:bg-neutral-200 font-black px-6 h-12 rounded-xl transition-all disabled:opacity-30 flex items-center gap-2 group/btn"
+            >
+              Debug Execution
+              <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
+            </Button>
+          </CardContent>
+        </Card>
+      </form>
+
+      {/* INSTANT WOW / DEMO */}
+      <div className="flex flex-col items-center gap-6 animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-500">
+        <button 
+          onClick={handleDemo}
+          className="flex items-center gap-3 text-blue-500 hover:text-blue-400 font-bold tracking-tight transition-all hover:scale-105 active:scale-95 group"
+        >
+          <PlayCircle className="w-6 h-6 group-hover:rotate-12 transition-transform" />
+          Try a sample debugging session →
+        </button>
+
+        <div className="flex items-center justify-center gap-8 opacity-40 hover:opacity-100 transition-opacity">
+           <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] font-black text-neutral-500">
+              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+              Infrastructure Ready
+           </div>
+           <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] font-black text-neutral-500">
+              <Zap className="w-3 h-3 text-blue-500" />
+              0s Cold Start
+           </div>
+        </div>
+      </div>
+
     </div>
   );
 }
