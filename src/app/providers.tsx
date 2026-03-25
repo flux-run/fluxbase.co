@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
+import { SessionProvider } from 'next-auth/react'
 import { PostHogProvider } from './posthog-provider'
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -18,8 +19,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
   )
 
   return (
-    <PostHogProvider>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    </PostHogProvider>
+    <SessionProvider>
+      <PostHogProvider>
+        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      </PostHogProvider>
+    </SessionProvider>
   )
 }

@@ -7,20 +7,38 @@ import { Plus, ArrowUpRight, Activity, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
+import { useSession } from "next-auth/react";
+
 export default function Dashboard() {
+  const { data: session, status } = useSession();
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const orgId = localStorage.getItem("current_org_id");
-    fetchApi(`/projects?org_id=${orgId}`).then(data => {
+    if (status === "loading") return;
+    
+    if (status === "unauthenticated") {
+        window.location.href = "/login";
+        return;
+    }
+
+    const orgId = session?.org_id || localStorage.getItem("current_org_id");
+    const token = session?.flux_token || localStorage.getItem("flux_token");
+
+    if (!orgId || !token) {
+      // If we are authenticated by NextAuth but induction hasn't finished 
+      // or synced yet, we wait.
+      return;
+    }
+
+    fetchApi(`/projects?org_id=${orgId}`, { token }).then(data => {
       setProjects(data);
       setLoading(false);
     }).catch(err => {
-      console.error(err);
+      console.error("Dashboard fetch error:", err);
       setLoading(false);
     });
-  }, []);
+  }, [session, status]);
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white font-sans flex flex-col">

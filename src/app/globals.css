@@ -554,3 +554,25 @@ pre:hover .copy-btn { opacity: 1; }
   .nav-github { display: none !important; }
   .nav-version { display: none !important; }
 }
+
+/* ─── Magic Code Component ───────────────────────────────────── */
+.magic-code {
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 1rem;
+  font-family: var(--font-geist-mono);
+  box-shadow: 0 0 40px -10px rgba(59, 130, 246, 0.2);
+  position: relative;
+}
+
+.magic-code::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.5), transparent);
+}

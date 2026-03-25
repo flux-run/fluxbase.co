@@ -3,17 +3,25 @@ import { useEffect, useState } from "react";
 import { fetchApi } from "@/lib/api";
 import { ChevronDown, Plus, Building } from "lucide-react";
 
+import { useSession } from "next-auth/react";
+
 export function OrgSwitcher() {
+  const { data: session, status } = useSession();
   const [orgs, setOrgs] = useState<any[]>([]);
   const [currentOrg, setCurrentOrg] = useState<any>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchApi("/orgs").then(data => {
+    if (status !== "authenticated") return;
+    
+    const token = session?.flux_token || localStorage.getItem("flux_token");
+    if (!token) return;
+
+    fetchApi("/orgs", { token }).then(data => {
       setOrgs(data);
       if (data && data.length > 0) {
-        const stored = localStorage.getItem("current_org_id");
+        const stored = localStorage.getItem("current_org_id") || session?.org_id;
         const found = data.find((o: any) => o.id === stored) || data[0];
         if (found) {
           setCurrentOrg(found);
@@ -25,7 +33,7 @@ export function OrgSwitcher() {
       console.error("OrgSwitcher fetch failed:", err);
       setLoading(false);
     });
-  }, []);
+  }, [session, status]);
 
   const switchOrg = (org: any) => {
     setCurrentOrg(org);

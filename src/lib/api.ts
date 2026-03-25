@@ -1,7 +1,7 @@
 const API_URL = process.env.NEXT_PUBLIC_CONTROL_URL || "http://localhost:3001";
 
-export async function fetchApi<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = typeof window !== "undefined" ? localStorage.getItem("flux_token") : null;
+export async function fetchApi<T = any>(endpoint: string, options: RequestInit & { token?: string } = {}): Promise<T> {
+  const token = options.token || (typeof window !== "undefined" ? localStorage.getItem("flux_token") : null);
   const headers = new Headers(options.headers);
   if (token) headers.set("Authorization", `Bearer ${token}`);
   if (!headers.has("Content-Type") && options.method !== "DELETE") {

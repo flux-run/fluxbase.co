@@ -4,13 +4,21 @@ import { fetchApi } from "@/lib/api";
 import { Activity, AlertCircle, Clock, Zap } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
+import { useSession } from "next-auth/react";
+
 export default function ProjectOverview({ params }: { params: Promise<{ id: string }> }) {
+  const { data: session, status } = useSession();
   const { id } = use(params);
   const [stats, setStats] = useState<any>(null);
 
   useEffect(() => {
-    fetchApi(`/stats/project?project_id=${id}`).then(setStats).catch(console.error);
-  }, [id]);
+    if (status !== "authenticated" || !id) return;
+    
+    const token = session?.flux_token || localStorage.getItem("flux_token");
+    if (!token) return;
+
+    fetchApi(`/stats/project?project_id=${id}`, { token }).then(setStats).catch(console.error);
+  }, [id, session, status]);
 
   if (!stats) return <div className="animate-pulse text-sm font-mono text-neutral-500 p-8">Calculating environment metrics...</div>;
 
