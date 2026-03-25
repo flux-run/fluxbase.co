@@ -35,60 +35,67 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center justify-center p-6 lg:p-12">
-      {/* Top Logo */}
-      <div className="absolute top-12 left-12 hidden lg:block">
+    <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center p-8 sm:p-12 lg:p-20 overflow-x-hidden selection:bg-blue-500/30 selection:text-white">
+      {/* Absolute Logo */}
+      <div className="absolute top-8 left-8 sm:top-12 sm:left-12">
         <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
-          <span className="text-xl font-bold tracking-tighter text-white">flux</span>
+          <span className="text-xl font-black tracking-tighter text-white">flux</span>
         </Link>
       </div>
-      
-      <Link href="/" className="mb-12 flex items-center hover:opacity-80 transition-opacity lg:hidden">
-        <span className="text-xl font-bold tracking-tighter text-white">flux</span>
-      </Link>
 
-      <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-24 items-center">
-        {/* Left Col: Marketing & Terminal */}
-        <div className="flex flex-col space-y-10 order-2 lg:order-1">
-          <div className="space-y-6 text-center lg:text-left">
-            <h1 className="text-4xl md:text-6xl font-black tracking-tight text-white leading-[1.1]">
-              Reproduce any production bug <br />
-              <span className="text-neutral-600">with one command.</span>
-            </h1>
-            <div className="space-y-4">
-                <p className="text-xl text-neutral-300 font-medium leading-relaxed">
-                    No logs. No guessing. <br className="hidden lg:block" />
-                    Replay exactly what happened in production — locally.
-                </p>
-            </div>
-          </div>
-          
-          <div className="w-full max-w-xl mx-auto lg:mx-0">
-            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-neutral-700 mb-6 text-center lg:text-left">
-              From production failure → fix in seconds
-            </p>
-            <FluxTerminalDemo />
+      <main className="w-full max-w-5xl flex flex-col items-center pt-20 sm:pt-32">
+        {/* Hero Copy Section */}
+        <div className="text-center space-y-8 mb-20 animate-in fade-in slide-in-from-top-4 duration-1000">
+          <h1 className="text-4xl md:text-7xl lg:text-8xl font-black tracking-tight text-white leading-[1] text-balance">
+            Reproduce any <br className="hidden md:block"/> production bug <br />
+            <span className="text-neutral-700">with one command.</span>
+          </h1>
+          <div className="space-y-4 max-w-2xl mx-auto">
+              <p className="text-xl md:text-2xl text-neutral-300 font-medium leading-relaxed text-balance">
+                  No logs. No guessing. <br className="hidden sm:block" />
+                  Replay exactly what happened in production — locally.
+              </p>
           </div>
         </div>
 
-        {/* Right Col: Login Card */}
-        <div className="flex justify-center lg:justify-end order-1 lg:order-2">
-          <Card className="w-full max-w-md bg-[#0D0D0D] border-neutral-900 shadow-[0_0_80px_rgba(0,0,0,0.6)] relative overflow-visible">
+        {/* Terminal Section - THE HERO */}
+        <div className="w-full relative group space-y-8 animate-in fade-in zoom-in-95 duration-1000 delay-300">
+           {/* Terminal background glow */}
+          <div className="absolute -inset-20 bg-blue-500/5 blur-[120px] rounded-full pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity duration-1000" />
+          
+          <div className="relative text-center uppercase tracking-[0.4em] text-neutral-800 text-[10px] font-black pointer-events-none">
+             This is your debugging workflow now
+          </div>
+          
+          <div className="relative transform group-hover:scale-[1.01] transition-transform duration-700">
+            <FluxTerminalDemo />
+          </div>
+
+          <div className="relative text-center">
+            <p className="text-xs text-neutral-600 font-bold uppercase tracking-widest leading-relaxed">
+               Works with your existing backend. <br className="sm:hidden" /> 
+               <span className="text-neutral-700 ml-1">No setup required.</span>
+            </p>
+          </div>
+        </div>
+
+        {/* Login Section - SECONDARY */}
+        <section className="w-full max-w-md mt-32 mb-40 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-500">
+          <Card className="bg-transparent border border-neutral-800/50 shadow-2xl backdrop-blur-sm relative overflow-visible group hover:border-neutral-700/50 transition-colors">
             <div className="absolute -top-10 left-0 right-0 text-center">
-              <p className="text-[10px] uppercase tracking-[0.3em] font-black text-neutral-700">
-                Start debugging production failures instantly
+              <p className="text-[10px] uppercase tracking-[0.3em] font-black text-neutral-700 group-hover:text-neutral-500 transition-colors">
+                Start debugging instantly
               </p>
             </div>
             
             <CardHeader className="space-y-1 text-center pb-4 pt-10">
               <CardTitle className="text-2xl font-bold tracking-tight text-white">Login to Flux</CardTitle>
-              <p className="text-xs text-neutral-500">Built for debugging real production systems</p>
             </CardHeader>
 
             <CardContent className="space-y-4 px-10 pb-10">
               <Button 
                 onClick={() => handleOAuth("github")}
-                className="w-full bg-[#1A1A1A] text-white hover:bg-white hover:text-black transition-all font-bold h-12 flex items-center justify-center gap-3 border border-neutral-800"
+                className="w-full bg-[#1A1A1A] text-white hover:bg-white hover:text-black transition-all font-bold h-12 flex items-center justify-center gap-4 border border-neutral-800 active:scale-95 duration-200"
                 disabled={loading}
               >
                 <GitHubIcon className="w-5 h-5 fill-current" />
@@ -96,35 +103,30 @@ export default function LoginPage() {
               </Button>
               <Button 
                 onClick={() => handleOAuth("google")}
-                className="w-full bg-white text-black hover:bg-neutral-200 transition-all font-bold h-12 flex items-center justify-center gap-3"
+                className="w-full bg-white text-black hover:bg-neutral-200 transition-all font-bold h-12 flex items-center justify-center gap-4 active:scale-95 duration-200"
                 disabled={loading}
               >
                 <GoogleIcon className="w-5 h-5" />
                 Continue with Google →
               </Button>
               
-              <div className="pt-6 text-center">
-                 <p className="text-xs text-neutral-500 font-medium leading-relaxed">
-                    No setup. No config. <br />
-                    <span className="text-neutral-600 italic font-medium">Works with your existing backend.</span>
-                 </p>
-              </div>
-
               {error && <p className="text-xs text-red-500 font-medium text-center pt-2">{error}</p>}
             </CardContent>
           </Card>
-        </div>
-      </div>
+        </section>
 
-      {/* Global Footer */}
-      <div className="mt-20 lg:mt-32 text-center border-t border-neutral-900/50 pt-8 w-full max-w-lg">
-        <p className="text-neutral-700 text-[10px] uppercase tracking-widest font-bold mb-4">
-          Zero logs. Zero friction. Total visibility.
-        </p>
-        <Link href="/docs" className="text-neutral-500 hover:text-white transition text-xs font-medium">
-          Read the technical architecture →
-        </Link>
-      </div>
+        {/* Global Footer */}
+        <footer className="w-full max-w-lg text-center border-t border-neutral-900/50 pt-12 pb-20 opacity-50 hover:opacity-100 transition-opacity duration-500">
+          <p className="text-neutral-600 text-[10px] uppercase tracking-[0.3em] font-black mb-6 leading-relaxed">
+            Zero logs. Zero friction. <br className="sm:hidden" /> Total visibility.
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+            <Link href="/docs" className="text-neutral-500 hover:text-white transition text-xs font-bold uppercase tracking-widest">
+              Technical architecture →
+            </Link>
+          </div>
+        </footer>
+      </main>
     </div>
   );
 }
