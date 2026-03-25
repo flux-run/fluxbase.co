@@ -1,8 +1,15 @@
 import { cn } from "@/lib/utils";
 
-export function FluxLogo({ className }: { className?: string }) {
+interface FluxLogoProps {
+  className?: string;
+  size?: number;
+}
+
+export function FluxLogo({ className, size = 24 }: FluxLogoProps) {
   return (
     <svg 
+      width={size}
+      height={size}
       viewBox="0 0 100 100" 
       fill="currentColor" 
       className={cn("text-current", className)}
@@ -14,3 +21,6 @@ export function FluxLogo({ className }: { className?: string }) {
     </svg>
   );
 }
+
+// Alias for compatibility with pre-existing pages (e.g. not-found.tsx)
+export const FluxIcon = FluxLogo;
