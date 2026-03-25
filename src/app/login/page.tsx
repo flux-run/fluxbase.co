@@ -35,75 +35,89 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center justify-center p-6 sm:p-8">
-      <Link href="/" className="mb-12 flex items-center hover:opacity-80 transition-opacity">
+    <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center justify-center p-6 lg:p-12">
+      {/* Top Logo */}
+      <div className="absolute top-12 left-12 hidden lg:block">
+        <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
+          <span className="text-xl font-bold tracking-tighter text-white">flux</span>
+        </Link>
+      </div>
+      
+      <Link href="/" className="mb-12 flex items-center hover:opacity-80 transition-opacity lg:hidden">
         <span className="text-xl font-bold tracking-tighter text-white">flux</span>
       </Link>
 
-      <div className="w-full max-w-2xl mb-16 text-center space-y-6">
-        <h1 className="text-4xl md:text-6xl font-black tracking-tight text-white leading-[1.1] sm:px-10">
-          Reproduce any production bug <br />
-          <span className="text-neutral-600">with one command.</span>
-        </h1>
-        <div className="space-y-2">
-            <p className="text-xl text-neutral-300 font-medium">
-                No logs. No guessing. 
+      <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-24 items-center">
+        {/* Left Col: Marketing & Terminal */}
+        <div className="flex flex-col space-y-10 order-2 lg:order-1">
+          <div className="space-y-6 text-center lg:text-left">
+            <h1 className="text-4xl md:text-6xl font-black tracking-tight text-white leading-[1.1]">
+              Reproduce any production bug <br />
+              <span className="text-neutral-600">with one command.</span>
+            </h1>
+            <div className="space-y-4">
+                <p className="text-xl text-neutral-300 font-medium leading-relaxed">
+                    No logs. No guessing. <br className="hidden lg:block" />
+                    Replay exactly what happened in production — locally.
+                </p>
+            </div>
+          </div>
+          
+          <div className="w-full max-w-xl mx-auto lg:mx-0">
+            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-neutral-700 mb-6 text-center lg:text-left">
+              From production failure → fix in seconds
             </p>
-            <p className="text-lg text-neutral-500">
-                Replay exactly what happened in production — locally.
-            </p>
+            <FluxTerminalDemo />
+          </div>
         </div>
-        
-        <div className="max-w-xl mx-auto pt-8">
-          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-neutral-700 mb-6\">
-            From production failure → fix in seconds
-          </p>
-          <FluxTerminalDemo />
+
+        {/* Right Col: Login Card */}
+        <div className="flex justify-center lg:justify-end order-1 lg:order-2">
+          <Card className="w-full max-w-md bg-[#0D0D0D] border-neutral-900 shadow-[0_0_80px_rgba(0,0,0,0.6)] relative overflow-visible">
+            <div className="absolute -top-10 left-0 right-0 text-center">
+              <p className="text-[10px] uppercase tracking-[0.3em] font-black text-neutral-700">
+                Start debugging production failures instantly
+              </p>
+            </div>
+            
+            <CardHeader className="space-y-1 text-center pb-4 pt-10">
+              <CardTitle className="text-2xl font-bold tracking-tight text-white">Login to Flux</CardTitle>
+              <p className="text-xs text-neutral-500">Built for debugging real production systems</p>
+            </CardHeader>
+
+            <CardContent className="space-y-4 px-10 pb-10">
+              <Button 
+                onClick={() => handleOAuth("github")}
+                className="w-full bg-[#1A1A1A] text-white hover:bg-white hover:text-black transition-all font-bold h-12 flex items-center justify-center gap-3 border border-neutral-800"
+                disabled={loading}
+              >
+                <GitHubIcon className="w-5 h-5 fill-current" />
+                Continue with GitHub →
+              </Button>
+              <Button 
+                onClick={() => handleOAuth("google")}
+                className="w-full bg-white text-black hover:bg-neutral-200 transition-all font-bold h-12 flex items-center justify-center gap-3"
+                disabled={loading}
+              >
+                <GoogleIcon className="w-5 h-5" />
+                Continue with Google →
+              </Button>
+              
+              <div className="pt-6 text-center">
+                 <p className="text-xs text-neutral-500 font-medium leading-relaxed">
+                    No setup. No config. <br />
+                    <span className="text-neutral-600 italic font-medium">Works with your existing backend.</span>
+                 </p>
+              </div>
+
+              {error && <p className="text-xs text-red-500 font-medium text-center pt-2">{error}</p>}
+            </CardContent>
+          </Card>
         </div>
       </div>
 
-      <Card className="w-full max-w-md bg-[#0D0D0D] border-neutral-900 shadow-[0_0_50px_rgba(0,0,0,0.4)] relative overflow-visible">
-        <div className="absolute -top-10 left-0 right-0 text-center">
-          <p className="text-[10px] uppercase tracking-[0.3em] font-black text-neutral-700">
-            Start debugging production failures instantly
-          </p>
-        </div>
-        
-        <CardHeader className="space-y-1 text-center pb-4 pt-8">
-          <CardTitle className="text-2xl font-bold tracking-tight text-white">Login to Flux</CardTitle>
-          <p className="text-xs text-neutral-500">Built for debugging real production systems</p>
-        </CardHeader>
-
-        <CardContent className="space-y-4 px-8 pb-8">
-          <Button 
-            onClick={() => handleOAuth("github")}
-            className="w-full bg-[#1A1A1A] text-white hover:bg-white hover:text-black transition-all font-bold h-12 flex items-center justify-center gap-3 border border-neutral-800"
-            disabled={loading}
-          >
-            <GitHubIcon className="w-5 h-5 fill-current" />
-            Continue with GitHub →
-          </Button>
-          <Button 
-            onClick={() => handleOAuth("google")}
-            className="w-full bg-white text-black hover:bg-neutral-200 transition-all font-bold h-12 flex items-center justify-center gap-3"
-            disabled={loading}
-          >
-            <GoogleIcon className="w-5 h-5" />
-            Continue with Google →
-          </Button>
-          
-          <div className="pt-4 text-center">
-             <p className="text-xs text-neutral-500 font-medium leading-relaxed">
-                No setup. No config. <br />
-                <span className="text-neutral-600 italic font-medium">Works with your existing backend.</span>
-             </p>
-          </div>
-
-          {error && <p className="text-xs text-red-500 font-medium text-center pt-2">{error}</p>}
-        </CardContent>
-      </Card>
-
-      <div className="mt-20 text-center border-t border-neutral-900/50 pt-8 w-full max-w-md">
+      {/* Global Footer */}
+      <div className="mt-20 lg:mt-32 text-center border-t border-neutral-900/50 pt-8 w-full max-w-lg">
         <p className="text-neutral-700 text-[10px] uppercase tracking-widest font-bold mb-4">
           Zero logs. Zero friction. Total visibility.
         </p>

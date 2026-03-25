@@ -97,7 +97,6 @@ export function FluxTerminalDemo() {
 
     return () => {
       isPaused.current = true;
-      clearTimeout(timeout);
     };
   }, []);
 
