@@ -7,7 +7,8 @@ import type {
   Function, 
   Org, 
   OrgMember, 
-  Route 
+  Route,
+  ServiceToken,
 } from "@/types/api";
 
 const API_URL = process.env.NEXT_PUBLIC_CONTROL_URL || "http://localhost:3001";
@@ -88,5 +89,16 @@ export function useFluxApi(projectId?: string) {
     /* Orgs */
     getOrgs: () => request<Org[]>("/orgs", token()),
     getOrgMembers: (orgId: string) => request<OrgMember[]>(`/orgs/${orgId}/members`, token()),
+
+    /* Service Tokens */
+    getServiceTokens: (id?: string) =>
+      request<ServiceToken[]>(`/service-tokens?project_id=${id ?? projectId}`, token()),
+    createServiceToken: (name: string, id?: string) =>
+      request<ServiceToken>("/service-tokens", token(), {
+        method: "POST",
+        body: JSON.stringify({ project_id: id ?? projectId, name }),
+      }),
+    revokeServiceToken: (tokenId: string) =>
+      request<{ success: boolean }>(`/service-tokens/${tokenId}`, token(), { method: "DELETE" }),
   }), [token, status, projectId]);
 }

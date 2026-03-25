@@ -58,3 +58,12 @@ export interface ExecutionDetail extends Execution {
   checkpoints?: Checkpoint[];
 }
 
+export interface ServiceToken {
+  id: string;
+  name?: string;
+  scope: string;
+  created_at: string;
+  last_used_at?: string;
+  revoked: boolean;
+  token?: string; // only present on create
+}
