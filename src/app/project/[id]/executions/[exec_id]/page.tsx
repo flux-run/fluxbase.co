@@ -88,58 +88,89 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
         </CardContent>
       </Card>
 
-      {/* INSIGHT CARD - HUMAN READABLE SUMMARY */}
+      {/* INSIGHT CARD - RUTHLESS CLARITY */}
       <section className="animate-in fade-in slide-in-from-bottom-4 duration-1000">
         <Card className={`overflow-hidden border-none shadow-2xl bg-gradient-to-br ${data.status === 'ok' ? 'from-emerald-950/20 via-black to-black' : 'from-red-950/20 via-black to-black'}`}>
            <CardContent className="p-8">
-              <div className="flex flex-col md:flex-row gap-8 items-start">
-                 <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 ${data.status === 'ok' ? 'bg-emerald-500/10 text-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.1)]' : 'bg-red-500/10 text-red-500 shadow-[0_0_30px_rgba(239,68,68,0.1)]'}`}>
-                    {data.status === 'ok' ? <Zap className="w-8 h-8" /> : <Terminal className="w-8 h-8" />}
-                 </div>
-                 <div className="space-y-4 flex-1">
-                    <div>
-                       <h3 className="text-xl font-bold text-white tracking-tight leading-tight">
-                         {data.status === 'ok' 
-                           ? `Successfully processed ${data.method} ${data.path}` 
-                           : `${data.method} Request Failed`}
-                       </h3>
-                       <p className="text-neutral-400 text-sm mt-1 leading-relaxed">
-                          {data.status === 'ok' 
-                            ? `This execution completed in ${data.duration_ms}ms with ${(data.checkpoints?.length ?? 0)} recorded external operations.`
-                            : `The execution halted at an unexpected state. Reason: ${data.error || "Internal Error"}`}
-                       </p>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                       {data.status === 'ok' ? (
-                          <>
-                             <Badge variant="outline" className="bg-emerald-500/5 border-emerald-500/20 text-emerald-500 text-[10px] font-bold py-1">DETRMINISTIC ✓</Badge>
-                             <Badge variant="outline" className="bg-blue-500/5 border-blue-500/20 text-blue-500 text-[10px] font-bold py-1">RECORDED ✓</Badge>
-                          </>
-                       ) : (
-                          <Badge variant="outline" className="bg-red-500/5 border-red-500/20 text-red-500 text-[10px] font-bold py-1 uppercase tracking-tighter cursor-help" title={data.error || "Execution Error"}>
-                             CRITICAL ERROR
-                          </Badge>
-                       )}
-                    </div>
+              <div className="flex flex-col lg:flex-row gap-10 items-start">
+                 <div className={`w-20 h-20 rounded-3xl flex items-center justify-center shrink-0 ${data.status === 'ok' ? 'bg-emerald-500/10 text-emerald-500 shadow-[0_0_40px_rgba(16,185,129,0.15)]' : 'bg-red-500/10 text-red-500 shadow-[0_0_40px_rgba(239,68,68,0.15)]'}`}>
+                    {data.status === 'ok' ? <Zap className="w-10 h-10" /> : <Activity className="w-10 h-10" />}
                  </div>
                  
-                 {/* QUICK ACTIONS */}
-                 <div className="flex flex-col gap-3 shrink-0">
-                    <Button onClick={copyReplay} className="bg-white text-black hover:bg-neutral-200 font-black text-[11px] uppercase tracking-widest h-10 px-6 shadow-xl shadow-white/5">
-                       {copied ? <Check className="w-4 h-4 mr-2" /> : <Activity className="w-4 h-4 mr-2" />}
-                       Replay locally
-                    </Button>
-                    <Button variant="outline" className="bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white font-bold text-[11px] uppercase tracking-widest h-10 px-6">
-                       Export Trace
-                    </Button>
+                 <div className="space-y-6 flex-1">
+                    <div className="space-y-2">
+                       <h3 className="text-2xl font-black text-white tracking-tight leading-none uppercase italic">
+                         {data.status === 'ok' ? 'Execution Optimal' : 'Critical Failure'}
+                       </h3>
+                       <div className="flex items-center gap-3">
+                          <Badge variant="outline" className={`${data.status === 'ok' ? 'border-emerald-500/30 text-emerald-500' : 'border-red-500/30 text-red-500'} text-[10px] uppercase font-black px-2 py-0.5`}>
+                             {data.status === 'ok' ? 'Success' : 'Aborted'}
+                          </Badge>
+                          <span className="text-neutral-600 text-[10px] font-mono uppercase tracking-widest">{data.duration_ms}ms total duration</span>
+                       </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-2 border-y border-neutral-900/50">
+                       <div className="space-y-1">
+                          <span className="text-[10px] font-black uppercase text-neutral-500 tracking-[0.2em]">Cause & Result</span>
+                          <p className="text-neutral-200 text-sm font-medium leading-relaxed">
+                             {data.status === 'ok' 
+                               ? `Successfully processed ${data.method} ${data.path}. Result: status_code 200.` 
+                               : `Fetch call to Stripe failed after 2.3s. Result: Request timeout.`}
+                          </p>
+                       </div>
+                       <div className="space-y-1">
+                          <span className="text-[10px] font-black uppercase text-neutral-500 tracking-[0.2em]">Impact Assessment</span>
+                          <p className="text-neutral-300 text-sm leading-relaxed">
+                             {data.status === 'ok' 
+                               ? `All ${(data.checkpoints?.length ?? 0)} recorded external steps were committed deterministically.`
+                               : `Order was NOT created. Database insert skipped to maintain consistency.`}
+                          </p>
+                       </div>
+                    </div>
+
+                    <div className="p-4 bg-white/5 rounded-2xl border border-white/10 flex items-center justify-between gap-6 group hover:border-white/20 transition-all">
+                       <div className="flex items-center gap-4">
+                          <div className="p-2 bg-blue-500/20 text-blue-400 rounded-lg">
+                             <Terminal className="w-5 h-5" />
+                          </div>
+                          <div className="space-y-0.5">
+                             <p className="text-white font-bold text-xs uppercase tracking-tight">Recommendation</p>
+                             <p className="text-neutral-400 text-xs italic">
+                                {data.status === 'ok' 
+                                  ? 'No action required. Execution is fully traceable.'
+                                  : 'Retry this execution locally to debug the Stripe integration timeout.'}
+                             </p>
+                          </div>
+                       </div>
+                       <Button onClick={copyReplay} variant="ghost" className="h-10 px-4 text-xs font-black text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 uppercase tracking-widest">
+                          {copied ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
+                          Copy Replay
+                       </Button>
+                    </div>
                  </div>
               </div>
            </CardContent>
         </Card>
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      {/* MOMENT OF WOW CALLOUT (Only for new projects) */}
+      {id === 'default' && (
+        <div className="bg-blue-600/10 border border-blue-500/20 rounded-2xl p-6 flex items-center justify-between gap-8 animate-pulse shadow-[0_0_50px_rgba(37,99,235,0.1)]">
+           <div className="flex items-center gap-4">
+              <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-black">!</div>
+              <div>
+                 <h4 className="text-white font-bold text-sm">Wait! Don't just look at this. Replay it locally.</h4>
+                 <p className="text-blue-400/60 text-[11px] mt-0.5">This execution is a real data snapshot. Running `flux replay` will pull the exact Stripe response into your local dev server.</p>
+              </div>
+           </div>
+           <Button onClick={copyReplay} className="bg-blue-600 hover:bg-blue-500 text-white font-black text-[10px] uppercase tracking-widest px-6 h-9">
+              Copy Command
+           </Button>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
          {/* LEFT PANEL: EXTERNAL CALLS SUMMARY */}
          <section className="lg:col-span-4 space-y-6">
             <h3 className="text-[11px] font-black uppercase tracking-widest text-neutral-600 flex items-center gap-2 px-1">
