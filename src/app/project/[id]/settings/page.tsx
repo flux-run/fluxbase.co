@@ -247,10 +247,11 @@ function ServiceTokensSection({ projectId }: { projectId: string }) {
 
         {/* Token List */}
         <div className="space-y-2">
-          <div className="grid grid-cols-4 px-4 py-2 text-[9px] font-bold text-neutral-600 uppercase tracking-widest border-b border-neutral-900/50">
+          <div className="grid grid-cols-5 px-4 py-2 text-[9px] font-bold text-neutral-600 uppercase tracking-widest border-b border-neutral-900/50">
             <div className="col-span-1">Name</div>
             <div className="col-span-1 text-center">Created</div>
             <div className="col-span-1 text-center">Last Used</div>
+            <div className="col-span-1 text-center">Usage (24h)</div>
             <div className="col-span-1 text-right">Action</div>
           </div>
 
@@ -262,7 +263,7 @@ function ServiceTokensSection({ projectId }: { projectId: string }) {
             </div>
           ) : (
             tokens.map(token => (
-              <div key={token.id} className="grid grid-cols-4 items-center px-4 py-3 bg-black border border-neutral-900 rounded-lg group hover:border-neutral-800 transition-colors">
+              <div key={token.id} className="grid grid-cols-5 items-center px-4 py-3 bg-black border border-neutral-900 rounded-lg group hover:border-neutral-800 transition-colors">
                 <div className="col-span-1">
                   <span className="text-xs font-bold text-neutral-300">{token.name || "Unnamed Token"}</span>
                 </div>
@@ -275,6 +276,11 @@ function ServiceTokensSection({ projectId }: { projectId: string }) {
                   <span className="text-[10px] text-neutral-500 font-mono uppercase">
                     {token.last_used_at ? `${formatDistanceToNow(new Date(token.last_used_at))} ago` : "Never"}
                   </span>
+                </div>
+                <div className="col-span-1 text-center">
+                  <Badge variant="outline" className="text-[10px] font-mono border-neutral-800 bg-neutral-900/50 text-neutral-400">
+                    {token.usage_24h || 0} reqs
+                  </Badge>
                 </div>
                 <div className="col-span-1 text-right">
                   <Button 

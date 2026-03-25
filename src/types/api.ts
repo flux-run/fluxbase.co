@@ -64,6 +64,7 @@ export interface ServiceToken {
   scope: string;
   created_at: string;
   last_used_at?: string;
+  usage_24h?: number;
   revoked: boolean;
   token?: string; // only present on create
 }

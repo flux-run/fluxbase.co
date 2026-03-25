@@ -88,37 +88,127 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-         <section className="space-y-4">
-            <h3 className="text-[11px] font-black uppercase tracking-widest text-neutral-600 flex items-center gap-2">
+      {/* INSIGHT CARD - HUMAN READABLE SUMMARY */}
+      <section className="animate-in fade-in slide-in-from-bottom-4 duration-1000">
+        <Card className={`overflow-hidden border-none shadow-2xl bg-gradient-to-br ${data.status === 'ok' ? 'from-emerald-950/20 via-black to-black' : 'from-red-950/20 via-black to-black'}`}>
+           <CardContent className="p-8">
+              <div className="flex flex-col md:flex-row gap-8 items-start">
+                 <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 ${data.status === 'ok' ? 'bg-emerald-500/10 text-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.1)]' : 'bg-red-500/10 text-red-500 shadow-[0_0_30px_rgba(239,68,68,0.1)]'}`}>
+                    {data.status === 'ok' ? <Zap className="w-8 h-8" /> : <Terminal className="w-8 h-8" />}
+                 </div>
+                 <div className="space-y-4 flex-1">
+                    <div>
+                       <h3 className="text-xl font-bold text-white tracking-tight leading-tight">
+                         {data.status === 'ok' 
+                           ? `Successfully processed ${data.method} ${data.path}` 
+                           : `${data.method} Request Failed`}
+                       </h3>
+                       <p className="text-neutral-400 text-sm mt-1 leading-relaxed">
+                          {data.status === 'ok' 
+                            ? `This execution completed in ${data.duration_ms}ms with ${(data.checkpoints?.length ?? 0)} recorded external operations.`
+                            : `The execution halted at an unexpected state. Reason: ${data.error || "Internal Error"}`}
+                       </p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                       {data.status === 'ok' ? (
+                          <>
+                             <Badge variant="outline" className="bg-emerald-500/5 border-emerald-500/20 text-emerald-500 text-[10px] font-bold py-1">DETRMINISTIC ✓</Badge>
+                             <Badge variant="outline" className="bg-blue-500/5 border-blue-500/20 text-blue-500 text-[10px] font-bold py-1">RECORDED ✓</Badge>
+                          </>
+                       ) : (
+                          <Badge variant="outline" className="bg-red-500/5 border-red-500/20 text-red-500 text-[10px] font-bold py-1 uppercase tracking-tighter cursor-help" title={data.error || "Execution Error"}>
+                             CRITICAL ERROR
+                          </Badge>
+                       )}
+                    </div>
+                 </div>
+                 
+                 {/* QUICK ACTIONS */}
+                 <div className="flex flex-col gap-3 shrink-0">
+                    <Button onClick={copyReplay} className="bg-white text-black hover:bg-neutral-200 font-black text-[11px] uppercase tracking-widest h-10 px-6 shadow-xl shadow-white/5">
+                       {copied ? <Check className="w-4 h-4 mr-2" /> : <Activity className="w-4 h-4 mr-2" />}
+                       Replay locally
+                    </Button>
+                    <Button variant="outline" className="bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white font-bold text-[11px] uppercase tracking-widest h-10 px-6">
+                       Export Trace
+                    </Button>
+                 </div>
+              </div>
+           </CardContent>
+        </Card>
+      </section>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+         {/* LEFT PANEL: EXTERNAL CALLS SUMMARY */}
+         <section className="lg:col-span-4 space-y-6">
+            <h3 className="text-[11px] font-black uppercase tracking-widest text-neutral-600 flex items-center gap-2 px-1">
                <Globe className="w-3.5 h-3.5 text-blue-500/60" />
-               Raw Payload
+               External Steps
             </h3>
-            <Card className="bg-[#0c0c0c] border-neutral-900 shadow-inner overflow-hidden">
-               <div className="bg-neutral-900/40 border-b border-neutral-800/50 px-4 py-2 flex items-center justify-between">
-                  <span className="text-[10px] text-neutral-500 font-mono italic">application/json</span>
-                  <Copy className="w-3 h-3 text-neutral-700 hover:text-white cursor-pointer transition-colors" />
-               </div>
-               <pre className="p-6 text-[12px] font-mono leading-relaxed text-neutral-300 max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-neutral-800">
-                  {JSON.stringify(reqObj, null, 2)}
-               </pre>
-            </Card>
+            
+            <div className="space-y-3">
+               {(data.checkpoints?.length ?? 0) === 0 ? (
+                  <div className="py-12 text-center text-[10px] font-mono uppercase text-neutral-700 bg-neutral-900/10 border border-dashed border-neutral-900 rounded-xl tracking-tighter italic">
+                     No external steps recorded
+                  </div>
+               ) : (
+                  data.checkpoints?.map((cp: Checkpoint, i: number) => (
+                    <div key={i} className="group p-4 bg-black border border-neutral-900 rounded-xl hover:border-neutral-700 transition-all cursor-pointer">
+                      <div className="flex items-center justify-between mb-2">
+                         <div className="flex items-center gap-2">
+                            {cp.boundary === 'db' ? <Database className="w-3.5 h-3.5 text-purple-500" /> : <Globe className="w-3.5 h-3.5 text-blue-500" />}
+                            <span className="text-[10px] font-black uppercase text-neutral-500 tracking-widest">{cp.boundary}</span>
+                         </div>
+                         <span className="text-[10px] font-mono text-neutral-600">{cp.duration_ms}ms</span>
+                      </div>
+                      <code className="text-[11px] text-neutral-300 font-mono block truncate opacity-80 group-hover:opacity-100 transition-opacity">
+                        {cp.url || cp.query || 'Internal Call'}
+                      </code>
+                    </div>
+                  ))
+               )}
+               
+               {data.status !== 'ok' && (
+                  <div className="p-4 bg-red-950/10 border border-red-900/20 rounded-xl">
+                    <div className="flex items-center gap-2 mb-2">
+                       <Terminal className="w-3.5 h-3.5 text-red-500" />
+                       <span className="text-[10px] font-black uppercase text-red-500 tracking-widest">Halt Reason</span>
+                    </div>
+                    <code className="text-[11px] text-red-400 font-mono italic">
+                       {data.error || 'Execution interrupted by unhandled exception'}
+                    </code>
+                  </div>
+               )}
+            </div>
          </section>
-         <section className="space-y-4">
-            <h3 className="text-[11px] font-black uppercase tracking-widest text-neutral-600 flex items-center gap-2">
-               <Server className="w-3.5 h-3.5 text-emerald-500/60" />
-               Response Block
+
+         {/* RIGHT PANEL: PAYLOADS */}
+         <section className="lg:col-span-8 space-y-6">
+            <h3 className="text-[11px] font-black uppercase tracking-widest text-neutral-600 flex items-center gap-2 px-1">
+               <Activity className="w-3.5 h-3.5 text-emerald-500/60" />
+               Raw Context
             </h3>
-            <Card className="bg-[#0c0c0c] border-neutral-900 shadow-inner overflow-hidden">
-               <div className="bg-neutral-900/40 border-b border-neutral-800/50 px-4 py-2 flex items-center justify-between">
-                  <span className={`text-[10px] font-bold font-mono ${data.status === 'ok' ? 'text-green-500' : 'text-red-500'}`}>
-                    HTTP {data.status === 'ok' ? '200' : '500'}
-                  </span>
-               </div>
-               <pre className="p-6 text-[12px] font-mono leading-relaxed text-neutral-400 max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-neutral-800">
-                  {JSON.stringify(resObj, null, 2)}
-               </pre>
-            </Card>
+            
+            <div className="grid grid-cols-1 gap-6">
+               <Card className="bg-[#0c0c0c] border-neutral-900 shadow-inner overflow-hidden border-l-2 border-l-blue-900/30">
+                  <div className="bg-neutral-900/40 border-b border-neutral-800/50 px-4 py-2 flex items-center justify-between">
+                     <span className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest">Request Payload</span>
+                  </div>
+                  <pre className="p-6 text-[12px] font-mono leading-relaxed text-neutral-300 max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-thumb-neutral-800">
+                     {JSON.stringify(reqObj, null, 2)}
+                  </pre>
+               </Card>
+
+               <Card className={`bg-[#0c0c0c] border-neutral-900 shadow-inner overflow-hidden border-l-2 ${data.status === 'ok' ? 'border-l-emerald-900/30' : 'border-l-red-900/30'}`}>
+                  <div className="bg-neutral-900/40 border-b border-neutral-800/50 px-4 py-2 flex items-center justify-between">
+                     <span className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest">Response Output</span>
+                  </div>
+                  <pre className="p-6 text-[12px] font-mono leading-relaxed text-neutral-400 max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-thumb-neutral-800">
+                     {JSON.stringify(resObj, null, 2)}
+                  </pre>
+               </Card>
+            </div>
          </section>
       </div>
 
