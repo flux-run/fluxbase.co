@@ -1,133 +1,177 @@
-import type { Metadata } from 'next'
+"use client";
+import React from 'react';
+import Link from 'next/link';
 
-export const metadata: Metadata = {
-  title: 'Documentation — Flux',
-  description: 'Flux records every backend request so you can debug, replay, and resume failures. Get started in minutes.',
-}
-
-export default function Page() {
+export default function DocsPage() {
   return (
-    <div dangerouslySetInnerHTML={{ __html: `
-<h1>Flux Documentation</h1>
-<p class="page-subtitle">Debug production failures by replaying them locally.</p>
+    <div className="space-y-16 animate-in fade-in duration-1000">
+      {/* Header section */}
+      <section className="space-y-4">
+        <h1 className="text-4xl md:text-6xl font-black tracking-tight text-white leading-[1.1]">
+          Flux Documentation
+        </h1>
+        <p className="text-xl text-neutral-500 font-medium">
+          Debug production failures by replaying them locally.
+        </p>
+      </section>
 
-<div style="background:var(--bg-elevated);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:8px;padding:20px 24px;margin:0 0 36px;">
-  <div style="font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:14px;">Get running in 60 seconds</div>
-  <div style="display:flex;flex-direction:column;gap:0;">
-    <div style="display:flex;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid var(--border)">
-      <div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--accent-dim);color:var(--accent);font-size:.75rem;font-weight:700;display:flex;align-items:center;justify-content:center;">1</div>
-      <div style="flex:1;font-size:.875rem;">Install flux CLI</div>
-      <code style="font-size:.78rem;color:var(--accent);background:var(--bg);border:1px solid var(--border);padding:3px 8px;border-radius:4px;white-space:nowrap;">curl -fsSL https://fluxbase.co/install | bash</code>
-    </div>
-    <div style="display:flex;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid var(--border)">
-      <div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--accent-dim);color:var(--accent);font-size:.75rem;font-weight:700;display:flex;align-items:center;justify-content:center;">2</div>
-      <div style="flex:1;font-size:.875rem;">Start your app</div>
-      <code style="font-size:.78rem;color:var(--accent);background:var(--bg);border:1px solid var(--border);padding:3px 8px;border-radius:4px;white-space:nowrap;">flux serve index.ts</code>
-    </div>
-    <div style="display:flex;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid var(--border)">
-      <div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--accent-dim);color:var(--accent);font-size:.75rem;font-weight:700;display:flex;align-items:center;justify-content:center;">3</div>
-      <div style="flex:1;font-size:.875rem;">Watch live traffic</div>
-      <code style="font-size:.78rem;color:var(--accent);background:var(--bg);border:1px solid var(--border);padding:3px 8px;border-radius:4px;white-space:nowrap;">flux tail</code>
-    </div>
-    <div style="display:flex;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid var(--border)">
-      <div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--accent-dim);color:var(--accent);font-size:.75rem;font-weight:700;display:flex;align-items:center;justify-content:center;">4</div>
-      <div style="flex:1;font-size:.875rem;">Understand a failure</div>
-      <code style="font-size:.78rem;color:var(--accent);background:var(--bg);border:1px solid var(--border);padding:3px 8px;border-radius:4px;white-space:nowrap;">flux why &lt;id&gt;</code>
-    </div>
-    <div style="display:flex;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid var(--border)">
-      <div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--accent-dim);color:var(--accent);font-size:.75rem;font-weight:700;display:flex;align-items:center;justify-content:center;">5</div>
-      <div style="flex:1;font-size:.875rem;">Test your fix safely</div>
-      <code style="font-size:.78rem;color:var(--accent);background:var(--bg);border:1px solid var(--border);padding:3px 8px;border-radius:4px;white-space:nowrap;">flux replay &lt;id&gt;</code>
-    </div>
-    <div style="display:flex;align-items:center;gap:14px;padding:10px 0;">
-      <div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--accent-dim);color:var(--accent);font-size:.75rem;font-weight:700;display:flex;align-items:center;justify-content:center;">6</div>
-      <div style="flex:1;font-size:.875rem;">Apply fix with real IO</div>
-      <code style="font-size:.78rem;color:var(--accent);background:var(--bg);border:1px solid var(--border);padding:3px 8px;border-radius:4px;white-space:nowrap;">flux resume &lt;id&gt;</code>
-    </div>
-  </div>
-</div>
+      {/* Quickstart Card */}
+      <section className="relative group">
+        <div className="absolute -inset-px bg-gradient-to-r from-blue-600/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000 rounded-xl pointer-events-none" />
+        <div className="relative bg-[#0D0D0D] border border-neutral-900 rounded-xl overflow-hidden p-8 sm:p-10 space-y-10">
+          <div className="flex items-center justify-between">
+             <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-500">
+                Get running in 60 seconds
+             </h3>
+             <div className="flex gap-1.5 opacity-30">
+                <div className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+             </div>
+          </div>
 
-<h2>Start here</h2>
+          <div className="grid grid-cols-1 gap-6">
+            <QuickStep 
+              number="1" 
+              title="Install Flux CLI" 
+              cmd="curl -fsSL fluxbase.co/install | bash" 
+            />
+            <QuickStep 
+              number="2" 
+              title="Start your node app" 
+              cmd="flux serve index.ts" 
+            />
+            <QuickStep 
+              number="3" 
+              title="Watch live traffic" 
+              cmd="flux tail" 
+            />
+            <QuickStep 
+              number="4" 
+              title="Understand a failure" 
+              cmd="flux why <id>" 
+            />
+            <QuickStep 
+              number="5" 
+              title="Test your fix safely" 
+              cmd="flux replay <id>" 
+            />
+            <QuickStep 
+              number="6" 
+              title="Apply fix with real IO" 
+              cmd="flux resume <id>" 
+              isLast
+            />
+          </div>
+        </div>
+      </section>
 
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin:24px 0 40px;">
-  <a href="/docs/quickstart" style="display:block;padding:20px 24px;border:2px solid var(--accent);border-radius:10px;background:var(--accent-dim);color:var(--text);text-decoration:none;">
-    <div style="font-size:1.2rem;margin-bottom:8px;">🚀</div>
-    <div style="font-weight:700;margin-bottom:4px;">Quickstart</div>
-    <div style="font-size:.85rem;color:var(--muted);">From install to first replay in 5 minutes.</div>
-  </a>
-  <a href="/docs/install" style="display:block;padding:20px 24px;border:1px solid var(--border);border-radius:10px;background:var(--bg-surface);color:var(--text);text-decoration:none;">
-    <div style="font-size:1.2rem;margin-bottom:8px;">⬇️</div>
-    <div style="font-weight:700;margin-bottom:4px;">Install</div>
-    <div style="font-size:.85rem;color:var(--muted);">CLI, server, and runtime setup.</div>
-  </a>
-</div>
+      {/* Navigation Hub */}
+      <section className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <Link href="/docs/quickstart" className="p-8 bg-blue-600/5 border border-blue-500/20 rounded-xl hover:bg-blue-600/10 hover:border-blue-500/40 transition-all group">
+          <div className="text-2xl mb-4 group-hover:scale-110 transition-transform">🚀</div>
+          <h4 className="text-lg font-black uppercase tracking-tight text-white mb-2">Quickstart Guide</h4>
+          <p className="text-sm text-neutral-500 leading-relaxed font-medium">
+            From first install to your first production replay in 5 minutes.
+          </p>
+        </Link>
+        <Link href="/docs/install" className="p-8 bg-neutral-900/40 border border-neutral-800 rounded-xl hover:bg-neutral-900/60 hover:border-neutral-700 transition-all group">
+          <div className="text-2xl mb-4 group-hover:scale-110 transition-transform">⬇️</div>
+          <h4 className="text-lg font-black uppercase tracking-tight text-white mb-2">Detailed Install</h4>
+          <p className="text-sm text-neutral-500 leading-relaxed font-medium">
+            CLI reference, server architecture, and runtime environments.
+          </p>
+        </Link>
+      </section>
 
-<h2>How it works</h2>
+      {/* Main explanation content */}
+      <div className="prose prose-invert max-w-none space-y-12">
+        <section className="space-y-6">
+          <h2 className="text-2xl font-black uppercase tracking-widest text-white border-b border-neutral-900 pb-4">How it works</h2>
+          <p className="text-neutral-400 font-medium leading-relaxed">
+            Flux runs alongside your existing TypeScript backend. It records every incoming request — inputs, outputs, database calls, console logs — atomically. When a request fails, Flux provides a deterministic way to debug and fix it without duplicate side effects.
+          </p>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm font-medium border-collapse">
+              <thead>
+                <tr className="border-b border-neutral-800 text-[10px] uppercase font-black tracking-widest text-neutral-600">
+                  <th className="py-4 px-2">Command</th>
+                  <th className="py-4 px-2">Role</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-900">
+                <tr>
+                  <td className="py-4 px-2"><code className="text-blue-500 italic">flux why &lt;id&gt;</code></td>
+                  <td className="py-4 px-2 text-neutral-400">Explains why it failed — showing error logs and the exact IO line that crashed.</td>
+                </tr>
+                <tr>
+                  <td className="py-4 px-2"><code className="text-blue-500 italic">flux replay &lt;id&gt;</code></td>
+                  <td className="py-4 px-2 text-neutral-400">Replays execution using your latest local code. DB/API calls are virtualized.</td>
+                </tr>
+                <tr>
+                  <td className="py-4 px-2"><code className="text-emerald-500 italic font-bold">flux resume &lt;id&gt;</code></td>
+                  <td className="py-4 px-2 text-neutral-400">Atomically commits the fix to production with real IO side effects.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
 
-<p>Flux runs alongside your existing TypeScript backend (Hono, Express-compatible). It records every incoming request — inputs, outputs, database calls, console logs — into Postgres. When something breaks, you have three commands:</p>
+        <section className="space-y-8">
+           <h2 className="text-2xl font-black uppercase tracking-widest text-white border-b border-neutral-900 pb-4">Simple Implementation</h2>
+           <p className="text-neutral-400 font-medium">
+              Flux is non-invasive. Use Hono and <code className="text-neutral-100">flux:pg</code> for database interactions.
+           </p>
+           <div className="bg-[#080808] border border-neutral-900 rounded-xl p-8 font-mono text-xs sm:text-sm leading-relaxed overflow-x-auto shadow-2xl">
+<pre><code>{`import { Hono } from "npm:hono"
+import pg from "flux:pg"
 
-<table>
-  <thead>
-    <tr>
-      <th>Command</th>
-      <th>What it does</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr><td><code>flux why &lt;id&gt;</code></td><td>Explains why the request failed — error, console output, which IO was reached</td></tr>
-    <tr><td><code>flux trace &lt;id&gt;</code></td><td>Full execution trace with all recorded checkpoints</td></tr>
-    <tr><td><code>flux replay &lt;id&gt;</code></td><td>Re-runs the request with your updated code. Never touches real IO — deterministic and safe</td></tr>
-    <tr><td><code>flux resume &lt;id&gt;</code></td><td>Re-runs the request with real IO — commits to the database, calls external services</td></tr>
-    <tr><td><code>flux tail</code></td><td>Stream live requests as they arrive</td></tr>
-  </tbody>
-</table>
+const app = new Hono()
+const pool = new pg.Pool({ connectionString: Deno.env.get("DATABASE_URL") })
 
-<h2>Architecture</h2>
-
-<p>Flux is three Rust binaries backed by a single Postgres database:</p>
-
-<table>
-  <thead>
-    <tr><th>Binary</th><th>Role</th></tr>
-  </thead>
-  <tbody>
-    <tr><td><code>flux-server</code></td><td>Stores execution records, checkpoints, logs. gRPC API.</td></tr>
-    <tr><td><code>flux-runtime</code></td><td>Executes your TypeScript via Deno V8. Records all IO.</td></tr>
-    <tr><td><code>flux</code> (CLI)</td><td>Developer tools: tail, why, trace, replay, resume.</td></tr>
-  </tbody>
-</table>
-
-<p>No cloud account required. Self-hosted. Your data stays in your Postgres.</p>
-
-<hr>
-
-<h2>Writing your app</h2>
-
-<p>Flux uses <strong>Hono</strong> as the HTTP framework and <code>flux:pg</code> for Postgres. These are the only dependencies you need:</p>
-
-<pre><code><span class="kw">import</span> { Hono } <span class="kw">from</span> <span class="str">"npm:hono"</span>
-<span class="kw">import</span> pg <span class="kw">from</span> <span class="str">"flux:pg"</span>
-
-<span class="kw">const</span> app = <span class="kw">new</span> Hono()
-<span class="kw">const</span> pool = <span class="kw">new</span> pg.Pool({ connectionString: Deno.env.get(<span class="str">"DATABASE_URL"</span>) })
-
-app.post(<span class="str">"/orders"</span>, <span class="kw">async</span> (c) => {
-  <span class="kw">const</span> body = <span class="kw">await</span> c.req.json()
-  <span class="kw">const</span> result = <span class="kw">await</span> pool.query(
-    <span class="str">"INSERT INTO orders (email) VALUES ($1) RETURNING *"</span>,
+app.post("/orders", async (c) => {
+  const body = await c.req.json()
+  const result = await pool.query(
+    "INSERT INTO orders (email) VALUES ($1) RETURNING *",
     [body.email]
   )
-  <span class="kw">return</span> c.json(result.rows[0])
+  return c.json(result.rows[0])
 })
 
-<span class="kw">export default</span> app</code></pre>
+export default app`}</code></pre>
+           </div>
+           <div className="pt-6">
+              <p className="text-xs text-neutral-600 font-black uppercase tracking-widest italic leading-relaxed text-center">
+                 Every request is automatically recorded. No instrumentation required.
+              </p>
+           </div>
+        </section>
+      </div>
+    </div>
+  );
+}
 
-<p>Start it with:</p>
-
-<pre><code><span class="shell-prompt">$</span> flux serve index.ts</code></pre>
-
-<p>Every request is automatically recorded. No instrumentation needed.</p>
-` }}
-    />
-  )
+function QuickStep({ number, title, cmd, isLast }: { number: string, title: string, cmd: string, isLast?: boolean }) {
+  return (
+    <div className={`flex flex-col sm:flex-row sm:items-center gap-6 pb-6 ${!isLast ? 'border-b border-neutral-900/50' : ''}`}>
+      <div className="flex items-center gap-4 flex-1">
+        <div className="h-7 w-7 rounded-sm bg-blue-500/10 flex items-center justify-center border border-blue-500/20 text-blue-500 text-[10px] font-black shrink-0">
+          {number}
+        </div>
+        <span className="text-sm font-black uppercase tracking-tight text-neutral-300">
+          {title}
+        </span>
+      </div>
+      <div className="group/cmd relative">
+        <div className="bg-[#050505] border border-neutral-800 py-2.5 px-4 rounded-sm font-mono text-xs text-neutral-500 sm:min-w-[280px] flex items-center justify-between group-hover/cmd:border-blue-500/30 transition-all">
+          <div className="flex items-center gap-2">
+            <span className="text-neutral-700">$</span>
+            <span className="text-blue-500/80 font-medium">{cmd}</span>
+          </div>
+          <button className="opacity-0 group-hover/cmd:opacity-100 transition-opacity ml-4 text-[9px] uppercase font-black text-neutral-500 hover:text-white">Copy</button>
+        </div>
+      </div>
+    </div>
+  );
 }

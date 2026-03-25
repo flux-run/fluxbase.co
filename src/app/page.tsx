@@ -1,226 +1,123 @@
-'use client'
-
-import Link from 'next/link'
-import { useRef, useEffect } from 'react'
-import { CopyCodeBlocks } from '@/components/CopyCodeBlocks'
-import { FluxLogo } from '@/components/FluxLogo'
-
-const COMMANDS = [
-  { cmd: 'flux why',    arg: '<id>', desc: 'understand what failed and why'     },
-  { cmd: 'flux replay', arg: '<id>', desc: 'test your fix safely (no real IO)'  },
-  { cmd: 'flux resume', arg: '<id>', desc: 'apply the fix with real IO'          },
-]
+"use client";
+import React from 'react';
+import Link from 'next/link';
+import { FluxTerminalDemo } from '@/components/marketing/FluxTerminalDemo';
 
 export default function HomePage() {
-  const videoRef = useRef<HTMLVideoElement>(null)
-
-  useEffect(() => {
-    const video = videoRef.current
-    if (!video) return
-    video.play().catch(() => {
-      const overlay = document.getElementById('play-overlay')
-      if (overlay) overlay.style.display = 'flex'
-    })
-  }, [])
-
   return (
-    <div style={{ background: '#0a0a0a', color: '#f0f0f0', minHeight: '100vh', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-      <CopyCodeBlocks />
-
+    <div className="min-h-screen bg-[#0A0A0A] text-white selection:bg-blue-500/30 selection:text-white overflow-x-hidden">
       {/* ── Nav ── */}
-      <nav style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '20px 32px', borderBottom: '1px solid rgba(255,255,255,0.06)',
-        position: 'sticky', top: 0, background: 'rgba(10,10,10,0.92)',
-        backdropFilter: 'blur(12px)', zIndex: 100,
-      }}>
-        <Link href="/" className="flex items-center text-white hover:opacity-80 transition-opacity">
-          <span style={{ fontWeight: 700, fontSize: '1.2rem', letterSpacing: '-0.04em', color: '#fff' }}>flux</span>
+      <nav className="flex items-center justify-between px-6 py-6 md:px-12 md:py-8 border-b border-white/5 sticky top-0 bg-[#0A0A0A]/80 backdrop-blur-xl z-[100]">
+        <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
+          <span className="text-2xl font-black tracking-tighter text-white">flux</span>
         </Link>
-        <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
-          <Link href="/docs" style={{ color: 'rgba(255,255,255,0.5)', fontSize: '.88rem', textDecoration: 'none' }}>Docs</Link>
-          <Link href="https://github.com/flux-run/flux" style={{ color: 'rgba(255,255,255,0.5)', fontSize: '.88rem', textDecoration: 'none' }}>GitHub</Link>
-          <Link href="/docs/quickstart" style={{
-            background: '#fff', color: '#000', fontSize: '.82rem', fontWeight: 600,
-            padding: '7px 16px', borderRadius: 6, textDecoration: 'none',
-          }}>Get Started →</Link>
+        <div className="flex items-center gap-6 md:gap-10">
+          <Link href="/docs" className="text-sm font-bold uppercase tracking-widest text-neutral-500 hover:text-white transition-colors">Docs</Link>
+          <Link href="https://github.com/flux-run/flux" className="text-sm font-bold uppercase tracking-widest text-neutral-500 hover:text-white transition-colors">GitHub</Link>
+          <Link href="/login" className="bg-white text-black text-[11px] font-black uppercase tracking-[0.2em] px-5 py-2.5 rounded-sm hover:bg-neutral-200 transition-all active:scale-95">
+            Get Started →
+          </Link>
         </div>
       </nav>
 
-      {/* ── Hero ── */}
-      <section style={{ maxWidth: 900, margin: '0 auto', padding: '80px 24px 60px', textAlign: 'center' }}>
-
-        <h1 style={{
-          fontSize: 'clamp(2rem, 5vw, 3.2rem)', fontWeight: 700,
-          lineHeight: 1.15, letterSpacing: '-0.03em',
-          marginBottom: 20, color: '#fff',
-        }}>
-          What if you could replay<br />
-          production API failures locally?
-        </h1>
-
-        <p style={{
-          fontSize: 'clamp(.95rem, 2vw, 1.1rem)',
-          color: 'rgba(255,255,255,0.6)',
-          maxWidth: 540, margin: '0 auto 12px',
-          lineHeight: 1.6,
-        }}>
-          Replay production failures locally. Fix them. Resume execution.
-        </p>
-
-        <p style={{
-          fontSize: '.92rem',
-          color: 'rgba(255,255,255,0.35)',
-          maxWidth: 480, margin: '0 auto 10px',
-          lineHeight: 1.6,
-        }}>
-          Same request. Same IO. Same outcome.
-        </p>
-
-        <p style={{
-          fontSize: '.88rem',
-          color: 'rgba(255,255,255,0.25)',
-          maxWidth: 500, margin: '0 auto 52px',
-          lineHeight: 1.6,
-        }}>
-          Fix the bug. Resume the same execution. No duplicate side effects.
-        </p>
-
-        {/* Video cue */}
-        <p style={{
-          fontSize: '.8rem', color: 'rgba(255,255,255,0.2)',
-          marginBottom: 16, letterSpacing: '.01em',
-        }}>
-          Watch a real debugging session ↓
-        </p>
-
-        {/* ── Video ── */}
-        <div style={{
-          position: 'relative',
-          borderRadius: 12, overflow: 'hidden',
-          border: '1px solid rgba(255,255,255,0.08)',
-          background: '#111',
-          boxShadow: '0 32px 80px rgba(0,0,0,0.6)',
-          marginBottom: 48,
-        }}>
-          <div id="play-overlay" style={{
-            display: 'none', position: 'absolute', inset: 0,
-            alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(0,0,0,0.5)', zIndex: 10, cursor: 'pointer',
-          }} onClick={() => videoRef.current?.play()}>
-            <div style={{
-              width: 64, height: 64, borderRadius: '50%',
-              background: 'rgba(255,255,255,0.9)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <span style={{ fontSize: 24, marginLeft: 4 }}>▶</span>
+      <main className="flex flex-col items-center">
+        {/* ── Hero Section ── */}
+        <section className="w-full max-w-6xl px-6 pt-24 pb-40 flex flex-col items-center text-center">
+          <div className="space-y-8 mb-24 animate-in fade-in slide-in-from-top-4 duration-1000">
+            <h1 className="text-5xl md:text-8xl font-black tracking-tight leading-[1] text-balance">
+              Reproduce <br className="hidden md:block"/> production bugs <br />
+              <span className="text-neutral-700">with one command.</span>
+            </h1>
+            <div className="max-w-3xl mx-auto">
+              <p className="text-xl md:text-2xl text-neutral-400 font-medium leading-relaxed text-balance">
+                No logs. No guessing. Replay exactly what happened in production — locally.
+                Fix the bug and resume execution as if it never failed.
+              </p>
+            </div>
+            
+            <div className="pt-6 flex flex-col sm:flex-row items-center justify-center gap-6">
+               <Link href="/login" className="h-14 px-10 bg-blue-600 text-white flex items-center justify-center text-sm font-black uppercase tracking-[0.2em] rounded-sm hover:bg-blue-500 hover:shadow-[0_0_40px_rgba(59,130,246,0.3)] transition-all active:scale-95 group">
+                  Start Debugging <span className="ml-3 group-hover:translate-x-1 transition-transform">→</span>
+               </Link>
+               <div className="flex items-center gap-3 px-6 py-4 rounded-sm border border-neutral-800 bg-neutral-900/50 font-mono text-sm text-neutral-400">
+                  <span className="text-neutral-600 block">$</span>
+                  <span>curl -fsSL fluxbase.co/install | bash</span>
+               </div>
             </div>
           </div>
 
-          <video
-            ref={videoRef}
-            src="/flux_demo.mp4"
-            muted
-            loop
-            playsInline
-            controls
-            preload="metadata"
-            style={{ width: '100%', display: 'block', maxHeight: '60vh', objectFit: 'contain' }}
-          />
-        </div>
-
-        {/* ── CLI Block ── */}
-        <p style={{
-          fontSize: '.78rem',
-          color: 'rgba(255,255,255,0.25)',
-          textTransform: 'uppercase',
-          letterSpacing: '.1em',
-          marginBottom: 14,
-          fontFamily: 'monospace',
-        }}>
-          The debugging loop
-        </p>
-        <div style={{
-          background: '#0d0d0d',
-          border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: 10, overflow: 'hidden',
-          boxShadow: '0 0 0 1px rgba(255,255,255,0.03), 0 16px 48px rgba(0,0,0,0.4)',
-          marginBottom: 64, textAlign: 'left',
-        }}>
-          {/* Toolbar */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: '14px 18px',
-            borderBottom: '1px solid rgba(255,255,255,0.06)',
-            background: '#111',
-          }}>
-            <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ff5f57' }} />
-            <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ffbd2e' }} />
-            <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#28c840' }} />
-            <span style={{ marginLeft: 8, fontSize: '.72rem', color: 'rgba(255,255,255,0.25)', fontFamily: 'monospace' }}>flux — bash</span>
-          </div>
-
-          <div style={{ padding: '28px 28px 32px', fontFamily: '"SF Mono", "Fira Code", "Cascadia Code", monospace', fontSize: '.88rem', lineHeight: 2.2 }}>
-            {COMMANDS.map(({ cmd, arg, desc }) => (
-              <div key={cmd} style={{ display: 'flex', alignItems: 'baseline' }}>
-                <span style={{ color: 'rgba(255,255,255,0.25)', userSelect: 'none', marginRight: 8 }}>$</span>
-                <span style={{ color: '#7dd3fc', display: 'inline-block', width: '7.5rem' }}>{cmd}</span>
-                <span style={{ color: 'rgba(255,255,255,0.4)', marginRight: 24 }}>{arg}</span>
-                <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '.78rem' }}>&mdash; {desc}</span>
+          {/* ── Terminal Hero ── */}
+          <div className="w-full relative group animate-in fade-in zoom-in-95 duration-1000 delay-300">
+            <div className="absolute -inset-40 bg-blue-500/10 blur-[160px] rounded-full pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity duration-1000" />
+            
+            <div className="relative mb-8 flex flex-col items-center gap-4">
+              <p className="uppercase tracking-[0.4em] text-neutral-800 text-[10px] font-black pointer-events-none">
+                 The modern debugging workflow
+              </p>
+              <div className="h-20 w-px bg-gradient-to-b from-neutral-900 via-neutral-800 to-transparent" />
+            </div>
+            
+            <div className="relative transform group-hover:scale-[1.01] transition-transform duration-1000">
+              <FluxTerminalDemo />
+              
+              <div className="mt-12 text-center space-y-4">
+                <p className="text-xs text-neutral-500 font-bold uppercase tracking-widest leading-relaxed max-w-md mx-auto">
+                  Works with your existing backend. <br />
+                  <span className="text-neutral-700">No complex configuration required.</span>
+                </p>
               </div>
-            ))}
+            </div>
           </div>
-        </div>
+        </section>
 
-        {/* ── Quote ── */}
-        <blockquote style={{
-          fontSize: 'clamp(1rem, 2.5vw, 1.3rem)',
-          fontStyle: 'italic',
-          color: 'rgba(255,255,255,0.3)',
-          fontWeight: 400,
-          margin: '0 0 64px',
-          letterSpacing: '-0.01em',
-        }}>
-          &ldquo;Debugging should be deterministic, not guesswork.&rdquo;
-        </blockquote>
-
-        {/* ── Install ── */}
-        <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: 14,
-          background: '#111',
-          border: '1px solid rgba(255,255,255,0.12)',
-          boxShadow: '0 0 0 1px rgba(255,255,255,0.04), 0 8px 24px rgba(0,0,0,0.4)',
-          borderRadius: 8, padding: '16px 32px',
-          fontFamily: '"SF Mono", "Fira Code", monospace', fontSize: '1rem',
-          color: 'rgba(255,255,255,0.75)',
-          cursor: 'text',
-          marginBottom: 64,
-        }}>
-          <span style={{ color: 'rgba(255,255,255,0.3)', userSelect: 'none' }}>$</span>
-          <span style={{ userSelect: 'all' }}>curl -fsSL https://fluxbase.co/install | bash</span>
-        </div>
-      </section>
+        {/* ── Features Grid ── */}
+        <section className="w-full max-w-6xl px-6 py-40 border-t border-neutral-900">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-16">
+            <div className="space-y-4">
+              <div className="h-10 w-10 rounded-sm bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
+                <span className="text-blue-500 font-bold text-sm">01</span>
+              </div>
+              <h3 className="text-lg font-black uppercase tracking-tight">Real IO Replay</h3>
+              <p className="text-neutral-500 leading-relaxed">
+                Flux captures the exact outcome of every API call and database query. Replay them locally without mock data.
+              </p>
+            </div>
+            <div className="space-y-4">
+              <div className="h-10 w-10 rounded-sm bg-amber-500/10 flex items-center justify-center border border-amber-500/20">
+                <span className="text-amber-500 font-bold text-sm">02</span>
+              </div>
+              <h3 className="text-lg font-black uppercase tracking-tight">Zero Side Effects</h3>
+              <p className="text-neutral-500 leading-relaxed">
+                Test your fixes safely. External services are never hit during replay, ensuring no duplicate emails or charges.
+              </p>
+            </div>
+            <div className="space-y-4">
+              <div className="h-10 w-10 rounded-sm bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+                <span className="text-emerald-500 font-bold text-sm">03</span>
+              </div>
+              <h3 className="text-lg font-black uppercase tracking-tight">Atomically Resume</h3>
+              <p className="text-neutral-500 leading-relaxed">
+                Once fixed, resume the execution precisely from where it failed. No need to retry the entire workflow.
+              </p>
+            </div>
+          </div>
+        </section>
+      </main>
 
       {/* ── Footer ── */}
-      <footer style={{
-        borderTop: '1px solid rgba(255,255,255,0.06)',
-        maxWidth: 900, margin: '0 auto', padding: '28px 24px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        flexWrap: 'wrap', gap: 12,
-      }}>
-        <span style={{ fontSize: '.78rem', color: 'rgba(255,255,255,0.2)' }}>
-          Built with Flux runtime
-        </span>
-        <Link href="https://github.com/flux-run/flux" style={{
-          fontSize: '.78rem', color: 'rgba(255,255,255,0.3)',
-          textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6,
-        }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
-          </svg>
-          GitHub
-        </Link>
+      <footer className="w-full max-w-6xl mx-auto px-6 py-20 border-t border-neutral-900 flex flex-col md:flex-row justify-between items-center gap-12 opacity-50 hover:opacity-100 transition-opacity duration-700">
+        <div className="flex flex-col items-center md:items-start gap-4">
+          <span className="text-xl font-black tracking-tighter text-white">flux</span>
+          <p className="text-neutral-600 text-[10px] uppercase tracking-[0.3em] font-black">
+            Deterministic Debugging for modern infra
+          </p>
+        </div>
+        <div className="flex gap-12 text-neutral-500 text-[11px] font-bold uppercase tracking-widest">
+          <Link href="/docs" className="hover:text-white transition-colors">Documentation</Link>
+          <Link href="https://github.com/flux-run/flux" className="hover:text-white transition-colors">GitHub</Link>
+          <Link href="mailto:shashis339@gmail.com" className="hover:text-white transition-colors">Contact</Link>
+        </div>
       </footer>
     </div>
-  )
+  );
 }

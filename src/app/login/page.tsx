@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { FluxTerminalDemo } from "@/components/marketing/FluxTerminalDemo";
 
 // Minimal Icons
 function GitHubIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -35,97 +34,77 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center p-8 sm:p-12 lg:p-20 overflow-x-hidden selection:bg-blue-500/30 selection:text-white">
-      {/* Absolute Logo */}
-      <div className="absolute top-8 left-8 sm:top-12 sm:left-12">
-        <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
-          <span className="text-xl font-black tracking-tighter text-white">flux</span>
+    <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center justify-center p-8 selection:bg-blue-500/30 selection:text-white">
+      {/* Centered Minimal Header */}
+      <div className="mb-12 animate-in fade-in slide-in-from-top-4 duration-1000">
+        <Link href="/" className="flex flex-col items-center gap-2 hover:opacity-80 transition-opacity">
+          <span className="text-2xl font-black tracking-tighter text-white">flux</span>
         </Link>
       </div>
 
-      <main className="w-full max-w-5xl flex flex-col items-center pt-20 sm:pt-32">
-        {/* Hero Copy Section */}
-        <div className="text-center space-y-8 mb-20 animate-in fade-in slide-in-from-top-4 duration-1000">
-          <h1 className="text-4xl md:text-7xl lg:text-8xl font-black tracking-tight text-white leading-[1] text-balance">
-            Reproduce any <br className="hidden md:block"/> production bug <br />
-            <span className="text-neutral-700">with one command.</span>
-          </h1>
-          <div className="space-y-4 max-w-2xl mx-auto">
-              <p className="text-xl md:text-2xl text-neutral-300 font-medium leading-relaxed text-balance">
-                  No logs. No guessing. <br className="hidden sm:block" />
-                  Replay exactly what happened in production — locally.
-              </p>
-          </div>
-        </div>
-
-        {/* Terminal Section - THE HERO */}
-        <div className="w-full relative group space-y-8 animate-in fade-in zoom-in-95 duration-1000 delay-300">
-           {/* Terminal background glow */}
-          <div className="absolute -inset-20 bg-blue-500/5 blur-[120px] rounded-full pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity duration-1000" />
+      <main className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-1000">
+        <Card className="bg-[#0D0D0D] border-neutral-900 shadow-2xl relative overflow-hidden group">
+          {/* Subtle accent line */}
+          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-blue-500/50 to-transparent opacity-50" />
           
-          <div className="relative text-center uppercase tracking-[0.4em] text-neutral-800 text-[10px] font-black pointer-events-none">
-             This is your debugging workflow now
-          </div>
-          
-          <div className="relative transform group-hover:scale-[1.01] transition-transform duration-700">
-            <FluxTerminalDemo />
-          </div>
-
-          <div className="relative text-center">
-            <p className="text-xs text-neutral-600 font-bold uppercase tracking-widest leading-relaxed">
-               Works with your existing backend. <br className="sm:hidden" /> 
-               <span className="text-neutral-700 ml-1">No setup required.</span>
+          <CardHeader className="space-y-2 text-center pb-6 pt-12">
+            <CardTitle className="text-2xl font-black tracking-tight text-white">Login to Flux</CardTitle>
+            <p className="text-[11px] text-neutral-500 uppercase tracking-[0.2em] font-bold">
+               Continue debugging production systems
             </p>
-          </div>
-        </div>
+          </CardHeader>
 
-        {/* Login Section - SECONDARY */}
-        <section className="w-full max-w-md mt-32 mb-40 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-500">
-          <Card className="bg-transparent border border-neutral-800/50 shadow-2xl backdrop-blur-sm relative overflow-visible group hover:border-neutral-700/50 transition-colors">
-            <div className="absolute -top-10 left-0 right-0 text-center">
-              <p className="text-[10px] uppercase tracking-[0.3em] font-black text-neutral-700 group-hover:text-neutral-500 transition-colors">
-                Start debugging instantly
-              </p>
-            </div>
-            
-            <CardHeader className="space-y-1 text-center pb-4 pt-10">
-              <CardTitle className="text-2xl font-bold tracking-tight text-white">Login to Flux</CardTitle>
-            </CardHeader>
-
-            <CardContent className="space-y-4 px-10 pb-10">
+          <CardContent className="space-y-4 px-10 pb-12">
+            <div className="space-y-3">
               <Button 
                 onClick={() => handleOAuth("github")}
-                className="w-full bg-[#1A1A1A] text-white hover:bg-white hover:text-black transition-all font-bold h-12 flex items-center justify-center gap-4 border border-neutral-800 active:scale-95 duration-200"
+                className="w-full bg-[#1A1A1A] text-white hover:bg-white hover:text-black transition-all font-black h-12 flex items-center justify-center gap-4 border border-neutral-800 active:scale-[0.98] duration-200 text-xs uppercase tracking-widest"
                 disabled={loading}
               >
                 <GitHubIcon className="w-5 h-5 fill-current" />
-                Continue with GitHub →
+                Continue with GitHub
               </Button>
               <Button 
                 onClick={() => handleOAuth("google")}
-                className="w-full bg-white text-black hover:bg-neutral-200 transition-all font-bold h-12 flex items-center justify-center gap-4 active:scale-95 duration-200"
+                className="w-full bg-white text-black hover:bg-neutral-200 transition-all font-black h-12 flex items-center justify-center gap-4 active:scale-[0.98] duration-200 text-xs uppercase tracking-widest"
                 disabled={loading}
               >
                 <GoogleIcon className="w-5 h-5" />
-                Continue with Google →
+                Continue with Google
               </Button>
-              
-              {error && <p className="text-xs text-red-500 font-medium text-center pt-2">{error}</p>}
-            </CardContent>
-          </Card>
-        </section>
+            </div>
+            
+            {error && (
+              <div className="pt-2 animate-in fade-in slide-in-from-top-1">
+                <p className="text-xs text-red-500 font-bold text-center border border-red-500/20 bg-red-500/5 py-2 rounded-sm uppercase tracking-tighter">
+                   {error}
+                </p>
+              </div>
+            )}
 
-        {/* Global Footer */}
-        <footer className="w-full max-w-lg text-center border-t border-neutral-900/50 pt-12 pb-20 opacity-50 hover:opacity-100 transition-opacity duration-500">
-          <p className="text-neutral-600 text-[10px] uppercase tracking-[0.3em] font-black mb-6 leading-relaxed">
-            Zero logs. Zero friction. <br className="sm:hidden" /> Total visibility.
+            <div className="pt-8 text-center">
+               <p className="text-[10px] text-neutral-600 font-bold uppercase tracking-widest leading-relaxed">
+                  No setup. No config. <br />
+                  <span className="text-neutral-700 italic">Works with your existing backend.</span>
+               </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Minimal Footer Links */}
+        <div className="mt-12 text-center space-y-6 opacity-30 hover:opacity-100 transition-opacity duration-500">
+          <p className="text-neutral-500 text-[9px] uppercase tracking-[0.3em] font-black italic">
+             Zero logs. Zero friction. Total visibility.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-            <Link href="/docs" className="text-neutral-500 hover:text-white transition text-xs font-bold uppercase tracking-widest">
-              Technical architecture →
+          <div className="flex items-center justify-center gap-8">
+            <Link href="/" className="text-neutral-500 hover:text-white transition text-[10px] font-black uppercase tracking-widest">
+              Landing Page
+            </Link>
+            <Link href="/docs" className="text-neutral-500 hover:text-white transition text-[10px] font-black uppercase tracking-widest">
+              Docs
             </Link>
           </div>
-        </footer>
+        </div>
       </main>
     </div>
   );
