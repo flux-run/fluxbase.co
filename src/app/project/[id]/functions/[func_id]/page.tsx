@@ -1,28 +1,26 @@
 "use client";
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
-import { fetchApi } from "@/lib/api";
+import { useFluxApi } from "@/lib/api";
 import { Zap, Activity, AlertCircle, Clock, Globe, Terminal, Save, Play, ArrowUpRight } from "lucide-react";
 
 export default function FunctionDetail({ params }: { params: Promise<{ id: string, func_id: string }> }) {
   const { id, func_id } = use(params);
+  const api = useFluxApi(id);
   const [data, setData] = useState<any>(null);
   const [executions, setExecutions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
-    fetchApi(`/functions/${func_id}`).then(setData).catch(console.error);
-    fetchApi(`/executions?function_id=${func_id}`).then(setExecutions).catch(console.error);
+    api.getFunction(func_id).then(setData).catch(console.error);
+    api.getFunctionExecutions(func_id).then(setExecutions).catch(console.error);
   };
 
   useEffect(() => {
     loadData().then(() => setLoading(false));
-    
-    // LIVE POLLING: Every 3 seconds
     const interval = setInterval(() => {
-      fetchApi(`/executions?function_id=${func_id}&limit=10`).then(setExecutions).catch(console.error);
+      api.getFunctionExecutions(func_id).then(setExecutions).catch(console.error);
     }, 3000);
-    
     return () => clearInterval(interval);
   }, [func_id]);
 

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, use } from "react";
-import { fetchApi } from "@/lib/api";
+import { useFluxApi } from "@/lib/api";
 import { Activity, Terminal, ExternalLink, Copy, Check, ChevronRight, Zap, Globe, Database, Server } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,11 +8,12 @@ import { Badge } from "@/components/ui/badge";
 
 export default function ExecutionDetail({ params }: { params: Promise<{ id: string, exec_id: string }> }) {
   const { id, exec_id } = use(params);
+  const api = useFluxApi(id);
   const [data, setData] = useState<any>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    fetchApi(`/executions/${exec_id}`).then(setData).catch(console.error);
+    api.getExecution(exec_id).then(setData).catch(console.error);
   }, [exec_id]);
 
   const copyReplay = () => {
@@ -148,8 +149,8 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
            <Card className="bg-black border-neutral-900 p-6 font-mono text-[13px] space-y-2 shadow-2xl">
               {data.logs.map((log: any) => (
                 <div key={log.seq} className="flex gap-6 border-l-2 border-neutral-900 pl-4 py-1 hover:bg-neutral-900/30 transition-colors rounded-r">
-                   <span className="text-neutral-700 w-20 flex-shrink-0">{(log.elapsed_ms / 1000).toFixed(4)}s</span>
-                   <span className={log.level === 'error' ? 'text-red-400' : 'text-neutral-400'}>{log.args_json}</span>
+                   <span className="text-neutral-700 w-20 flex-shrink-0">+{log.seq}s</span>
+                   <span className={log.level === 'error' ? 'text-red-400' : 'text-neutral-400'}>{log.message ?? log.args_json}</span>
                 </div>
               ))}
            </Card>

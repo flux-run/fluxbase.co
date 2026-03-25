@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
-import { fetchApi } from "@/lib/api";
+import { useFluxApi } from "@/lib/api";
 import { Activity, Search, ChevronRight, Clock } from "lucide-react";
 import { 
   Table, 
@@ -16,12 +16,13 @@ import { Input } from "@/components/ui/input";
 
 export default function ExecutionsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const api = useFluxApi(id);
   const [executions, setExecutions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
 
   useEffect(() => {
-    fetchApi(`/executions?project_id=${id}`).then(data => {
+    api.getExecutions().then(data => {
       setExecutions(data);
       setLoading(false);
     }).catch(console.error);

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
-import { fetchApi } from "@/lib/api";
+import { useFluxApi } from "@/lib/api";
 import { Zap, Activity, AlertCircle, Plus } from "lucide-react";
 import { 
   Table, 
@@ -16,11 +16,12 @@ import { Button } from "@/components/ui/button";
 
 export default function FunctionsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const api = useFluxApi(id);
   const [functions, setFunctions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchApi(`/functions?project_id=${id}`).then(data => {
+    api.getFunctions().then(data => {
       setFunctions(data);
       setLoading(false);
     }).catch(console.error);

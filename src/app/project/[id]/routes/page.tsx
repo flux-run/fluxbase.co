@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, use } from "react";
-import { fetchApi } from "@/lib/api";
+import { useFluxApi } from "@/lib/api";
 import { Globe, Plus, ArrowUpRight, Zap, MoreVertical } from "lucide-react";
 import { 
   Table, 
@@ -16,11 +16,12 @@ import { Card } from "@/components/ui/card";
 
 export default function RoutesPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const api = useFluxApi(id);
   const [routes, setRoutes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchApi(`/routes?project_id=${id}`).then(data => {
+    api.getRoutes().then(data => {
       setRoutes(data);
       setLoading(false);
     }).catch(console.error);

@@ -1,12 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
-import { fetchApi } from "@/lib/api";
+import { useFluxApi } from "@/lib/api";
 import { ChevronDown, Plus, Building } from "lucide-react";
-
 import { useSession } from "next-auth/react";
 
 export function OrgSwitcher() {
   const { data: session, status } = useSession();
+  const api = useFluxApi();
   const [orgs, setOrgs] = useState<any[]>([]);
   const [currentOrg, setCurrentOrg] = useState<any>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -14,11 +14,7 @@ export function OrgSwitcher() {
 
   useEffect(() => {
     if (status !== "authenticated") return;
-    
-    const token = session?.flux_token || localStorage.getItem("flux_token");
-    if (!token) return;
-
-    fetchApi("/orgs", { token }).then(data => {
+    api.getOrgs().then(data => {
       setOrgs(data);
       if (data && data.length > 0) {
         const stored = localStorage.getItem("current_org_id") || session?.org_id;
