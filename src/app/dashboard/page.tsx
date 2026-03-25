@@ -3,7 +3,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { fetchApi } from "@/lib/api";
 import { Header } from "@/components/dashboard/Header";
-import { Plus, ArrowUpRight, AlertCircle, Activity } from "lucide-react";
+import { Plus, ArrowUpRight, Activity, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 export default function Dashboard() {
   const [projects, setProjects] = useState<any[]>([]);
@@ -25,21 +27,22 @@ export default function Dashboard() {
       <Header />
       
       <main className="max-w-6xl mx-auto w-full p-8">
-        <header className="mb-10 flex items-center justify-between">
+        <header className="mb-12 flex items-center justify-between pb-4 border-b border-neutral-900">
           <div>
-            <h1 className="text-2xl font-bold text-neutral-100 tracking-tight">Projects</h1>
-            <p className="text-sm text-neutral-500 mt-1">Manage your infrastructure environments.</p>
+            <h1 className="text-xl font-bold font-mono tracking-tight text-neutral-200">
+              <span className="text-neutral-500">flux /</span> projects
+            </h1>
           </div>
-          <button className="flex items-center gap-2 bg-white text-black px-4 py-2 rounded-md font-semibold text-sm hover:bg-neutral-200 transition">
-            <Plus className="w-4 h-4" />
+          <Button variant="outline" size="sm" className="bg-white text-black hover:bg-neutral-200 hover:text-black font-bold h-9">
+            <Plus className="w-4 h-4 mr-2" />
             New Project
-          </button>
+          </Button>
         </header>
 
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3].map(i => (
-              <div key={i} className="h-40 bg-neutral-900 border border-neutral-800 rounded-xl animate-pulse" />
+              <Card key={i} className="h-40 bg-[#111] border-neutral-800 animate-pulse" />
             ))}
           </div>
         ) : (
@@ -48,41 +51,41 @@ export default function Dashboard() {
               <Link 
                 key={p.id} 
                 href={`/project/${p.id}`} 
-                className="group relative flex flex-col justify-between border border-neutral-800 p-6 rounded-xl bg-[#111] hover:border-neutral-600 transition-all hover:shadow-2xl hover:shadow-black/50"
+                className="group transition-transform active:scale-[0.98]"
               >
-                <div>
-                  <div className="flex justify-between items-start">
-                    <h3 className="text-lg font-bold text-neutral-100 group-hover:text-white transition-colors">{p.name}</h3>
-                    <ArrowUpRight className="w-4 h-4 text-neutral-600 group-hover:text-white transition-all opacity-0 group-hover:opacity-100" />
+                <Card className="bg-[#111] border-neutral-800 p-6 h-full hover:border-neutral-600 transition-all flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-start">
+                      <h3 className="text-lg font-bold text-neutral-100 group-hover:text-blue-400 transition-colors uppercase tracking-tight">{p.name}</h3>
+                      <ArrowUpRight className="w-4 h-4 text-neutral-700 group-hover:text-white transition-all opacity-0 group-hover:opacity-100" />
+                    </div>
+                    <p className="text-xs text-neutral-600 mt-1 font-mono">{p.id.slice(0, 12)}</p>
                   </div>
-                  <p className="text-xs text-neutral-600 mt-1 font-mono uppercase tracking-widest">{p.id.slice(0, 8)}</p>
-                </div>
 
-                <div className="mt-8 flex items-center justify-between">
-                  <div className="flex items-center gap-4">
+                  <div className="mt-8 flex items-center gap-6">
                     <div className="flex flex-col">
-                      <span className="text-[10px] uppercase font-bold text-neutral-500">Executions (24h)</span>
+                      <span className="text-[10px] uppercase font-bold text-neutral-600 tracking-widest">Execs (24h)</span>
                       <div className="flex items-center gap-1.5 text-sm font-mono text-neutral-300">
                         <Activity className="w-3.5 h-3.5 text-blue-500" />
                         {p.execs_24h || 0}
                       </div>
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[10px] uppercase font-bold text-neutral-500">Error Rate</span>
-                      <div className="flex items-center gap-1.5 text-sm font-mono text-red-500">
+                      <span className="text-[10px] uppercase font-bold text-neutral-600 tracking-widest">Errors</span>
+                      <div className="flex items-center gap-1.5 text-sm font-mono text-red-500/80">
                         <AlertCircle className="w-3.5 h-3.5" />
                         {p.execs_24h > 0 ? ((p.errors_24h / p.execs_24h) * 100).toFixed(1) : 0}%
                       </div>
                     </div>
                   </div>
-                </div>
+                </Card>
               </Link>
             ))}
             
             {projects.length === 0 && (
-              <div className="col-span-full py-16 flex flex-col items-center justify-center border border-dashed border-neutral-800 rounded-xl bg-neutral-950/50">
-                <p className="text-neutral-500 text-sm font-medium">Waiting for your first project...</p>
-                <button className="mt-4 text-xs text-blue-500 hover:underline">Deploy a sample function →</button>
+              <div className="col-span-full py-20 flex flex-col items-center justify-center border border-dashed border-neutral-800 rounded-xl bg-[#0c0c0c]">
+                <p className="text-neutral-500 text-sm font-mono italic">Waiting for your first project deployment...</p>
+                <Button variant="link" className="mt-2 text-blue-500 text-xs font-bold hover:text-blue-400">Deploy a sample function →</Button>
               </div>
             )}
           </div>

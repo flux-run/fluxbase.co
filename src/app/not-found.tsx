@@ -3,20 +3,17 @@ import { FluxIcon } from '@/components/FluxLogo'
 
 export default function NotFound() {
   return (
-    <div style={{
-      minHeight: '100dvh',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 24,
-      background: 'var(--mg-bg)',
-      color: 'var(--mg-text)',
-      fontFamily: 'var(--font-geist-sans), -apple-system, sans-serif',
-      padding: '0 24px',
-      textAlign: 'center',
-    }}>
-      <FluxIcon size={40} />
+    <div className="marketing flex flex-col items-center justify-center p-6 text-center">
+      <div style={{
+        maxWidth: 500,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 24,
+      }}>
+      <Link href="/" style={{ textDecoration: 'none', marginBottom: 8, opacity: 0.8, transition: 'opacity .15s' }}>
+        <span style={{ fontWeight: 700, fontSize: '1.2rem', letterSpacing: '-0.04em', color: '#fff' }}>flux</span>
+      </Link>
 
       <div>
         <div style={{ fontSize: '4rem', fontWeight: 800, lineHeight: 1, color: 'var(--mg-muted)', letterSpacing: '-0.04em' }}>
@@ -50,6 +47,7 @@ export default function NotFound() {
         }}>
           Browse docs
         </Link>
+      </div>
       </div>
     </div>
   )

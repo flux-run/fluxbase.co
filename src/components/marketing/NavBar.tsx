@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { useLatestVersion } from '@/lib/use-latest-version'
+import { FluxLogo } from '@/components/FluxLogo'
 
 function GitHubStarButton() {
   const [count, setCount] = useState<string | null>(null)
@@ -82,7 +83,7 @@ export function NavBar() {
       borderBottom: '1px solid rgba(255,255,255,0.06)',
     }}>
       <Link href="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
-        <span style={{ fontWeight: 700, fontSize: '1.1rem', letterSpacing: '-0.02em', color: '#fff' }}>flux</span>
+        <span style={{ fontWeight: 700, fontSize: '1.2rem', letterSpacing: '-0.04em', color: '#fff' }}>flux</span>
       </Link>
 
       {version && (

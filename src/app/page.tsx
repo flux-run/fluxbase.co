@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useRef, useEffect } from 'react'
 import { CopyCodeBlocks } from '@/components/CopyCodeBlocks'
+import { FluxLogo } from '@/components/FluxLogo'
 
 const COMMANDS = [
   { cmd: 'flux why',    arg: '<id>', desc: 'understand what failed and why'     },
@@ -33,7 +34,9 @@ export default function HomePage() {
         position: 'sticky', top: 0, background: 'rgba(10,10,10,0.92)',
         backdropFilter: 'blur(12px)', zIndex: 100,
       }}>
-        <span style={{ fontWeight: 700, fontSize: '1.1rem', letterSpacing: '-0.02em' }}>flux</span>
+        <Link href="/" className="flex items-center text-white hover:opacity-80 transition-opacity">
+          <span style={{ fontWeight: 700, fontSize: '1.2rem', letterSpacing: '-0.04em', color: '#fff' }}>flux</span>
+        </Link>
         <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
           <Link href="/docs" style={{ color: 'rgba(255,255,255,0.5)', fontSize: '.88rem', textDecoration: 'none' }}>Docs</Link>
           <Link href="https://github.com/flux-run/flux" style={{ color: 'rgba(255,255,255,0.5)', fontSize: '.88rem', textDecoration: 'none' }}>GitHub</Link>

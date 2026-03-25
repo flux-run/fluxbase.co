@@ -1,7 +1,10 @@
 "use client";
 import { useEffect, useState, use } from "react";
 import { fetchApi } from "@/lib/api";
-import { Activity, Terminal, ExternalLink, Copy, Check, ChevronDown, ChevronRight, Zap, Globe, Database, Server } from "lucide-react";
+import { Activity, Terminal, ExternalLink, Copy, Check, ChevronRight, Zap, Globe, Database, Server } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 export default function ExecutionDetail({ params }: { params: Promise<{ id: string, exec_id: string }> }) {
   const { id, exec_id } = use(params);
@@ -18,51 +21,49 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
     setTimeout(() => setCopied(false), 2000);
   };
 
-  if (!data) return <div className="animate-pulse text-sm font-mono text-neutral-500 p-8">Reconstructing deterministic execution state...</div>;
+  if (!data) return <div className="animate-pulse text-sm font-mono text-neutral-500 p-8 text-center mt-20">Reconstructing deterministic execution state...</div>;
 
   const reqObj = typeof data.request === "string" ? JSON.parse(data.request) : data.request;
   let resObj = typeof data.response === "string" ? JSON.parse(data.response) : data.response;
   if (!resObj && data.error) resObj = { error: data.error };
 
   return (
-    <div className="space-y-12 pb-24 max-w-5xl">
+    <div className="space-y-12 pb-24 max-w-5xl mx-auto">
       <header className="flex justify-between items-start border-b border-neutral-900 pb-8">
         <div>
           <div className="flex items-center gap-4 mb-3">
-             <div className={`px-2.5 py-1 rounded text-[11px] font-black uppercase tracking-widest ${data.status === 'ok' ? 'bg-green-500/10 text-green-500 border border-green-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'}`}>
-                {data.status === 'ok' ? 'Success' : 'Failure'}
-             </div>
+             <Badge variant={data.status === 'ok' ? 'success' : 'destructive'} className="font-bold text-[10px] uppercase tracking-widest">
+               {data.status === 'ok' ? 'Success' : 'Failure'}
+             </Badge>
              <h2 className="text-2xl font-bold text-white font-mono flex items-center">
-               <span className="text-neutral-600 mr-2">{data.method}</span>
+               <span className="text-neutral-600 mr-2 text-xl">{data.method}</span>
                {data.path}
              </h2>
           </div>
           <div className="flex items-center gap-4 text-neutral-500 font-mono text-[12px]">
              <span>{exec_id}</span>
-             <span className="w-1 h-1 bg-neutral-800 rounded-full" />
+             <span className="w-1.5 h-1.5 bg-neutral-900 rounded-full" />
              <span className="flex items-center gap-1.5"><Activity className="w-3.5 h-3.5" /> {data.duration_ms}ms</span>
-             <span className="w-1 h-1 bg-neutral-800 rounded-full" />
+             <span className="w-1.5 h-1.5 bg-neutral-900 rounded-full" />
              <span>{new Date(data.started_at).toUTCString()}</span>
           </div>
         </div>
-        <div className="flex gap-2">
-           <button className="flex items-center gap-2 px-3 py-1.5 bg-neutral-900 border border-neutral-800 rounded-md text-sm font-medium hover:border-neutral-700 transition">
-              <ExternalLink className="w-4 h-4" />
-              Open in CLI
-           </button>
-        </div>
+        <Button variant="outline" size="sm" className="bg-neutral-900 border-neutral-800 text-xs font-bold hover:bg-neutral-800 hover:text-white h-9">
+           <ExternalLink className="w-4 h-4 mr-2" />
+           Open in CLI
+        </Button>
       </header>
 
       {/* REPLAY BLOCK - THE MAGIC MOMENT */}
-      <section className="relative overflow-hidden group">
+      <Card className="relative overflow-hidden group border-blue-500/20 bg-blue-500/5 backdrop-blur-sm">
         <div className="absolute inset-0 bg-blue-600/5 blur-2xl group-hover:bg-blue-600/10 transition-all duration-1000" />
-        <div className="relative bg-[#111] border border-blue-500/30 p-6 rounded-2xl shadow-2xl flex flex-col md:flex-row items-center justify-between gap-6 backdrop-blur-sm">
+        <CardContent className="relative p-8 flex flex-col md:flex-row items-center justify-between gap-6">
            <div className="flex items-center gap-5">
               <div className="w-12 h-12 bg-blue-600/20 rounded-xl flex items-center justify-center text-blue-500 shadow-[0_0_20px_rgba(37,99,235,0.2)]">
                  <RepeatIcon className="w-6 h-6" />
               </div>
               <div>
-                 <h4 className="text-white font-bold text-lg">Replay this execution locally</h4>
+                 <h4 className="text-white font-bold text-lg tracking-tight">Replay this execution locally</h4>
                  <p className="text-neutral-500 text-sm mt-0.5">Hydrate your local runtime with the exact state of this production call.</p>
               </div>
            </div>
@@ -73,47 +74,47 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
               <code className="text-blue-400">flux replay {exec_id.slice(0, 8)}</code>
               {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4 text-neutral-600 group-hover/btn:text-white transition-colors" />}
            </button>
-        </div>
-      </section>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
          <section className="space-y-4">
             <h3 className="text-[11px] font-black uppercase tracking-widest text-neutral-600 flex items-center gap-2">
-               <Globe className="w-3.5 h-3.5" />
+               <Globe className="w-3.5 h-3.5 text-blue-500/60" />
                Raw Payload
             </h3>
-            <div className="bg-[#0c0c0c] border border-neutral-900 rounded-xl overflow-hidden shadow-inner">
-               <div className="bg-neutral-900/50 border-b border-neutral-800/50 px-4 py-2 flex items-center justify-between">
+            <Card className="bg-[#0c0c0c] border-neutral-900 shadow-inner overflow-hidden">
+               <div className="bg-neutral-900/40 border-b border-neutral-800/50 px-4 py-2 flex items-center justify-between">
                   <span className="text-[10px] text-neutral-500 font-mono italic">application/json</span>
-                  <Copy className="w-3.5 h-3.5 text-neutral-700 hover:text-white cursor-pointer transition-colors" />
+                  <Copy className="w-3 h-3 text-neutral-700 hover:text-white cursor-pointer transition-colors" />
                </div>
-               <pre className="p-6 text-[13px] font-mono leading-relaxed text-neutral-300 max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-neutral-800">
+               <pre className="p-6 text-[12px] font-mono leading-relaxed text-neutral-300 max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-neutral-800">
                   {JSON.stringify(reqObj, null, 2)}
                </pre>
-            </div>
+            </Card>
          </section>
          <section className="space-y-4">
             <h3 className="text-[11px] font-black uppercase tracking-widest text-neutral-600 flex items-center gap-2">
-               <Server className="w-3.5 h-3.5" />
+               <Server className="w-3.5 h-3.5 text-emerald-500/60" />
                Response Block
             </h3>
-            <div className="bg-[#0c0c0c] border border-neutral-900 rounded-xl overflow-hidden shadow-inner">
-               <div className="bg-neutral-900/50 border-b border-neutral-800/50 px-4 py-2 flex items-center justify-between">
+            <Card className="bg-[#0c0c0c] border-neutral-900 shadow-inner overflow-hidden">
+               <div className="bg-neutral-900/40 border-b border-neutral-800/50 px-4 py-2 flex items-center justify-between">
                   <span className={`text-[10px] font-bold font-mono ${data.status === 'ok' ? 'text-green-500' : 'text-red-500'}`}>
                     HTTP {data.status === 'ok' ? '200' : '500'}
                   </span>
                </div>
-               <pre className="p-6 text-[13px] font-mono leading-relaxed text-neutral-400 max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-neutral-800">
+               <pre className="p-6 text-[12px] font-mono leading-relaxed text-neutral-400 max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-neutral-800">
                   {JSON.stringify(resObj, null, 2)}
                </pre>
-            </div>
+            </Card>
          </section>
       </div>
 
       {data.checkpoints?.length > 0 && (
         <section className="space-y-6">
            <h3 className="text-[11px] font-black uppercase tracking-widest text-neutral-600 flex items-center gap-2">
-              <Activity className="w-3.5 h-3.5" />
+              <Activity className="w-3.5 h-3.5 text-indigo-500/60" />
               Determinism Trace (Step-by-Step)
            </h3>
            <div className="space-y-3 relative before:absolute before:left-[19px] before:top-2 before:bottom-2 before:w-[2px] before:bg-neutral-900">
@@ -122,7 +123,7 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                    <div className="w-10 h-10 rounded-full bg-black border-2 border-neutral-900 flex items-center justify-center z-10 group-hover:border-blue-500 transition-colors shadow-xl">
                       {cp.boundary === 'db' ? <Database className="w-4 h-4 text-purple-500" /> : <Globe className="w-4 h-4 text-blue-500" />}
                    </div>
-                   <div className="flex-1 bg-[#111] border border-neutral-900 p-4 rounded-xl flex items-center justify-between hover:border-neutral-700 transition">
+                   <Card className="flex-1 bg-[#111] border-neutral-900 p-4 flex items-center justify-between hover:border-neutral-700 transition">
                       <div className="flex flex-col">
                         <span className="text-xs font-bold text-neutral-200 uppercase tracking-tighter">{cp.boundary} Request</span>
                         <code className="text-[12px] text-neutral-500 mt-1 max-w-[300px] truncate">{cp.url || cp.query || 'Internal Call'}</code>
@@ -131,7 +132,7 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                         <span className="text-[11px] font-mono text-neutral-600">{cp.duration_ms}ms</span>
                         <span className="text-[10px] text-green-500 font-bold mt-1">✓ RECORDED</span>
                       </div>
-                   </div>
+                   </Card>
                 </div>
               ))}
            </div>
@@ -141,17 +142,17 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
       {data.logs?.length > 0 && (
         <section className="space-y-4">
            <h3 className="text-[11px] font-black uppercase tracking-widest text-neutral-600 flex items-center gap-2">
-              <Terminal className="w-3.5 h-3.5" />
+              <Terminal className="w-3.5 h-3.5 text-zinc-500" />
               Isolate Console Output
            </h3>
-           <div className="bg-black border border-neutral-900 rounded-xl p-6 font-mono text-[13px] space-y-2 shadow-2xl">
+           <Card className="bg-black border-neutral-900 p-6 font-mono text-[13px] space-y-2 shadow-2xl">
               {data.logs.map((log: any) => (
                 <div key={log.seq} className="flex gap-6 border-l-2 border-neutral-900 pl-4 py-1 hover:bg-neutral-900/30 transition-colors rounded-r">
                    <span className="text-neutral-700 w-20 flex-shrink-0">{(log.elapsed_ms / 1000).toFixed(4)}s</span>
                    <span className={log.level === 'error' ? 'text-red-400' : 'text-neutral-400'}>{log.args_json}</span>
                 </div>
               ))}
-           </div>
+           </Card>
         </section>
       )}
     </div>
