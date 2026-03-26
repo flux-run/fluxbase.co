@@ -78,6 +78,11 @@ export function useFluxApi(projectId?: string) {
 
       /* Projects */
       getProjects: () => request<Project[]>("/projects", token()),
+      createProject: (name: string, org_id: string) =>
+        request<Project>("/projects", token(), {
+          method: "POST",
+          body: JSON.stringify({ name, org_id }),
+        }),
       deleteProject: (id: string) =>
         request<{ success: boolean }>(`/projects/${id}`, token(), {
           method: "DELETE",
@@ -130,6 +135,11 @@ export function useFluxApi(projectId?: string) {
 
       /* Orgs */
       getOrgs: () => request<Org[]>("/orgs", token()),
+      createOrg: (name: string) =>
+        request<Org>("/orgs", token(), {
+          method: "POST",
+          body: JSON.stringify({ name }),
+        }),
       getOrgMembers: (orgId: string) =>
         request<OrgMember[]>(`/orgs/${orgId}/members`, token()),
 
