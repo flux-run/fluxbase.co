@@ -78,6 +78,10 @@ export function useFluxApi(projectId?: string) {
 
       /* Projects */
       getProjects: () => request<Project[]>("/projects", token()),
+      deleteProject: (id: string) =>
+        request<{ success: boolean }>(`/projects/${id}`, token(), {
+          method: "DELETE",
+        }),
       seedProject: (id?: string) =>
         request<{ success: boolean; projectId: string }>(
           `/projects/${id ?? projectId}/seed`,

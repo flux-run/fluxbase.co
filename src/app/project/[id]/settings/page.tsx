@@ -12,6 +12,7 @@ import { formatDistanceToNow } from "date-fns";
 
 export default function ProjectSettings({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const api = useFluxApi(id);
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
 
   useEffect(() => {
@@ -22,6 +23,21 @@ export default function ProjectSettings({ params }: { params: Promise<{ id: stri
 
   const deleteWebhook = (id: string) => {
     setWebhooks(prev => prev.filter(w => w.id !== id));
+  };
+
+  const handleDeleteProject = async () => {
+    if (!confirm("Are you sure you want to PERMANENTLY delete this project? This cannot be undone.")) {
+      return;
+    }
+
+    try {
+      await api.deleteProject(id);
+      localStorage.removeItem("flux_last_project");
+      window.location.href = "/dashboard";
+    } catch (err) {
+      console.error("Failed to delete project:", err);
+      alert("Failed to delete project. Please try again.");
+    }
   };
 
   return (
@@ -129,7 +145,12 @@ export default function ProjectSettings({ params }: { params: Promise<{ id: stri
                  <h4 className="text-white font-bold text-sm tracking-tight">Delete Project</h4>
                  <p className="text-neutral-600 text-xs italic">Permanently remove this environment and all telemetry logs.</p>
               </div>
-              <Button variant="destructive" size="sm" className="bg-red-600 text-white font-bold text-[10px] uppercase tracking-widest px-6 h-9 shadow-lg shadow-red-600/10 hover:bg-red-500">
+              <Button 
+                variant="destructive" 
+                size="sm" 
+                onClick={handleDeleteProject}
+                className="bg-red-600 text-white font-bold text-[10px] uppercase tracking-widest px-6 h-9 shadow-lg shadow-red-600/10 hover:bg-red-500"
+              >
                 Nuclear Option
               </Button>
            </div>

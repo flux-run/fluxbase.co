@@ -3,17 +3,20 @@ import Link from "next/link";
 import { Search, Bell, User } from "lucide-react";
 import { FluxLogo } from "@/components/FluxLogo";
 import { OrgSwitcher } from "./OrgSwitcher";
+import { ProjectSwitcher } from "./ProjectSwitcher";
 import { UserNav } from "./UserNav";
 
 export function Header() {
   return (
     <header className="h-16 border-b border-neutral-900 bg-black flex items-center justify-between px-6 sticky top-0 z-40">
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-4">
         <Link href="/dashboard" className="flex items-center text-white hover:opacity-80 transition-opacity">
           <span className="font-mono font-black text-xl tracking-tighter">flux</span>
         </Link>
-        <div className="h-4 w-[1px] bg-neutral-800" />
+        <div className="h-4 w-[1px] bg-neutral-800 mx-2" />
         <OrgSwitcher />
+        <div className="text-neutral-800 select-none">/</div>
+        <ProjectSwitcher />
       </div>
 
       <div className="flex items-center gap-4">
