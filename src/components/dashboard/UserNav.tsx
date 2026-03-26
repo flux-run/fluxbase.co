@@ -14,11 +14,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { getStoredUser } from "@/lib/api";
 
-import { useSession, signOut } from "next-auth/react";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 export function UserNav() {
   const router = useRouter();
-  const { data: session } = useSession();
+  const { session } = useAuth();
   
   const user = session?.user;
   const email = user?.email || "user@fluxbase.co";
@@ -28,7 +28,7 @@ export function UserNav() {
     localStorage.removeItem("flux_token");
     localStorage.removeItem("flux_user");
     localStorage.removeItem("current_org_id");
-    await signOut({ callbackUrl: "/login" });
+    window.location.href = "/api/auth/logout";
   };
 
   return (

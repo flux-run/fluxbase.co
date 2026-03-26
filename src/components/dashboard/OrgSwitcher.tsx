@@ -3,10 +3,10 @@ import { useEffect, useState } from "react";
 import { useFluxApi } from "@/lib/api";
 import { Org } from "@/types/api";
 import { ChevronDown, Plus, Building } from "lucide-react";
-import { useSession } from "next-auth/react";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 export function OrgSwitcher() {
-  const { data: session, status } = useSession();
+  const { session } = useAuth();
   const api = useFluxApi();
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [currentOrg, setCurrentOrg] = useState<Org | null>(null);

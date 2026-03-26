@@ -1,7 +1,7 @@
 "use client";
 import { useState, use, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useAuth } from "@/components/auth/AuthProvider";
 import {
   AlertCircle,
   Zap,
@@ -113,13 +113,13 @@ function PipelineStep({
   );
 }
 
-export default function ProjectOverview({
+export default function ProjectPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { data: session } = useSession();
+  const { session, status } = useAuth();
   const router = useRouter();
 
   const [project, setProject] = useState<Project | null>(null);

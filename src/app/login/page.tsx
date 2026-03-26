@@ -2,7 +2,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
@@ -23,14 +22,13 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleOAuth = async (provider: string) => {
-    setLoading(true);
-    try {
-      await signIn(provider, { callbackUrl: "/dashboard" });
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Invalid credentials");
-    } finally {
-      setLoading(false);
+  const handleOAuth = (provider: string) => {
+    if (provider === "github") {
+      const clientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID || "Iv23li9OidZfI47D2d08";
+      const redirectUri = typeof window !== "undefined" ? `${window.location.origin}/api/auth/github` : "";
+      window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=user:email&redirect_uri=${redirectUri}`;
+    } else {
+      setError("Google login is coming soon to our custom auth.");
     }
   };
 

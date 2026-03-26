@@ -4,13 +4,13 @@ import { Header } from "@/components/dashboard/Header";
 import { ChevronLeft, Info, AlertTriangle, XCircle, Activity, Play, TerminalSquare, Check, Copy, Zap } from "lucide-react";
 import { useFluxApi } from "@/lib/api";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { useRouter } from "next/navigation";
 import { ExecutionDetail, LogEntry } from "@/types/api";
 
 export default function RealExecutionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { data: session, status } = useSession();
+  const { session, status } = useAuth();
   const [data, setData] = useState<ExecutionDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);

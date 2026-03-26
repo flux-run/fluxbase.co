@@ -1,11 +1,11 @@
 "use client";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { useFluxApi } from "@/lib/api";
 
 export default function Dashboard() {
-  const { data: session, status } = useSession();
+  const { session, status } = useAuth();
   const router = useRouter();
   const api = useFluxApi();
 

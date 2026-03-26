@@ -5,21 +5,19 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 
-import { signIn } from "next-auth/react";
 
 export default function SignupPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleOAuth = async (provider: string) => {
-    setLoading(true);
-    try {
-      await signIn(provider, { callbackUrl: "/dashboard" });
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to create account");
-    } finally {
-      setLoading(false);
+  const handleOAuth = (provider: string) => {
+    if (provider === "github") {
+      const clientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID || "Iv23li9OidZfI47D2d08";
+      const redirectUri = typeof window !== "undefined" ? `${window.location.origin}/api/auth/github` : "";
+      window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=user:email&redirect_uri=${redirectUri}`;
+    } else {
+      setError("Google signup is coming soon to our custom auth.");
     }
   };
 
