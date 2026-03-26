@@ -1,18 +1,9 @@
-"use client";
-import { useEffect, useState, use } from "react";
 import dynamic from "next/dynamic";
 import { Sidebar } from "@/components/dashboard/Sidebar";
-import { Project } from "@/types/api";
 const Header = dynamic(() => import("@/components/dashboard/Header").then(m => m.Header), { ssr: false });
 
-export default function ProjectLayout({ children, params }: { children: React.ReactNode, params: Promise<{ id: string }> }) {
-  const { id } = use(params);
-  const [project, setProject] = useState<Project | null>(null);
-
-  useEffect(() => {
-    // We can fetch project metadata if needed, but for now we trust the ID
-    // Later we can add a check to ensure project exists in current org
-  }, [id]);
+export default async function ProjectLayout({ children, params }: { children: React.ReactNode, params: Promise<{ id: string }> }) {
+  const { id } = await params;
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-neutral-300 font-sans flex flex-col">
