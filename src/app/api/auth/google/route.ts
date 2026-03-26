@@ -11,9 +11,10 @@ export async function GET(request: NextRequest) {
 
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://api.fluxbase.co";
+    const callbackUrl = new URL("/api/auth/google", request.url).toString();
     console.log(`[Auth] Exchanging Google code with backend at ${apiUrl}/auth/google`);
 
-    const res = await fetch(`${apiUrl}/auth/google?code=${code}`);
+    const res = await fetch(`${apiUrl}/auth/google?code=${code}&redirect_uri=${encodeURIComponent(callbackUrl)}`);
     
     if (!res.ok) {
       const error = await res.text();
