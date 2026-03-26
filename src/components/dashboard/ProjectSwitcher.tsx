@@ -77,7 +77,7 @@ export function ProjectSwitcher() {
             ))}
             <div className="border-t border-neutral-800 my-1.5" />
             <button 
-              onClick={() => router.push("/dashboard")}
+              onClick={() => router.push("/dashboard?select=true")}
               className="w-full flex items-center gap-3 px-3 py-2.5 text-xs hover:bg-neutral-800 transition text-neutral-500 hover:text-white font-medium"
             >
               <Plus className="w-4 h-4" />

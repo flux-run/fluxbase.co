@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useFluxApi } from "@/lib/api";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import { Project } from "@/types/api";
 export default function Dashboard() {
   const { session, status } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const api = useFluxApi();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,9 +31,10 @@ export default function Dashboard() {
 
         // Check for manual "Back to Dashboard" intent
         const lastProjectId = localStorage.getItem("flux_last_project");
+        const isManualSelect = searchParams.get("select") === "true";
         
-        // If we have a last project and it still exists, auto-redirect
-        if (lastProjectId && data.some(p => p.id === lastProjectId)) {
+        // If we have a last project and it still exists, auto-redirect (unless ?select=true)
+        if (!isManualSelect && lastProjectId && data.some(p => p.id === lastProjectId)) {
           setRedirecting(true);
           router.replace(`/project/${lastProjectId}`);
           return;
