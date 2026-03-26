@@ -1,6 +1,5 @@
-import dynamic from "next/dynamic";
 import { Sidebar } from "@/components/dashboard/Sidebar";
-const Header = dynamic(() => import("@/components/dashboard/Header").then(m => m.Header), { ssr: false });
+import { Header } from "@/components/dashboard/Header";
 
 export default async function ProjectLayout({ children, params }: { children: React.ReactNode, params: Promise<{ id: string }> }) {
   const { id } = await params;
