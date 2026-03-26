@@ -17,9 +17,8 @@ const handler = NextAuth({
       if (!user.email || !account) return false;
 
       try {
-        // Induction: Sync with Flux custom backend
-        // Note: Using 127.0.0.1 to avoid IPv6 resolution issues on some local setups
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8080';
+        console.log(`[NextAuth] Starting induction for ${user.email} at ${apiUrl}/auth/oauth`);
         
         const res = await fetch(`${apiUrl}/auth/oauth`, {
           method: "POST",
@@ -33,18 +32,18 @@ const handler = NextAuth({
         });
 
         if (!res.ok) {
-          const errorData = await res.json().catch(() => ({}));
-          console.error(`[NextAuth] Backend induction failed: ${res.status}`, errorData);
+          const errorText = await res.text().catch(() => "No error body");
+          console.error(`[NextAuth] Backend induction failed: Status ${res.status}. Body: ${errorText}`);
           return false;
         }
         
         const data = await res.json();
-        // Attach backend metadata to user object for the JWT callback
+        console.log(`[NextAuth] Induction successful for ${user.email}`);
         user.flux_token = data.token;
         user.org_id = data.org_id;
         return true;
       } catch (error) {
-        console.error("[NextAuth] Sign-in induction error:", error);
+        console.error("[NextAuth] Sign-in induction exception:", error);
         return false;
       }
     },
