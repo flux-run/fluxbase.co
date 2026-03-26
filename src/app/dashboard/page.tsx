@@ -61,6 +61,7 @@ export default function Dashboard() {
       <div className="flex flex-col items-center gap-4">
         <div className="w-8 h-8 border-2 border-neutral-800 border-t-white rounded-full animate-spin" />
         <p className="text-neutral-600 text-xs font-mono uppercase tracking-widest">Loading...</p>
+        <p className="text-neutral-800 text-[10px] font-mono mt-8">v1.1-DEBUG</p>
       </div>
     </div>
   );
