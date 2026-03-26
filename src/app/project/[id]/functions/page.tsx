@@ -56,7 +56,6 @@ export default function FunctionsPage({ params }: { params: Promise<{ id: string
         isOpen={isInitOpen}
         onClose={() => setIsInitOpen(false)}
         projectId={id}
-        token={session?.flux_token}
       />
 
       <div className="border border-neutral-900 rounded-lg bg-[#0c0c0c] overflow-hidden">

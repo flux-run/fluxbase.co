@@ -212,7 +212,6 @@ export default function ProjectPage({
         isOpen={isInitOpen}
         onClose={() => setIsInitOpen(false)}
         projectId={id}
-        token={session?.flux_token}
       />
       {/* ── HEADER ── */}
       <div className="flex items-start justify-between">

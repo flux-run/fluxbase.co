@@ -1,20 +1,41 @@
 "use client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useEffect, useState, useMemo } from "react";
 import { Terminal, Copy, Check, Info } from "lucide-react";
-import { useState } from "react";
 import { useLatestVersion } from "@/lib/use-latest-version";
+import { useFluxApi } from "@/lib/api";
 
 interface CLIInitDialogProps {
   isOpen: boolean;
   onClose: () => void;
   projectId: string;
-  token?: string;
 }
 
-export function CLIInitDialog({ isOpen, onClose, projectId, token }: CLIInitDialogProps) {
+export function CLIInitDialog({ isOpen, onClose, projectId }: CLIInitDialogProps) {
   const [copied, setCopied] = useState<string | null>(null);
+  const [serviceToken, setServiceToken] = useState<string | null>(null);
+  const [loadingToken, setLoadingToken] = useState(false);
   const version = useLatestVersion();
+  const api = useFluxApi(projectId);
+
+  useEffect(() => {
+    if (isOpen && !serviceToken && !loadingToken) {
+      const getOrCreateToken = async () => {
+        setLoadingToken(true);
+        try {
+          // Provision a new one for the guide to ensure the user SEES it
+          const newToken = await api.createServiceToken("CLI Onboarding Token");
+          setServiceToken(newToken.token || null);
+        } catch (err) {
+          console.error("Failed to provision CLI token:", err);
+        } finally {
+          setLoadingToken(false);
+        }
+      };
+      getOrCreateToken();
+    }
+  }, [isOpen, projectId, api, serviceToken, loadingToken]);
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -22,14 +43,14 @@ export function CLIInitDialog({ isOpen, onClose, projectId, token }: CLIInitDial
     setTimeout(() => setCopied(null), 2000);
   };
 
-  const steps = [
+  const steps = useMemo(() => [
     {
       title: "Install CLI",
       command: "curl -fsSL https://fluxbase.co/install | bash",
     },
     {
       title: "Authenticate",
-      command: `flux login --url https://api.fluxbase.co --token ${token || "YOUR_TOKEN"}`,
+      command: `flux login --url https://api.fluxbase.co --token ${serviceToken || (loadingToken ? "PROVISIONING..." : "YOUR_SERVICE_TOKEN")}`,
     },
     {
       title: "Initialize Project",
@@ -39,7 +60,7 @@ export function CLIInitDialog({ isOpen, onClose, projectId, token }: CLIInitDial
       title: "Run Development",
       command: "flux dev",
     }
-  ];
+  ], [serviceToken, loadingToken]);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
