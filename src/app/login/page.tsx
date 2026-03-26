@@ -25,8 +25,8 @@ export default function LoginPage() {
   const handleOAuth = (provider: string) => {
     if (provider === "github") {
       window.location.href = "/api/auth/login/github";
-    } else {
-      setError("Google login is coming soon to our custom auth.");
+    } else if (provider === "google") {
+      window.location.href = "/api/auth/login/google";
     }
   };
 
