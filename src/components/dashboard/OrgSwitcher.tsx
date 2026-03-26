@@ -38,14 +38,14 @@ export function OrgSwitcher() {
     setCurrentOrg(org);
     if (org.id) localStorage.setItem("current_org_id", org.id);
     setIsOpen(false);
-    window.location.reload(); // Context refresh
+    window.location.href = "/dashboard?select=true";
   };
 
   const handleConfirmCreate = async (name: string) => {
     const newOrg = await api.createOrg(name);
     if (newOrg.id) {
       localStorage.setItem("current_org_id", newOrg.id);
-      window.location.reload();
+      window.location.href = "/dashboard?select=true";
     }
   };
 
