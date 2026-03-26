@@ -11,7 +11,7 @@ import type {
   ServiceToken,
 } from "@/types/api";
 
-const API_URL = process.env.NEXT_PUBLIC_CONTROL_URL || "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 // Raw HTTP helper — always reads token from localStorage as fallback
 async function request<T = unknown>(endpoint: string, token: string | null, options: RequestInit = {}): Promise<T> {
