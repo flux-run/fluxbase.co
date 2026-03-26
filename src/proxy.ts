@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 
 export function proxy(request: NextRequest) {
   const token = request.cookies.get("flux_token");
+  console.log(`[Proxy] Path: ${request.nextUrl.pathname}, Token: ${token ? "Found" : "Missing"}`);
   
   // Protected routes
   const isProtected = ["/project", "/dashboard"].some(p => request.nextUrl.pathname.startsWith(p));
