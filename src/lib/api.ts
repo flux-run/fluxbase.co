@@ -77,7 +77,8 @@ export function useFluxApi(projectId?: string) {
         request<T>(endpoint, token(), options),
 
       /* Projects */
-      getProjects: () => request<Project[]>("/projects", token()),
+      getProjects: (orgId?: string) => 
+        request<Project[]>(`/projects${orgId ? `?org_id=${orgId}` : ""}`, token()),
       createProject: (name: string, org_id: string) =>
         request<Project>("/projects", token(), {
           method: "POST",

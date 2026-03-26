@@ -21,7 +21,8 @@ export function ProjectSwitcher() {
 
   useEffect(() => {
     if (!api.ready) return;
-    api.getProjects().then(data => {
+    const currentOrgId = localStorage.getItem("current_org_id");
+    api.getProjects(currentOrgId || undefined).then(data => {
       setProjects(data);
       const found = data.find((p: Project) => p.id === currentProjectId);
       if (found) {
