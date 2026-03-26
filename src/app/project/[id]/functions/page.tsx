@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useFluxApi } from "@/lib/api";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { Zap, Activity, AlertCircle, Plus } from "lucide-react";
 import { 
   Table, 
@@ -13,13 +15,17 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Function } from "@/types/api";
+import { Function, Project } from "@/types/api";
+import { CLIInitDialog } from "@/components/dashboard/CLIInitDialog";
 
 export default function FunctionsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const router = useRouter();
+  const { session } = useAuth();
   const api = useFluxApi(id);
   const [functions, setFunctions] = useState<Function[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isInitOpen, setIsInitOpen] = useState(false);
 
   useEffect(() => {
     if (!api.ready) return;
@@ -37,11 +43,21 @@ export default function FunctionsPage({ params }: { params: Promise<{ id: string
           <h2 className="text-2xl font-bold text-white tracking-tight">Functions</h2>
           <p className="text-sm text-neutral-500 mt-1">Your serverless compute units.</p>
         </div>
-        <Button variant="outline" size="sm" className="bg-white text-black hover:bg-neutral-200 font-bold h-9">
+        <Button 
+          onClick={() => setIsInitOpen(true)}
+          variant="outline" size="sm" className="bg-white text-black hover:bg-neutral-200 font-bold h-9"
+        >
           <Plus className="w-4 h-4 mr-2" />
           Deploy Function
         </Button>
       </header>
+
+      <CLIInitDialog
+        isOpen={isInitOpen}
+        onClose={() => setIsInitOpen(false)}
+        projectId={id}
+        token={session?.flux_token}
+      />
 
       <div className="border border-neutral-900 rounded-lg bg-[#0c0c0c] overflow-hidden">
         <Table>

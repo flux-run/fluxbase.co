@@ -3,7 +3,6 @@ import { useState, use, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
-  AlertCircle,
   Zap,
   RefreshCw,
   ChevronRight,
@@ -14,13 +13,8 @@ import {
   GitBranch,
   Clock,
   Activity,
-  Circle,
-  CheckCircle2,
-  XCircle,
   ArrowRight,
   Terminal,
-  Layers,
-  Cpu,
   Globe,
   Code2,
   LucideIcon,
@@ -28,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useFluxApi } from "@/lib/api";
 import { Project, Execution, Function, LogEntry } from "@/types/api";
+import { CLIInitDialog } from "@/components/dashboard/CLIInitDialog";
 
 function timeAgo(d: string) {
   const m = Math.floor((Date.now() - new Date(d).getTime()) / 60000);
@@ -128,6 +123,7 @@ export default function ProjectPage({
   const [heroLogs, setHeroLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
+  const [isInitOpen, setIsInitOpen] = useState(false);
 
   const api = useFluxApi(id);
 
@@ -212,6 +208,12 @@ export default function ProjectPage({
 
   return (
     <div className="py-6 space-y-5 animate-in fade-in duration-300">
+      <CLIInitDialog 
+        isOpen={isInitOpen}
+        onClose={() => setIsInitOpen(false)}
+        projectId={id}
+        token={session?.flux_token}
+      />
       {/* ── HEADER ── */}
       <div className="flex items-start justify-between">
         <div>
@@ -657,8 +659,9 @@ export default function ProjectPage({
               ))}
             </div>
           ) : (
-            <div className="border border-neutral-900/40 rounded-lg p-4 text-center">
-              <p className="text-[10px] text-neutral-700">No functions registered yet</p>
+            <div className="border border-neutral-900/40 rounded-lg p-4 text-center group cursor-pointer hover:bg-white/[0.02] transition-colors" onClick={() => setIsInitOpen(true)}>
+              <p className="text-[10px] text-neutral-500 font-bold group-hover:text-blue-400 transition-colors">No functions registered yet</p>
+              <p className="text-[9px] text-neutral-700 mt-0.5">Click to view CLI deployment guide</p>
             </div>
           )}
         </div>
