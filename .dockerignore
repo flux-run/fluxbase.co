@@ -1,0 +1,8 @@
+node_modules
+.next
+.git
+.env.local
+deno.json
+deno.lock
+proxy.ts
+middleware.ts
