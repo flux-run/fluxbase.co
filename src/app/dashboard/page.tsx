@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useFluxApi } from "@/lib/api";
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { LayoutDashboard, Plus, ArrowRight, Box, Clock, Activity } from "lucide-react";
 import { Project } from "@/types/api";
 
-export default function Dashboard() {
+function DashboardContent() {
   const { session, status } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -48,7 +48,7 @@ export default function Dashboard() {
     };
 
     if (api.ready) init();
-  }, [session, status, api, router]);
+  }, [session, status, api, router, searchParams]); // Added searchParams for completeness
 
   const handleSelectProject = (id: string) => {
     localStorage.setItem("flux_last_project", id);
@@ -56,16 +56,7 @@ export default function Dashboard() {
   };
 
   if (loading || redirecting) {
-    return (
-      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-8 h-8 border-2 border-neutral-800 border-t-white rounded-full animate-spin" />
-          <p className="text-neutral-600 text-[10px] font-mono uppercase tracking-[0.3em]">
-            {redirecting ? "Redirecting to last project..." : "Loading Workspace..."}
-          </p>
-        </div>
-      </div>
-    );
+    return <DashboardLoading redirecting={redirecting} />;
   }
 
   return (
@@ -119,7 +110,6 @@ export default function Dashboard() {
                     </div>
                     <div className="flex items-center gap-2">
                        <Clock className="w-3 h-3 text-neutral-600" />
-                       {/* Safe access for null created_at */}
                        <span>{project.created_at ? new Date(project.created_at).toLocaleDateString() : "Just now"}</span>
                     </div>
                   </div>
@@ -152,5 +142,26 @@ export default function Dashboard() {
          <span className="text-[10px] font-black uppercase tracking-[0.5em] text-neutral-700">Flux Control Plane</span>
       </footer>
     </div>
+  );
+}
+
+function DashboardLoading({ redirecting = false }: { redirecting?: boolean }) {
+  return (
+    <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-8 h-8 border-2 border-neutral-800 border-t-white rounded-full animate-spin" />
+        <p className="text-neutral-600 text-[10px] font-mono uppercase tracking-[0.3em]">
+          {redirecting ? "Redirecting to last project..." : "Loading Workspace..."}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <DashboardContent />
+    </Suspense>
   );
 }
