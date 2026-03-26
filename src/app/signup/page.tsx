@@ -13,9 +13,7 @@ export default function SignupPage() {
 
   const handleOAuth = (provider: string) => {
     if (provider === "github") {
-      const clientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID || "Iv23li9OidZfI47D2d08";
-      const redirectUri = typeof window !== "undefined" ? `${window.location.origin}/api/auth/github` : "";
-      window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=user:email&redirect_uri=${redirectUri}`;
+      window.location.href = "/api/auth/login/github";
     } else {
       setError("Google signup is coming soon to our custom auth.");
     }
