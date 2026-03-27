@@ -3,8 +3,9 @@ import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { useFluxApi } from "@/lib/api";
 import { toast } from "sonner";
-import { Zap, Activity, AlertCircle, Clock, Globe, Terminal, Save, Play, ArrowUpRight, BarChart3, AlertOctagon, LucideIcon } from "lucide-react";
+import { Zap, Activity, AlertCircle, Clock, Globe, Terminal, Save, Play, ArrowUpRight, BarChart3, AlertOctagon, LucideIcon, Lightbulb, User } from "lucide-react";
 import { Function, Execution, Route, FunctionStatsResult } from "@/types/api";
+import { ExecutionDetailDrawer } from "@/components/dashboard/ExecutionDetailDrawer";
 
 export default function FunctionDetail({ params }: { params: Promise<{ id: string, func_id: string }> }) {
   const { id, func_id } = use(params);
@@ -13,6 +14,8 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
   const [executions, setExecutions] = useState<Execution[]>([]);
   const [statsData, setStatsData] = useState<FunctionStatsResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedExecId, setSelectedExecId] = useState<string | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const loadData = async () => {
     if (!api.ready) return;
@@ -51,7 +54,13 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
     { name: "Executions", value: st?.total_execs || 0, icon: Activity as LucideIcon },
     { name: "Error Rate", value: `${(st?.total_execs ?? 0) > 0 ? (((st?.errors ?? 0) / (st?.total_execs ?? 1)) * 100).toFixed(1) : 0}%`, icon: AlertCircle as LucideIcon, color: (st?.errors ?? 0) > 0 ? "text-red-500" : "text-neutral-500" },
     { name: "p50 Latency", value: `${Math.round(st?.p50 || 0)}ms`, icon: Clock as LucideIcon },
-    { name: "p95 Latency", value: `${Math.round(st?.p95 || 0)}ms`, icon: Clock as LucideIcon },
+    { 
+      name: "p95 Latency", 
+      value: `${Math.round(st?.p95 || 0)}ms`, 
+      icon: Clock as LucideIcon,
+      subValue: st?.p95_delta && st.p95_delta !== 0 ? `${st.p95_delta > 0 ? '↑' : '↓'} ${Math.abs(Math.round(st.p95_delta))}ms vs baseline` : undefined,
+      subColor: (st?.p95_delta ?? 0) > 0 ? "text-red-500" : "text-green-500"
+    },
     { name: "p99 Latency", value: `${Math.round(st?.p99 || 0)}ms`, icon: Clock as LucideIcon },
   ];
 
@@ -68,9 +77,9 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
           <p className="text-neutral-500 font-mono text-sm mt-3 flex items-center gap-4">
             <span>id: {data.id}</span>
             <span className="w-1.5 h-1.5 bg-neutral-800 rounded-full" />
-            <span className="text-green-500 font-bold flex items-center gap-1.5">
-               <span className="w-1.5 h-1.5 bg-green-500 rounded-full" />
-               Deployed
+            <span className={`${statsData?.health?.severity === 'critical' ? 'text-red-500' : statsData?.health?.severity === 'warning' ? 'text-yellow-500' : 'text-green-500'} font-bold flex items-center gap-1.5`}>
+               <span className={`w-1.5 h-1.5 rounded-full ${statsData?.health?.severity === 'critical' ? 'bg-red-500 animate-pulse' : statsData?.health?.severity === 'warning' ? 'bg-yellow-500' : 'bg-green-500'}`} />
+               {statsData?.health?.message || 'Deployed'}
             </span>
           </p>
         </div>
@@ -91,6 +100,9 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                <span className="text-[10px] uppercase font-bold text-neutral-600 tracking-widest">{s.name}</span>
              </div>
              <div className="text-3xl font-bold font-mono text-neutral-100">{s.value}</div>
+             {s.subValue && (
+               <div className={`text-[10px] font-bold mt-1 ${s.subColor}`}>{s.subValue}</div>
+             )}
           </div>
         ))}
       </div>
@@ -112,6 +124,15 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                     <span className="block font-bold text-red-400 mb-1">Heuristic Engine Diagnosis</span>
                     {statsData.root_cause.cause}
                  </div>
+                 {statsData.root_cause.suggestion && (
+                    <div className="bg-blue-500/10 border border-blue-500/20 rounded p-3 text-xs text-blue-300 flex items-start gap-2 max-w-lg mt-4">
+                       <Lightbulb className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                       <div>
+                          <span className="font-bold text-blue-400 block mb-0.5">Recommended Action</span>
+                          {statsData.root_cause.suggestion}
+                       </div>
+                    </div>
+                 )}
               </div>
               
               <div className="flex flex-col gap-4 w-full md:w-auto shrink-0 bg-black/40 p-5 rounded-lg border border-red-950/60 backdrop-blur-sm">
@@ -119,10 +140,16 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                     <span className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Confidence</span>
                     <span className="font-mono text-green-400 font-bold">{Math.round(statsData.root_cause.confidence * 100)}%</span>
                  </div>
-                 <div className="flex justify-between items-center gap-8">
+                  <div className="flex justify-between items-center gap-8">
                     <span className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Impact</span>
                     <span className="font-mono text-red-400 font-bold">{statsData.root_cause.impact}</span>
                  </div>
+                 {statsData.impact_stats && (
+                    <div className="flex justify-between items-center gap-8">
+                       <span className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Users Affected</span>
+                       <span className="font-mono text-neutral-300 font-bold">{statsData.impact_stats.unique_ips} IPs</span>
+                    </div>
+                 )}
                  <div className="flex justify-between items-center gap-8 border-t border-red-950/40 pt-4 mt-1">
                     <span className="text-xs font-bold text-neutral-500 uppercase tracking-widest">First Seen</span>
                     <span className="font-mono text-neutral-300 font-medium">{new Date(statsData.root_cause.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
@@ -169,6 +196,44 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
             </div>
           </section>
 
+          {statsData?.span_breakdown && statsData.span_breakdown.length > 0 && (
+            <section className="mb-10">
+               <h3 className="text-sm font-bold uppercase tracking-widest text-neutral-500 mb-4 flex items-center gap-2">
+                 <Clock className="w-4 h-4" />
+                 Execution Breakdown (Avg)
+               </h3>
+               <div className="bg-[#111] border border-neutral-800 rounded-xl p-6">
+                  <div className="flex h-4 w-full bg-neutral-900 rounded-full overflow-hidden mb-6">
+                     {(() => {
+                        const totalDur = statsData.span_breakdown!.reduce((acc, s) => acc + Number(s.avg_duration), 0);
+                        const colors: Record<string, string> = { js: 'bg-blue-500', db: 'bg-purple-500', http: 'bg-orange-500', timeout: 'bg-red-500' };
+                        return statsData.span_breakdown!.map((s, i) => (
+                           <div 
+                              key={i} 
+                              className={`${colors[s.type] || 'bg-neutral-500'} h-full`} 
+                              style={{ width: `${(Number(s.avg_duration) / totalDur) * 100}%` }}
+                              title={`${s.type}: ${Math.round(Number(s.avg_duration))}ms`}
+                           />
+                        ));
+                     })()}
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                     {statsData.span_breakdown.map((s, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                           <div className={`w-2 h-2 rounded-full ${
+                              s.type === 'js' ? 'bg-blue-500' : 
+                              s.type === 'db' ? 'bg-purple-500' : 
+                              s.type === 'http' ? 'bg-orange-500' : 'bg-neutral-500'
+                           }`} />
+                           <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">{s.type}</span>
+                           <span className="text-xs font-mono text-neutral-200">{Math.round(Number(s.avg_duration))}ms</span>
+                        </div>
+                     ))}
+                  </div>
+               </div>
+            </section>
+          )}
+
           <section>
             <div className="flex items-center justify-between mb-4">
                <h3 className="text-sm font-bold uppercase tracking-widest text-neutral-500 flex items-center gap-2">
@@ -184,6 +249,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                     <th className="px-4 py-3">ID</th>
                     <th className="px-4 py-3">STATUS</th>
                     <th className="px-4 py-3">DURATION</th>
+                    <th className="px-4 py-3">CALLER</th>
                     <th className="px-4 py-3 text-right">TIME</th>
                   </tr>
                 </thead>
@@ -191,17 +257,28 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                   {executions.map(exec => (
                     <tr key={exec.id} className="hover:bg-neutral-900/50 transition-colors">
                       <td className="px-4 py-3">
-                        <Link href={`/project/${id}/executions/${exec.id}`} className="text-blue-500 hover:underline">{exec.id.slice(0, 8)}</Link>
+                        <button 
+                          onClick={() => { setSelectedExecId(exec.id); setIsDrawerOpen(true); }}
+                          className="text-blue-500 hover:underline text-left font-bold"
+                        >
+                          {exec.id.slice(0, 8)}
+                        </button>
                       </td>
                       <td className="px-4 py-3 align-top">
                         <span className={`font-bold ${exec.status === 'ok' ? 'text-green-500' : 'text-red-500'}`}>{exec.status.toUpperCase()}</span>
                         {exec.status === 'error' && exec.error && (
-                           <div className="text-[10px] text-red-400/80 mt-1 truncate max-w-[250px] font-mono" title={exec.error}>
-                             {exec.error.split('\n')[0]}
+                           <div className="text-[10px] text-red-400/80 mt-1 truncate max-w-[200px] font-mono" title={exec.error}>
+                             {exec.error.split('\\n')[0]}
                            </div>
                         )}
                       </td>
                        <td className="px-4 py-3 text-neutral-500">{exec.duration_ms}ms</td>
+                       <td className="px-4 py-3 text-neutral-600 truncate max-w-[100px]" title={exec.client_ip || 'Internal'}>
+                          <div className="flex items-center gap-1.5 grayscale opacity-50">
+                             <User className="w-3 h-3" />
+                             {exec.client_ip?.slice(0, 7) || 'system'}
+                          </div>
+                       </td>
                        <td className="px-4 py-3 text-right text-neutral-600">{new Date(exec.started_at ?? new Date().toISOString()).toLocaleTimeString()}</td>
                     </tr>
                   ))}
@@ -371,6 +448,13 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
           </section>
         </div>
       </div>
+      
+      <ExecutionDetailDrawer 
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        execId={selectedExecId || ""}
+        projectId={id}
+      />
     </div>
   );
 }

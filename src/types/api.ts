@@ -42,6 +42,8 @@ export interface FunctionStatsResult {
     p50: number;
     p95: number;
     p99: number;
+    p95_delta?: number;
+    p95_baseline?: number;
   };
   top_issues: {
     id: string;
@@ -56,13 +58,27 @@ export interface FunctionStatsResult {
     total: number;
     errors: number;
   }[];
+  span_breakdown?: {
+    type: string;
+    avg_duration: number;
+  }[];
+  impact_stats?: {
+    unique_ips: number;
+    unique_uas: number;
+  };
   root_cause: {
     issue: string;
     impact: string;
     cause: string;
     confidence: number;
     started_at: string;
+    suggestion?: string;
+    sample_stack?: string;
   } | null;
+  health?: {
+    severity: "critical" | "warning" | "healthy";
+    message: string;
+  };
 }
 
 export interface Function extends BaseFunction {
@@ -72,6 +88,9 @@ export interface Function extends BaseFunction {
   total_errors?: number;
   p95?: number;
   last_error_at?: string;
+  severity?: "critical" | "warning" | "healthy";
+  status_message?: string;
+  status?: string;
   stats?: {
     total_execs: number;
     errors: number;

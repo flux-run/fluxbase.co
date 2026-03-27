@@ -128,8 +128,14 @@ export default function FunctionsPage({ params }: { params: Promise<{ id: string
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.4)]" />
-                    <Badge variant="success" className="bg-transparent border-none p-0 text-[10px] font-bold uppercase tracking-tight">Active</Badge>
+                    <div className={`w-1.5 h-1.5 rounded-full ${
+                      f.severity === 'critical' ? 'bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.4)]' : 
+                      f.severity === 'warning' ? 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.4)]' : 
+                      'bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.4)]'
+                    }`} />
+                    <Badge variant={f.severity === 'critical' ? 'destructive' : f.severity === 'warning' ? 'secondary' : 'success'} className="bg-transparent border-none p-0 text-[10px] font-bold uppercase tracking-tight">
+                      {f.status_message || f.status || "Active"}
+                    </Badge>
                   </div>
                 </TableCell>
                 <TableCell className="text-right text-neutral-600 text-[11px] font-mono">
