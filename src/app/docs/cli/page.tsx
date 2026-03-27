@@ -50,7 +50,7 @@ export default function Page() {
   <tbody>
     <tr><td><code>--port</code></td><td>50051</td><td>gRPC port to listen on</td></tr>
     <tr><td><code>--database-url</code></td><td>env: DATABASE_URL</td><td>Postgres connection string (required)</td></tr>
-    <tr><td><code>--service-token</code></td><td>env: INTERNAL_SERVICE_TOKEN, falls back to <code>dev-service-token</code></td><td>Auth token for clients</td></tr>
+    <tr><td><code>--service-token</code></td><td>env: FLUX_SERVICE_TOKEN, falls back to <code>dev-service-token</code></td><td>Auth token for clients</td></tr>
     <tr><td><code>--release</code></td><td>false</td><td>Use release-mode binary</td></tr>
   </tbody>
 </table>
