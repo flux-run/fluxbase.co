@@ -74,6 +74,8 @@ export interface FunctionStatsResult {
     impact: string;
     cause: string;
     confidence: number;
+    confidence_reason?: string;
+    phase?: string;
     started_at: string;
     suggestion?: string;
     sample_stack?: string;
@@ -111,8 +113,6 @@ export interface Function extends BaseFunction {
 
 export interface Execution extends BaseExecution {
   external_calls?: number;
-  error_source?: 'user_code' | 'platform_runtime' | 'platform_executor';
-  error_type?: string;
 }
 
 export interface LogEntry extends ExecutionConsoleLog {
@@ -141,8 +141,11 @@ export interface ExecutionDetail {
     source: 'user_code' | 'platform_runtime';
     root_cause?: string;
     synthetic_root_cause?: string;
+    details?: string;
+    phase?: string;
     no_runtime_entry?: boolean;
     confidence: number;
+    confidence_reason?: string;
     pattern_history?: {
       count: number;
       window_min: number;

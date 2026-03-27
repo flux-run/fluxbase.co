@@ -4,6 +4,23 @@ import { X, Clock, Terminal, Globe, Activity, ChevronRight, AlertCircle, Cpu } f
 import { ExecutionDetail } from "@/types/api";
 import { useFluxApi } from "@/lib/api";
 
+function formatErrorHeadline(
+  errorName?: string | null,
+  errorMessage?: string | null,
+  fallback?: string | null,
+) {
+  const name = errorName?.trim();
+  const message = errorMessage?.trim();
+  const fallbackMessage = fallback?.trim();
+
+  if (name && message) {
+    return message.startsWith(`${name}:`) ? message : `${name}: ${message}`;
+  }
+  if (message) return message;
+  if (fallbackMessage) return fallbackMessage;
+  return "Unhandled exception";
+}
+
 interface ExecutionDetailDrawerProps {
   isOpen: boolean;
   onClose: () => void;
@@ -15,6 +32,13 @@ export function ExecutionDetailDrawer({ isOpen, onClose, execId, projectId }: Ex
   const api = useFluxApi(projectId);
   const [detail, setDetail] = useState<ExecutionDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const errorHeadline = detail
+    ? formatErrorHeadline(
+        detail.execution.error_name,
+        detail.execution.error_message,
+        detail.execution.error,
+      )
+    : null;
 
   useEffect(() => {
     if (isOpen && execId && api.ready) {
@@ -137,7 +161,10 @@ export function ExecutionDetailDrawer({ isOpen, onClose, execId, projectId }: Ex
                      <AlertCircle className="w-3.5 h-3.5" /> Unhandled Exception
                    </h4>
                    <div className="bg-black/40 rounded p-4 border border-red-900/20">
-                      <div className="text-red-100 font-bold text-sm leading-relaxed mb-4">{detail.execution.error}</div>
+                      <div className="text-red-100 font-bold text-sm leading-relaxed mb-2">{errorHeadline}</div>
+                      {detail.narrative?.phase && (
+                        <div className="text-[11px] text-red-200/60 mb-4">Phase: {detail.narrative.phase}</div>
+                      )}
                       {detail.execution.error_stack && (
                         <div className="p-4 bg-black rounded border border-neutral-900 overflow-x-auto">
                            <pre className="text-[10px] font-mono text-red-400/80 leading-snug">

@@ -7,6 +7,29 @@ import { Zap, Activity, AlertCircle, Clock, Globe, Terminal, Save, Play, ArrowUp
 import { Function, Execution, Route, FunctionStatsResult } from "@/types/api";
 import { ExecutionDetailDrawer } from "@/components/dashboard/ExecutionDetailDrawer";
 
+function formatErrorHeadline(
+  errorName?: string | null,
+  errorMessage?: string | null,
+  fallback?: string | null,
+) {
+  const name = errorName?.trim();
+  const message = errorMessage?.trim();
+  const fallbackMessage = fallback?.trim();
+
+  if (name && message) {
+    return message.startsWith(`${name}:`) ? message : `${name}: ${message}`;
+  }
+  if (message) return message;
+  if (fallbackMessage) return fallbackMessage;
+  return "Unhandled exception";
+}
+
+function confidenceLabel(confidence?: number) {
+  if ((confidence ?? 0) >= 0.85) return "High";
+  if ((confidence ?? 0) >= 0.65) return "Medium";
+  return "Low";
+}
+
 export default function FunctionDetail({ params }: { params: Promise<{ id: string, func_id: string }> }) {
   const { id, func_id } = use(params);
   const api = useFluxApi(id);
@@ -64,6 +87,8 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
     },
     { name: "p99 Latency", value: `${Math.round(st?.p99 || 0)}ms`, icon: Clock as LucideIcon },
   ];
+  const activeIssue = statsData?.root_cause?.issue ?? null;
+  const confidenceText = confidenceLabel(statsData?.root_cause?.confidence);
 
   return (
     <div className="space-y-10 pb-20">
@@ -110,7 +135,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
 
       {statsData?.root_cause && (
         <div 
-          onClick={() => setFilter(filter === statsData.root_cause?.issue ? null : statsData.root_cause?.issue || null)}
+          onClick={() => setFilter(filter === activeIssue ? null : activeIssue)}
           className={`bg-gradient-to-br from-red-950/40 to-black border ${filter === statsData.root_cause.issue ? 'border-red-500 ring-1 ring-red-500' : 'border-red-900/50'} rounded-xl p-8 relative overflow-hidden shadow-2xl transition-all cursor-pointer group hover:scale-[1.01]`}
         >
            <div className="absolute top-0 left-0 w-1 h-full bg-red-500 shadow-[0_0_20px_theme(colors.red.500)]" />
@@ -129,9 +154,12 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                     )}
                  </div>
                  <h3 className="text-3xl font-bold text-red-50 leading-tight max-w-2xl">{statsData.root_cause.issue}</h3>
-                 <div className="text-red-200/80 font-mono text-sm border-l-2 border-red-500/30 pl-4 py-1">
-                    <span className="block font-bold text-red-400 mb-1">Heuristic Engine Diagnosis</span>
+                 <div className="text-red-200/80 font-mono text-sm border-l-2 border-red-500/30 pl-4 py-1 space-y-1">
+                    <span className="block font-bold text-red-400 mb-1">Detected Cause</span>
                     {statsData.root_cause.cause}
+                    {statsData.root_cause.phase && (
+                      <div className="text-[11px] text-red-200/60">Phase: {statsData.root_cause.phase}</div>
+                    )}
                  </div>
                  
                  {/* Latest Failure Snapshot */}
@@ -189,10 +217,15 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                           />
                        </div>
                        <span className={`font-mono text-[11px] font-bold ${statsData.root_cause.confidence > 0.8 ? 'text-green-400' : statsData.root_cause.confidence > 0.5 ? 'text-yellow-400' : 'text-red-400'}`}>
-                          {Math.round(statsData.root_cause.confidence * 100)}%
+                          {confidenceText} {Math.round(statsData.root_cause.confidence * 100)}%
                        </span>
                     </div>
                  </div>
+                 {statsData.root_cause.confidence_reason && (
+                    <div className="text-[11px] text-neutral-500 leading-relaxed">
+                       {statsData.root_cause.confidence_reason}
+                    </div>
+                 )}
                   <div className="flex justify-between items-center gap-8">
                     <span className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Impact</span>
                     <span className="font-mono text-red-400 font-bold">{statsData.root_cause.impact}</span>
@@ -312,7 +345,10 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                 </thead>
                 <tbody>
                   {(executions ?? [])
-                    .filter(exec => !filter || exec.error?.includes(filter) || exec.status.includes(filter))
+                    .filter((exec) => {
+                      const headline = formatErrorHeadline(exec.error_name, exec.error_message, exec.error);
+                      return !filter || headline.includes(filter) || exec.status.includes(filter);
+                    })
                     .map((exec) => (
                     <tr 
                       key={exec.id} 
@@ -326,9 +362,12 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                       </td>
                       <td className="px-4 py-3 align-top">
                         <span className={`font-bold ${exec.status === 'ok' ? 'text-green-500' : 'text-red-500'}`}>{exec.status.toUpperCase()}</span>
-                        {exec.status === 'error' && exec.error && (
-                           <div className="text-[10px] text-red-400/80 mt-1 truncate max-w-[200px] font-mono" title={exec.error}>
-                             {exec.error.split('\\n')[0]}
+                        {exec.status === 'error' && (
+                           <div
+                             className="text-[10px] text-red-400/80 mt-1 truncate max-w-[240px] font-mono"
+                             title={formatErrorHeadline(exec.error_name, exec.error_message, exec.error)}
+                           >
+                             {formatErrorHeadline(exec.error_name, exec.error_message, exec.error)}
                            </div>
                         )}
                       </td>

@@ -7,6 +7,41 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ExecutionDetail as ExecutionDetailType, Checkpoint, LogEntry } from "@/types/api";
 
+function formatErrorHeadline(
+  errorName?: string | null,
+  errorMessage?: string | null,
+  fallback?: string | null,
+) {
+  const name = errorName?.trim();
+  const message = errorMessage?.trim();
+  const fallbackMessage = fallback?.trim();
+
+  if (name && message) {
+    return message.startsWith(`${name}:`) ? message : `${name}: ${message}`;
+  }
+  if (message) return message;
+  if (fallbackMessage) return fallbackMessage;
+  return "Unhandled exception";
+}
+
+function confidenceLabel(confidence?: number) {
+  if ((confidence ?? 0) >= 0.85) return "High";
+  if ((confidence ?? 0) >= 0.65) return "Medium";
+  return "Low";
+}
+
+function phaseLabel(errorPhase?: string | null) {
+  switch (errorPhase) {
+    case "init":
+      return "Initialization before request handling";
+    case "external":
+      return "External dependency step";
+    case "runtime":
+    default:
+      return "Runtime execution (synchronous)";
+  }
+}
+
 export default function ExecutionDetail({ params }: { params: Promise<{ id: string, exec_id: string }> }) {
   const { id, exec_id } = use(params);
   const api = useFluxApi(id);
@@ -49,6 +84,17 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
   const reqObj = parsePayload(exec.request);
   let resObj = parsePayload(exec.response);
   if (!resObj && exec.error) resObj = { error: exec.error };
+  const errorHeadline = formatErrorHeadline(exec.error_name, exec.error_message, exec.error);
+  const isPlatformFailure =
+    exec.is_user_code === false ||
+    exec.error_source === "platform_runtime" ||
+    exec.error_source === "platform_executor";
+  const sourceLabel = isPlatformFailure ? "Flux Runtime" : "User Code";
+  const confidenceText = confidenceLabel(data.narrative?.confidence);
+  const haltReason =
+    exec.status === "ok"
+      ? null
+      : `Execution interrupted by unhandled exception: ${errorHeadline}`;
 
   return (
     <div className="space-y-12 pb-24 max-w-5xl mx-auto">
@@ -60,7 +106,7 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
              </Badge>
              {exec.error_source && (
                <Badge variant="outline" className="border-neutral-800 text-neutral-500 font-bold text-[10px] uppercase tracking-widest">
-                 Source: {exec.error_source === 'user_code' ? 'User Code' : 'Platform Runtime'}
+                 Source: {sourceLabel}
                </Badge>
              )}
              <h2 className="text-2xl font-bold text-white font-mono flex items-center">
@@ -125,10 +171,10 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                               {data.narrative?.severity || 'Healthy'}
                            </Badge>
                            <Badge variant="outline" className="border-neutral-800 text-neutral-400 text-[9px] uppercase font-black px-1.5 py-0">
-                              Source: {data.narrative?.source === 'user_code' ? 'User Code' : 'Flux Runtime'}
+                              Source: {data.narrative?.source === 'user_code' ? 'User Code' : sourceLabel}
                            </Badge>
                            <div className="flex items-center gap-1.5 bg-white/5 px-2 py-0.5 rounded border border-white/10">
-                              <span className="text-[9px] font-bold text-neutral-500 uppercase">Confidence</span>
+                              <span className="text-[9px] font-bold text-neutral-500 uppercase">Confidence {confidenceText}</span>
                               <div className="w-12 h-1 bg-neutral-800 rounded-full overflow-hidden">
                                  <div 
                                     className="h-full bg-blue-500 transition-all duration-1000" 
@@ -138,7 +184,7 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                               <span className="text-[9px] font-black text-blue-400">{(data.narrative?.confidence ?? 0.85) * 100}%</span>
                            </div>
                         </div>
-                        <h3 className="text-3xl font-black text-white tracking-tighter leading-none uppercase italic">
+                        <h3 className="text-3xl font-black text-white tracking-tight leading-tight">
                           {data.narrative?.issue || (exec.status === 'ok' ? 'Execution Optimal' : 'Critical Failure')}
                         </h3>
                         <div className="flex flex-wrap items-center gap-3">
@@ -157,22 +203,41 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                      </div>
 
                      {(data.narrative?.root_cause || data.narrative?.synthetic_root_cause) && (
-                        <div className={`p-4 rounded-xl space-y-2 ${exec.status === 'ok' ? 'bg-emerald-500/5 border border-emerald-500/10' : 'bg-red-500/10 border border-red-500/20'}`}>
+                        <div className={`p-4 rounded-xl space-y-4 ${exec.status === 'ok' ? 'bg-emerald-500/5 border border-emerald-500/10' : 'bg-red-500/10 border border-red-500/20'}`}>
                            <span className={`text-[9px] font-black uppercase tracking-[0.2em] flex items-center gap-2 ${exec.status === 'ok' ? 'text-emerald-400' : 'text-red-400'}`}>
-                              <Zap className="w-3 h-3" /> {exec.status === 'ok' ? 'Execution Insight' : 'Root Cause Identified'}
+                              <Zap className="w-3 h-3" /> {exec.status === 'ok' ? 'Execution Insight' : 'Root Cause'}
                            </span>
-                           <div className="space-y-1">
-                              {data.narrative?.root_cause && (
+                           {exec.status === 'ok' ? (
+                              <div className="space-y-1">
                                  <p className="text-white text-lg font-bold tracking-tight">
-                                    {data.narrative.root_cause}
+                                    {data.narrative?.root_cause}
                                  </p>
-                              )}
-                              {data.narrative?.synthetic_root_cause && (
-                                 <p className="text-neutral-400 text-xs leading-relaxed font-medium">
-                                    {data.narrative.synthetic_root_cause}
-                                 </p>
-                              )}
-                           </div>
+                                 {data.narrative?.synthetic_root_cause && (
+                                    <p className="text-neutral-400 text-xs leading-relaxed font-medium">
+                                       {data.narrative.synthetic_root_cause}
+                                    </p>
+                                 )}
+                              </div>
+                           ) : (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                 <div className="space-y-1">
+                                    <span className="text-[10px] uppercase font-black tracking-[0.2em] text-red-300">Root Cause</span>
+                                    <p className="text-white text-sm font-semibold">{data.narrative?.root_cause || "Unhandled exception thrown in user code"}</p>
+                                 </div>
+                                 <div className="space-y-1">
+                                    <span className="text-[10px] uppercase font-black tracking-[0.2em] text-red-300">Details</span>
+                                    <p className="text-red-100 text-sm font-mono">{data.narrative?.details || errorHeadline}</p>
+                                 </div>
+                                 <div className="space-y-1">
+                                    <span className="text-[10px] uppercase font-black tracking-[0.2em] text-red-300">Phase</span>
+                                    <p className="text-neutral-200 text-sm">{data.narrative?.phase || phaseLabel(exec.error_phase)}</p>
+                                 </div>
+                                 <div className="space-y-1">
+                                    <span className="text-[10px] uppercase font-black tracking-[0.2em] text-red-300">Impact</span>
+                                    <p className="text-neutral-200 text-sm">{data.narrative?.impact}</p>
+                                 </div>
+                              </div>
+                           )}
                         </div>
                      )}
 
@@ -181,8 +246,8 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                            <span className="text-[10px] font-black uppercase text-neutral-500 tracking-[0.2em]">Cause Analysis</span>
                            <p className="text-neutral-200 text-sm font-medium leading-relaxed">
                               {data.narrative?.cause || (exec.status === 'ok' 
-                                ? `Successfully processed ${exec.method} ${exec.path}. Result: status_code 200.` 
-                                : `Code execution encountered an error. Reason: ${exec.error ? exec.error.split('\\n')[0] : 'Unknown error'}.`)}
+                                ? `Execution completed successfully in ${exec.duration_ms}ms.` 
+                                : `Unhandled exception in ${sourceLabel.toLowerCase()}.`)}
                            </p>
                         </div>
                         <div className="space-y-1">
@@ -203,9 +268,9 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                            <div className="space-y-0.5">
                               <p className="text-white font-bold text-xs uppercase tracking-tight">Intelligence Recommendation</p>
                               <p className="text-neutral-400 text-xs italic">
-                                 {data.narrative?.suggestion || (exec.status === 'ok' 
+                              {data.narrative?.suggestion || (exec.status === 'ok' 
                                    ? 'No action required. Execution is fully traceable.'
-                                   : 'Retry this execution locally to debug the error via `flux replay`.')}
+                                   : `Unhandled exception detected: ${errorHeadline}. Remove or handle this throw to allow execution to complete.`)}
                               </p>
                            </div>
                         </div>
@@ -214,6 +279,12 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                            Reproduce reality
                         </Button>
                      </div>
+
+                     {data.narrative?.confidence_reason && (
+                        <p className="text-[11px] text-neutral-500 italic border-t border-neutral-900/50 pt-3">
+                           {data.narrative.confidence_reason}
+                        </p>
+                     )}
 
                      {data.narrative?.anomaly && (
                         <div className="pt-4 border-t border-neutral-900/50 space-y-3">
@@ -314,7 +385,7 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                        <span className="text-[10px] font-black uppercase text-red-500 tracking-widest">Halt Reason</span>
                     </div>
                     <code className="text-[11px] text-red-400 font-mono italic">
-                       {exec.error || 'Execution interrupted by unhandled exception'}
+                       {haltReason}
                     </code>
                   </div>
                )}

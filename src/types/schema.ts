@@ -134,8 +134,14 @@ export interface Execution {
   response_body: string | null;
   client_ip: string | null;
   user_agent: string | null;
+  error_name: string | null;
+  error_message: string | null;
   error_stack: string | null;
   error_fingerprint: string | null;
+  error_phase: string | null;
+  is_user_code: boolean | null;
+  error_source: string | null;
+  error_type: string | null;
 }
 
 export interface Issue {
