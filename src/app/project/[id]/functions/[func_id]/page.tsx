@@ -16,6 +16,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
   const [loading, setLoading] = useState(true);
   const [selectedExecId, setSelectedExecId] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [filter, setFilter] = useState<string | null>(null);
 
   const loadData = async () => {
     if (!api.ready) return;
@@ -108,24 +109,62 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
       </div>
 
       {statsData?.root_cause && (
-        <div className="bg-gradient-to-br from-red-950/40 to-black border border-red-900/50 rounded-xl p-8 relative overflow-hidden shadow-2xl">
+        <div 
+          onClick={() => setFilter(filter === statsData.root_cause?.issue ? null : statsData.root_cause?.issue || null)}
+          className={`bg-gradient-to-br from-red-950/40 to-black border ${filter === statsData.root_cause.issue ? 'border-red-500 ring-1 ring-red-500' : 'border-red-900/50'} rounded-xl p-8 relative overflow-hidden shadow-2xl transition-all cursor-pointer group hover:scale-[1.01]`}
+        >
            <div className="absolute top-0 left-0 w-1 h-full bg-red-500 shadow-[0_0_20px_theme(colors.red.500)]" />
            <div className="absolute top-0 right-0 p-3 opacity-20"><AlertCircle className="w-48 h-48 text-red-500" /></div>
-           <div className="relative z-10 flex flex-col md:flex-row gap-8 items-start justify-between">
-              <div className="space-y-4">
+           <div className="relative z-10 flex flex-col xl:flex-row gap-8 items-start justify-between">
+              <div className="space-y-4 flex-1">
                  <div className="flex items-center gap-2">
                     <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1.5 uppercase tracking-wider shadow-[0_0_10px_theme(colors.red.500/50)] animate-pulse">
                        <Zap className="w-3 h-3" />
                        Active Anomaly
                     </span>
+                    {filter && (
+                      <span className="bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
+                         Filtering Active
+                      </span>
+                    )}
                  </div>
                  <h3 className="text-3xl font-bold text-red-50 leading-tight max-w-2xl">{statsData.root_cause.issue}</h3>
                  <div className="text-red-200/80 font-mono text-sm border-l-2 border-red-500/30 pl-4 py-1">
                     <span className="block font-bold text-red-400 mb-1">Heuristic Engine Diagnosis</span>
                     {statsData.root_cause.cause}
                  </div>
+                 
+                 {/* Latest Failure Snapshot */}
+                 {statsData.root_cause.latest_failure && (
+                    <div className="mt-6 bg-black/60 border border-neutral-800 rounded-lg p-4 max-w-2xl">
+                       <div className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                          <Activity className="w-3 h-3" /> Latest Failure Snapshot
+                       </div>
+                       <div className="grid grid-cols-3 gap-4 mb-3">
+                          <div className="bg-neutral-900/40 p-2 rounded">
+                             <div className="text-[9px] text-neutral-600 uppercase font-bold">Time</div>
+                             <div className="text-xs font-mono text-neutral-300">{new Date(statsData.root_cause.latest_failure.time).toLocaleTimeString()}</div>
+                          </div>
+                          <div className="bg-neutral-900/40 p-2 rounded">
+                             <div className="text-[9px] text-neutral-600 uppercase font-bold">Duration</div>
+                             <div className="text-xs font-mono text-neutral-300">{statsData.root_cause.latest_failure.duration}</div>
+                          </div>
+                          <div className="bg-neutral-900/40 p-2 rounded">
+                             <div className="text-[9px] text-neutral-600 uppercase font-bold">Result</div>
+                             <div className="text-xs font-mono text-red-400 font-bold uppercase truncate">{statsData.root_cause.latest_failure.error.slice(0, 15)}</div>
+                          </div>
+                       </div>
+                       <button 
+                          onClick={(e) => { e.stopPropagation(); setSelectedExecId(statsData.root_cause!.latest_failure!.id); setIsDrawerOpen(true); }}
+                          className="text-[10px] font-bold text-blue-500 hover:text-blue-400 flex items-center gap-1.5 uppercase transition-colors"
+                       >
+                          View Full Trace <ArrowUpRight className="w-3 h-3" />
+                       </button>
+                    </div>
+                 )}
+
                  {statsData.root_cause.suggestion && (
-                    <div className="bg-blue-500/10 border border-blue-500/20 rounded p-3 text-xs text-blue-300 flex items-start gap-2 max-w-lg mt-4">
+                    <div className="bg-blue-500/10 border border-blue-500/20 rounded p-3 text-xs text-blue-300 flex items-start gap-2 max-w-lg mt-4 shadow-inner">
                        <Lightbulb className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
                        <div>
                           <span className="font-bold text-blue-400 block mb-0.5">Recommended Action</span>
@@ -135,10 +174,20 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                  )}
               </div>
               
-              <div className="flex flex-col gap-4 w-full md:w-auto shrink-0 bg-black/40 p-5 rounded-lg border border-red-950/60 backdrop-blur-sm">
+              <div className="flex flex-col gap-4 w-full xl:w-72 shrink-0 bg-black/40 p-5 rounded-lg border border-red-950/60 backdrop-blur-sm">
                  <div className="flex justify-between items-center gap-8">
                     <span className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Confidence</span>
-                    <span className="font-mono text-green-400 font-bold">{Math.round(statsData.root_cause.confidence * 100)}%</span>
+                    <div className="flex items-center gap-2">
+                       <div className="w-20 h-1.5 bg-neutral-800 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full ${statsData.root_cause.confidence > 0.8 ? 'bg-green-500' : statsData.root_cause.confidence > 0.5 ? 'bg-yellow-500' : 'bg-red-500'}`} 
+                            style={{ width: `${statsData.root_cause.confidence * 100}%` }} 
+                          />
+                       </div>
+                       <span className={`font-mono text-[11px] font-bold ${statsData.root_cause.confidence > 0.8 ? 'text-green-400' : statsData.root_cause.confidence > 0.5 ? 'text-yellow-400' : 'text-red-400'}`}>
+                          {Math.round(statsData.root_cause.confidence * 100)}%
+                       </span>
+                    </div>
                  </div>
                   <div className="flex justify-between items-center gap-8">
                     <span className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Impact</span>
@@ -150,9 +199,11 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                        <span className="font-mono text-neutral-300 font-bold">{statsData.impact_stats.unique_ips} IPs</span>
                     </div>
                  )}
-                 <div className="flex justify-between items-center gap-8 border-t border-red-950/40 pt-4 mt-1">
-                    <span className="text-xs font-bold text-neutral-500 uppercase tracking-widest">First Seen</span>
-                    <span className="font-mono text-neutral-300 font-medium">{new Date(statsData.root_cause.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                 <div className="bg-red-500/5 rounded p-3 border border-red-500/10 mt-2">
+                    <div className="text-[10px] text-neutral-600 uppercase font-bold mb-1">Timeline correlation</div>
+                    <div className="text-[11px] text-neutral-400 font-mono">
+                       Anomaly started {new Date(statsData.root_cause.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.
+                    </div>
                  </div>
               </div>
            </div>
@@ -249,20 +300,25 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                     <th className="px-4 py-3">ID</th>
                     <th className="px-4 py-3">STATUS</th>
                     <th className="px-4 py-3">DURATION</th>
+                    <th className="px-4 py-3">TYPE</th>
+                    <th className="px-4 py-3">SOURCE</th>
                     <th className="px-4 py-3">CALLER</th>
                     <th className="px-4 py-3 text-right">TIME</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-neutral-900">
-                  {executions.map(exec => (
-                    <tr key={exec.id} className="hover:bg-neutral-900/50 transition-colors">
+                <tbody>
+                  {(executions ?? [])
+                    .filter(exec => !filter || exec.error?.includes(filter) || exec.status.includes(filter))
+                    .map((exec) => (
+                    <tr 
+                      key={exec.id} 
+                      onClick={() => { setSelectedExecId(exec.id); setIsDrawerOpen(true); }}
+                      className="border-b border-neutral-900 last:border-0 hover:bg-neutral-900/40 transition-colors cursor-pointer group"
+                    >
                       <td className="px-4 py-3">
-                        <button 
-                          onClick={() => { setSelectedExecId(exec.id); setIsDrawerOpen(true); }}
-                          className="text-blue-500 hover:underline text-left font-bold"
-                        >
-                          {exec.id.slice(0, 8)}
-                        </button>
+                          <span className="text-blue-500 group-hover:underline text-left font-bold">
+                            {exec.id.slice(0, 8)}
+                          </span>
                       </td>
                       <td className="px-4 py-3 align-top">
                         <span className={`font-bold ${exec.status === 'ok' ? 'text-green-500' : 'text-red-500'}`}>{exec.status.toUpperCase()}</span>
@@ -273,6 +329,20 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                         )}
                       </td>
                        <td className="px-4 py-3 text-neutral-500">{exec.duration_ms}ms</td>
+                       <td className="px-4 py-3">
+                          <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider bg-neutral-900 border border-neutral-800 px-1.5 py-0.5 rounded">
+                             {exec.error_type || 'default'}
+                          </span>
+                       </td>
+                       <td className="px-4 py-3">
+                          <span className={`text-[10px] font-bold uppercase tracking-wider border px-1.5 py-0.5 rounded ${
+                             exec.error_source === 'user_code' ? 'text-blue-400 border-blue-900/50 bg-blue-950/20' : 
+                             exec.error_source?.startsWith('platform') ? 'text-orange-400 border-orange-900/50 bg-orange-950/20' : 
+                             'text-neutral-500 border-neutral-800 bg-neutral-900/50'
+                          }`}>
+                             {exec.error_source ? exec.error_source.replace('_', ' ') : 'N/A'}
+                          </span>
+                       </td>
                        <td className="px-4 py-3 text-neutral-600 truncate max-w-[100px]" title={exec.client_ip || 'Internal'}>
                           <div className="flex items-center gap-1.5 grayscale opacity-50">
                              <User className="w-3 h-3" />

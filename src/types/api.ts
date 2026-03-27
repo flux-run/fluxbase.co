@@ -49,6 +49,9 @@ export interface FunctionStatsResult {
     id: string;
     title: string;
     fingerprint: string;
+    error_source?: 'user_code' | 'platform_runtime' | 'platform_executor';
+    error_type?: string;
+    code_sha: string;
     count: number;
     first_seen: string;
     last_seen: string;
@@ -65,7 +68,7 @@ export interface FunctionStatsResult {
   impact_stats?: {
     unique_ips: number;
     unique_uas: number;
-  };
+  } | null;
   root_cause: {
     issue: string;
     impact: string;
@@ -74,9 +77,16 @@ export interface FunctionStatsResult {
     started_at: string;
     suggestion?: string;
     sample_stack?: string;
+    impact_count?: number;
+    latest_failure?: {
+      id: string;
+      time: string;
+      duration: string;
+      error: string;
+    } | null;
   } | null;
-  health?: {
-    severity: "critical" | "warning" | "healthy";
+  health: {
+    severity: "critical" | "warning" | "info" | "healthy";
     message: string;
   };
 }
@@ -101,6 +111,8 @@ export interface Function extends BaseFunction {
 
 export interface Execution extends BaseExecution {
   external_calls?: number;
+  error_source?: 'user_code' | 'platform_runtime' | 'platform_executor';
+  error_type?: string;
 }
 
 export interface LogEntry extends ExecutionConsoleLog {
