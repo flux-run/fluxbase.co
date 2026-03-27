@@ -75,6 +75,10 @@ export function CLIInitDialog({ isOpen, onClose, projectId }: CLIInitDialogProps
     {
       title: "Run Development",
       command: "flux dev",
+    },
+    {
+      title: "Deploy to Cloud",
+      command: "flux deploy",
     }
   ], [serviceToken, loadingToken]);
 

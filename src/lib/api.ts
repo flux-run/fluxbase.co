@@ -133,6 +133,20 @@ export function useFluxApi(projectId?: string) {
       /* Routes */
       getRoutes: (id?: string) =>
         request<Route[]>(`/routes?project_id=${id ?? projectId}`, token()),
+      createRoute: (method: string, path: string, function_id: string, id?: string) =>
+        request<Route>("/routes", token(), {
+          method: "POST",
+          body: JSON.stringify({ project_id: id ?? projectId, method, path, function_id }),
+        }),
+      updateRoute: (routeId: string, method: string, path: string, function_id: string) =>
+        request<Route>(`/routes/${routeId}`, token(), {
+          method: "PUT",
+          body: JSON.stringify({ method, path, function_id }),
+        }),
+      deleteRoute: (routeId: string) =>
+        request<{ success: boolean }>(`/routes/${routeId}`, token(), {
+          method: "DELETE",
+        }),
 
       /* Orgs */
       getOrgs: () => request<Org[]>("/orgs", token()),

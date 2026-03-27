@@ -19,7 +19,10 @@ export type OrgMember = BaseMember & {
   id?: string; // sometimes used as alias for user_id in UI
   email?: string;
 };
-export type Route = BaseRoute;
+export type Route = BaseRoute & {
+  function_name?: string;
+  access_policy?: string;
+};
 export type User = BaseUser;
 export type Waitlist = BaseWaitlist;
 export interface Webhook extends BaseWebhook {
