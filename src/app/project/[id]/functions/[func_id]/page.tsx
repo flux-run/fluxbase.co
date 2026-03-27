@@ -11,16 +11,63 @@ function formatErrorHeadline(
   errorName?: string | null,
   errorMessage?: string | null,
   fallback?: string | null,
+  errorStack?: string | null,
 ) {
   const name = errorName?.trim();
   const message = errorMessage?.trim();
   const fallbackMessage = fallback?.trim();
+  const stackLine = errorStack
+    ?.split("\n")
+    .map((line) => line.trim())
+    .find((line) => line && !line.startsWith("at "))
+    ?.replace(/^Uncaught\s+/, "")
+    ?.trim();
+
+  const isGeneric = (value?: string | null) => {
+    const normalized = value?.trim().toLowerCase();
+    return !normalized ||
+      normalized === "unhandled exception" ||
+      normalized === "unknown runtime error" ||
+      normalized === "unknown error" ||
+      normalized === "runtime error" ||
+      normalized === "exception" ||
+      normalized === "error";
+  };
 
   if (name && message) {
     return message.startsWith(`${name}:`) ? message : `${name}: ${message}`;
   }
+  if (stackLine && !isGeneric(stackLine)) return stackLine;
+  if (message && !isGeneric(message)) return message;
+  if (fallbackMessage && !isGeneric(fallbackMessage)) return fallbackMessage;
+  if (stackLine) return stackLine;
   if (message) return message;
   if (fallbackMessage) return fallbackMessage;
+  return "Unhandled exception";
+}
+
+function choosePreferredErrorHeadline(...candidates: Array<string | null | undefined>) {
+  const isGeneric = (value?: string | null) => {
+    const normalized = value?.trim().toLowerCase();
+    return !normalized ||
+      normalized === "unhandled exception" ||
+      normalized === "unknown runtime error" ||
+      normalized === "unknown error" ||
+      normalized === "runtime error" ||
+      normalized === "exception" ||
+      normalized === "error";
+  };
+
+  for (const candidate of candidates) {
+    const normalized = candidate?.trim();
+    if (normalized && !isGeneric(normalized)) return normalized;
+  }
+
+  for (const candidate of candidates) {
+    const normalized = candidate?.trim();
+    if (normalized) return normalized;
+  }
+
   return "Unhandled exception";
 }
 
@@ -87,7 +134,19 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
     },
     { name: "p99 Latency", value: `${Math.round(st?.p99 || 0)}ms`, icon: Clock as LucideIcon },
   ];
-  const activeIssue = statsData?.root_cause?.issue ?? null;
+  const activeIssue = statsData?.root_cause
+    ? choosePreferredErrorHeadline(
+        statsData.root_cause.issue,
+        statsData.root_cause.latest_failure?.error,
+      )
+    : null;
+  const anomalySuggestion = statsData?.root_cause?.suggestion &&
+      !statsData.root_cause.suggestion.includes("Unknown runtime error") &&
+      !statsData.root_cause.suggestion.includes("Unhandled exception detected: Unhandled exception")
+    ? statsData.root_cause.suggestion
+    : statsData?.root_cause
+      ? `Unhandled exception detected: ${activeIssue}. Remove or handle this throw to allow execution to complete.`
+      : null;
   const confidenceText = confidenceLabel(statsData?.root_cause?.confidence);
 
   return (
@@ -136,7 +195,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
       {statsData?.root_cause && (
         <div 
           onClick={() => setFilter(filter === activeIssue ? null : activeIssue)}
-          className={`bg-gradient-to-br from-red-950/40 to-black border ${filter === statsData.root_cause.issue ? 'border-red-500 ring-1 ring-red-500' : 'border-red-900/50'} rounded-xl p-8 relative overflow-hidden shadow-2xl transition-all cursor-pointer group hover:scale-[1.01]`}
+          className={`bg-gradient-to-br from-red-950/40 to-black border ${filter === activeIssue ? 'border-red-500 ring-1 ring-red-500' : 'border-red-900/50'} rounded-xl p-8 relative overflow-hidden shadow-2xl transition-all cursor-pointer group hover:scale-[1.01]`}
         >
            <div className="absolute top-0 left-0 w-1 h-full bg-red-500 shadow-[0_0_20px_theme(colors.red.500)]" />
            <div className="absolute top-0 right-0 p-3 opacity-20"><AlertCircle className="w-48 h-48 text-red-500" /></div>
@@ -153,7 +212,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                       </span>
                     )}
                  </div>
-                 <h3 className="text-3xl font-bold text-red-50 leading-tight max-w-2xl">{statsData.root_cause.issue}</h3>
+                 <h3 className="text-3xl font-bold text-red-50 leading-tight max-w-2xl">{activeIssue}</h3>
                  <div className="text-red-200/80 font-mono text-sm border-l-2 border-red-500/30 pl-4 py-1 space-y-1">
                     <span className="block font-bold text-red-400 mb-1">Detected Cause</span>
                     {statsData.root_cause.cause}
@@ -181,8 +240,8 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                           </div>
                           <div className="bg-neutral-900/40 p-2 rounded">
                              <div className="text-[9px] text-neutral-600 uppercase font-bold">Result</div>
-                             <div className="text-xs font-mono text-red-400 font-bold uppercase truncate">
-                                {statsData.root_cause.latest_failure.error?.slice(0, 20) || "UNKNOWN ERROR"}
+                             <div className="text-xs font-mono text-red-400 font-bold truncate">
+                                {statsData.root_cause.latest_failure.error || "Unknown error"}
                              </div>
                           </div>
                        </div>
@@ -195,12 +254,12 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                     </div>
                  )}
 
-                 {statsData.root_cause.suggestion && (
+                 {anomalySuggestion && (
                     <div className="bg-blue-500/10 border border-blue-500/20 rounded p-3 text-xs text-blue-300 flex items-start gap-2 max-w-lg mt-4 shadow-inner">
                        <Lightbulb className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
                        <div>
                           <span className="font-bold text-blue-400 block mb-0.5">Recommended Action</span>
-                          {statsData.root_cause.suggestion}
+                          {anomalySuggestion}
                        </div>
                     </div>
                  )}
@@ -346,7 +405,12 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                 <tbody>
                   {(executions ?? [])
                     .filter((exec) => {
-                      const headline = formatErrorHeadline(exec.error_name, exec.error_message, exec.error);
+                      const headline = formatErrorHeadline(
+                        exec.error_name,
+                        exec.error_message,
+                        exec.error,
+                        exec.error_stack,
+                      );
                       return !filter || headline.includes(filter) || exec.status.includes(filter);
                     })
                     .map((exec) => (
@@ -365,9 +429,9 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                         {exec.status === 'error' && (
                            <div
                              className="text-[10px] text-red-400/80 mt-1 truncate max-w-[240px] font-mono"
-                             title={formatErrorHeadline(exec.error_name, exec.error_message, exec.error)}
+                             title={formatErrorHeadline(exec.error_name, exec.error_message, exec.error, exec.error_stack)}
                            >
-                             {formatErrorHeadline(exec.error_name, exec.error_message, exec.error)}
+                             {formatErrorHeadline(exec.error_name, exec.error_message, exec.error, exec.error_stack)}
                            </div>
                         )}
                       </td>

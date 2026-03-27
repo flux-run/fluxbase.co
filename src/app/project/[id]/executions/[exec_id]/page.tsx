@@ -11,17 +11,50 @@ function formatErrorHeadline(
   errorName?: string | null,
   errorMessage?: string | null,
   fallback?: string | null,
+  errorStack?: string | null,
 ) {
   const name = errorName?.trim();
   const message = errorMessage?.trim();
   const fallbackMessage = fallback?.trim();
+  const stackLine = errorStack
+    ?.split("\n")
+    .map((line) => line.trim())
+    .find((line) => line && !line.startsWith("at "))
+    ?.replace(/^Uncaught\s+/, "")
+    ?.trim();
+
+  const isGeneric = (value?: string | null) => {
+    const normalized = value?.trim().toLowerCase();
+    return !normalized ||
+      normalized === "unhandled exception" ||
+      normalized === "unknown runtime error" ||
+      normalized === "unknown error" ||
+      normalized === "runtime error" ||
+      normalized === "exception" ||
+      normalized === "error";
+  };
 
   if (name && message) {
     return message.startsWith(`${name}:`) ? message : `${name}: ${message}`;
   }
+  if (stackLine && !isGeneric(stackLine)) return stackLine;
+  if (message && !isGeneric(message)) return message;
+  if (fallbackMessage && !isGeneric(fallbackMessage)) return fallbackMessage;
+  if (stackLine) return stackLine;
   if (message) return message;
   if (fallbackMessage) return fallbackMessage;
   return "Unhandled exception";
+}
+
+function isGenericErrorHeadline(value?: string | null) {
+  const normalized = value?.trim().toLowerCase();
+  return !normalized ||
+    normalized === "unhandled exception" ||
+    normalized === "unknown runtime error" ||
+    normalized === "unknown error" ||
+    normalized === "runtime error" ||
+    normalized === "exception" ||
+    normalized === "error";
 }
 
 function confidenceLabel(confidence?: number) {
@@ -40,6 +73,29 @@ function phaseLabel(errorPhase?: string | null) {
     default:
       return "Runtime execution (synchronous)";
   }
+}
+
+function formatThrownExpression(
+  errorName?: string | null,
+  errorMessage?: string | null,
+  errorStack?: string | null,
+  fallback?: string | null,
+) {
+  const stackLine = errorStack
+    ?.split("\n")
+    .map((line) => line.trim())
+    .find((line) => line && !line.startsWith("at "))
+    ?.replace(/^Uncaught\s+/, "")
+    ?.trim();
+  const stackMatch = stackLine?.match(/^([^:]+):\s*(.+)$/);
+  const name = errorName?.trim() || stackMatch?.[1]?.trim();
+  const message = errorMessage?.trim() || stackMatch?.[2]?.trim();
+
+  if (name && message && !isGenericErrorHeadline(message)) {
+    return `${name}("${message.replaceAll("\n", " ")}")`;
+  }
+
+  return formatErrorHeadline(errorName, errorMessage, fallback, errorStack);
 }
 
 export default function ExecutionDetail({ params }: { params: Promise<{ id: string, exec_id: string }> }) {
@@ -84,7 +140,36 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
   const reqObj = parsePayload(exec.request);
   let resObj = parsePayload(exec.response);
   if (!resObj && exec.error) resObj = { error: exec.error };
-  const errorHeadline = formatErrorHeadline(exec.error_name, exec.error_message, exec.error);
+  const errorHeadline = formatErrorHeadline(
+    exec.error_name,
+    exec.error_message,
+    exec.error,
+    exec.error_stack,
+  );
+  const thrownExpression = formatThrownExpression(
+    exec.error_name,
+    exec.error_message,
+    exec.error_stack,
+    exec.error,
+  );
+  const displayIssue =
+    exec.status === "ok"
+      ? data.narrative?.issue || "Execution Optimal"
+      : isGenericErrorHeadline(data.narrative?.issue)
+        ? errorHeadline
+        : data.narrative?.issue || errorHeadline;
+  const displayDetails =
+    exec.status === "error" && isGenericErrorHeadline(data.narrative?.details)
+      ? errorHeadline
+      : data.narrative?.details || errorHeadline;
+  const displaySuggestion =
+    exec.status === "ok"
+      ? data.narrative?.suggestion || "No action required. Execution is fully traceable."
+      : data.narrative?.suggestion &&
+          !data.narrative.suggestion.includes("Unknown runtime error") &&
+          !data.narrative.suggestion.includes("Unhandled exception detected: Unhandled exception")
+        ? data.narrative.suggestion
+        : `Unhandled exception detected: ${thrownExpression}. Remove or handle this throw to allow execution to complete.`;
   const isPlatformFailure =
     exec.is_user_code === false ||
     exec.error_source === "platform_runtime" ||
@@ -185,7 +270,7 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                            </div>
                         </div>
                         <h3 className="text-3xl font-black text-white tracking-tight leading-tight">
-                          {data.narrative?.issue || (exec.status === 'ok' ? 'Execution Optimal' : 'Critical Failure')}
+                          {displayIssue}
                         </h3>
                         <div className="flex flex-wrap items-center gap-3">
                            <Badge variant="outline" className={`${exec.status === 'ok' ? 'border-emerald-500/30 text-emerald-500' : 'border-red-500/30 text-red-500'} text-[10px] uppercase font-black px-2 py-0.5`}>
@@ -226,7 +311,7 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                                  </div>
                                  <div className="space-y-1">
                                     <span className="text-[10px] uppercase font-black tracking-[0.2em] text-red-300">Details</span>
-                                    <p className="text-red-100 text-sm font-mono">{data.narrative?.details || errorHeadline}</p>
+                                    <p className="text-red-100 text-sm font-mono">{displayDetails}</p>
                                  </div>
                                  <div className="space-y-1">
                                     <span className="text-[10px] uppercase font-black tracking-[0.2em] text-red-300">Phase</span>
@@ -268,9 +353,7 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                            <div className="space-y-0.5">
                               <p className="text-white font-bold text-xs uppercase tracking-tight">Intelligence Recommendation</p>
                               <p className="text-neutral-400 text-xs italic">
-                              {data.narrative?.suggestion || (exec.status === 'ok' 
-                                   ? 'No action required. Execution is fully traceable.'
-                                   : `Unhandled exception detected: ${errorHeadline}. Remove or handle this throw to allow execution to complete.`)}
+                              {displaySuggestion}
                               </p>
                            </div>
                         </div>

@@ -8,14 +8,36 @@ function formatErrorHeadline(
   errorName?: string | null,
   errorMessage?: string | null,
   fallback?: string | null,
+  errorStack?: string | null,
 ) {
   const name = errorName?.trim();
   const message = errorMessage?.trim();
   const fallbackMessage = fallback?.trim();
+  const stackLine = errorStack
+    ?.split("\n")
+    .map((line) => line.trim())
+    .find((line) => line && !line.startsWith("at "))
+    ?.replace(/^Uncaught\s+/, "")
+    ?.trim();
+
+  const isGeneric = (value?: string | null) => {
+    const normalized = value?.trim().toLowerCase();
+    return !normalized ||
+      normalized === "unhandled exception" ||
+      normalized === "unknown runtime error" ||
+      normalized === "unknown error" ||
+      normalized === "runtime error" ||
+      normalized === "exception" ||
+      normalized === "error";
+  };
 
   if (name && message) {
     return message.startsWith(`${name}:`) ? message : `${name}: ${message}`;
   }
+  if (stackLine && !isGeneric(stackLine)) return stackLine;
+  if (message && !isGeneric(message)) return message;
+  if (fallbackMessage && !isGeneric(fallbackMessage)) return fallbackMessage;
+  if (stackLine) return stackLine;
   if (message) return message;
   if (fallbackMessage) return fallbackMessage;
   return "Unhandled exception";
@@ -37,6 +59,7 @@ export function ExecutionDetailDrawer({ isOpen, onClose, execId, projectId }: Ex
         detail.execution.error_name,
         detail.execution.error_message,
         detail.execution.error,
+        detail.execution.error_stack,
       )
     : null;
 
