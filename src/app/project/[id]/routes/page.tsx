@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, use } from "react";
 import { useFluxApi } from "@/lib/api";
-import { Globe, Plus, ArrowUpRight, Zap, MoreVertical, Edit2, Trash2, Shield } from "lucide-react";
+import { Globe, Plus, ArrowUpRight, Zap, MoreVertical, Edit2, Trash2, Shield, Activity, Clock } from "lucide-react";
 import { 
   Table, 
   TableBody, 
@@ -127,6 +127,8 @@ export default function RoutesPage({ params }: { params: Promise<{ id: string }>
               <TableHead className="px-8 font-mono text-[10px] uppercase tracking-widest text-neutral-500">Path</TableHead>
               <TableHead className="px-8 font-mono text-[10px] uppercase tracking-widest text-neutral-500">Function Mapping</TableHead>
               <TableHead className="px-8 font-mono text-[10px] uppercase tracking-widest text-neutral-500">Policy</TableHead>
+              <TableHead className="px-8 font-mono text-[10px] uppercase tracking-widest text-neutral-500 w-[120px]">Rate Limit</TableHead>
+              <TableHead className="px-8 font-mono text-[10px] uppercase tracking-widest text-neutral-500 w-[100px]">Timeout</TableHead>
               <TableHead className="px-8 text-right font-mono text-[10px] uppercase tracking-widest text-neutral-500">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -155,6 +157,18 @@ export default function RoutesPage({ params }: { params: Promise<{ id: string }>
                        {r.access_policy || "private"}
                     </div>
                  </TableCell>
+                 <TableCell className="px-8">
+                    <div className="flex items-center gap-1 text-neutral-600 text-[11px] font-mono">
+                       <Activity className="w-3 h-3" />
+                       {r.rate_limit_rpm ?? 60} RPM
+                    </div>
+                 </TableCell>
+                 <TableCell className="px-8">
+                    <div className="flex items-center gap-1 text-neutral-600 text-[11px] font-mono">
+                       <Clock className="w-3 h-3" />
+                       {r.max_duration_ms ?? 10000}ms
+                    </div>
+                 </TableCell>
                  <TableCell className="px-8 text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -163,12 +177,23 @@ export default function RoutesPage({ params }: { params: Promise<{ id: string }>
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="bg-[#111] border-neutral-800 text-neutral-300">
-                        <DropdownMenuItem onClick={() => handleOpenEdit(r)} className="hover:bg-neutral-800 cursor-pointer">
-                          <Edit2 className="w-4 h-4 mr-2" />
+                        <DropdownMenuItem onClick={() => handleOpenEdit(r)} className="hover:bg-neutral-800 cursor-pointer text-xs">
+                          <Edit2 className="w-3.5 h-3.5 mr-2" />
                           Edit Route
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDelete(r.id!)} className="text-red-400 hover:bg-red-400/10 cursor-pointer">
-                          <Trash2 className="w-4 h-4 mr-2" />
+                        <DropdownMenuItem 
+                          onClick={async () => {
+                            const newPolicy = r.access_policy === "public" ? "private" : "public";
+                            await api.updateFunction(r.function_id!, { access_policy: newPolicy });
+                            refresh();
+                          }}
+                          className="hover:bg-neutral-800 cursor-pointer text-xs"
+                        >
+                          <Shield className="w-3.5 h-3.5 mr-2" />
+                          Make {r.access_policy === "public" ? "Private" : "Public"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDelete(r.id!)} className="text-red-400 hover:bg-red-400/10 cursor-pointer text-xs">
+                          <Trash2 className="w-3.5 h-3.5 mr-2" />
                           Delete Route
                         </DropdownMenuItem>
                       </DropdownMenuContent>

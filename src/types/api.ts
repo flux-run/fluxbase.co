@@ -22,6 +22,8 @@ export type OrgMember = BaseMember & {
 export type Route = BaseRoute & {
   function_name?: string;
   access_policy?: string;
+  rate_limit_rpm?: number;
+  max_duration_ms?: number;
 };
 export type User = BaseUser;
 export type Waitlist = BaseWaitlist;

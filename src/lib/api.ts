@@ -129,6 +129,11 @@ export function useFluxApi(projectId?: string) {
           `/stats/project?project_id=${id ?? projectId}`,
           token(),
         ).catch(() => null),
+      updateFunction: (funcId: string, updates: Partial<{ access_policy: string, rate_limit_rpm: number, max_duration_ms: number, webhook_secret: string }>) =>
+        request<Function>(`/functions/${funcId}`, token(), {
+          method: "PATCH",
+          body: JSON.stringify(updates),
+        }),
 
       /* Routes */
       getRoutes: (id?: string) =>

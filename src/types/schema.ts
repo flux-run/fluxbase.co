@@ -5,6 +5,10 @@ export interface Function {
   project_id: string | null;
   name: string;
   latest_artifact_id: string | null;
+  access_policy: string;
+  webhook_secret: string | null;
+  rate_limit_rpm: number;
+  max_duration_ms: number;
   created_at: string | null;
 }
 
