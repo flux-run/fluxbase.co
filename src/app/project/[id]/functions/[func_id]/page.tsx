@@ -2,6 +2,7 @@
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { useFluxApi } from "@/lib/api";
+import { toast } from "sonner";
 import { Zap, Activity, AlertCircle, Clock, Globe, Terminal, Save, Play, ArrowUpRight, LucideIcon } from "lucide-react";
 import { Function, Execution, Route } from "@/types/api";
 
@@ -162,9 +163,10 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                       rate_limit_rpm: data.rate_limit_rpm,
                       max_duration_ms: data.max_duration_ms,
                     });
+                    toast.success("Settings updated");
                     loadData();
                   } catch (err) {
-                    alert("Failed to update settings: " + err);
+                    toast.error("Failed to update settings: " + err);
                   }
                 }}
                 className="text-blue-500 hover:text-blue-400 transition flex items-center gap-1.5 text-xs font-bold"

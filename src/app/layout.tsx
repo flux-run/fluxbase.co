@@ -4,6 +4,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 import { PostHogPageView } from "./posthog-provider";
 import { Suspense } from "react";
+import { Toaster } from "sonner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -38,6 +39,7 @@ export default function RootLayout({
             <PostHogPageView />
           </Suspense>
           {children}
+          <Toaster position="bottom-right" theme="dark" />
         </Providers>
       </body>
     </html>

@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState, use } from "react";
 import { useFluxApi } from "@/lib/api";
-import { Globe, Plus, ArrowUpRight, Zap, MoreVertical, Edit2, Trash2, Shield, Activity, Clock } from "lucide-react";
+import { toast } from "sonner";
+import { Globe, Plus, ArrowUpRight, Zap, MoreVertical, Edit2, Trash2, Shield, Activity, Clock, Terminal } from "lucide-react";
 import { 
   Table, 
   TableBody, 
@@ -37,6 +38,7 @@ export default function RoutesPage({ params }: { params: Promise<{ id: string }>
   const api = useFluxApi(id);
   const [routes, setRoutes] = useState<Route[]>([]);
   const [functions, setFunctions] = useState<FluxFunction[]>([]);
+  const [project, setProject] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   
   // Modal state
@@ -54,10 +56,12 @@ export default function RoutesPage({ params }: { params: Promise<{ id: string }>
     setLoading(true);
     Promise.all([
       api.getRoutes(),
-      api.getFunctions()
-    ]).then(([routesData, funcsData]) => {
+      api.getFunctions(),
+      api.getProject(id)
+    ]).then(([routesData, funcsData, projectData]) => {
       setRoutes(routesData);
       setFunctions(funcsData);
+      setProject(projectData);
       setLoading(false);
     }).catch(console.error);
   };
@@ -92,7 +96,7 @@ export default function RoutesPage({ params }: { params: Promise<{ id: string }>
       setIsDialogOpen(false);
       refresh();
     } catch (err) {
-      alert("Failed to save route: " + err);
+      toast.error("Failed to save route: " + err);
     }
   };
 
@@ -102,7 +106,7 @@ export default function RoutesPage({ params }: { params: Promise<{ id: string }>
       await api.deleteRoute(routeId);
       refresh();
     } catch (err) {
-      alert("Failed to delete route: " + err);
+      toast.error("Failed to delete route: " + err);
     }
   };
 
@@ -180,6 +184,18 @@ export default function RoutesPage({ params }: { params: Promise<{ id: string }>
                         <DropdownMenuItem onClick={() => handleOpenEdit(r)} className="hover:bg-neutral-800 cursor-pointer text-xs">
                           <Edit2 className="w-3.5 h-3.5 mr-2" />
                           Edit Route
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => {
+                            const url = `https://${project?.slug || 'unknown'}.fluxbase.co${r.path}`;
+                            const curl = `curl -X ${r.method} '${url}' \\\n  -H 'Authorization: Bearer YOUR_TOKEN' \\\n  -H 'Content-Type: application/json'`;
+                            navigator.clipboard.writeText(curl);
+                            toast.success("cURL command copied");
+                          }}
+                          className="hover:bg-neutral-800 cursor-pointer text-xs"
+                        >
+                          <Terminal className="w-3.5 h-3.5 mr-2" />
+                          Copy cURL
                         </DropdownMenuItem>
                         <DropdownMenuItem 
                           onClick={async () => {

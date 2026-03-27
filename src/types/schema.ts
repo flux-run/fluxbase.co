@@ -28,6 +28,7 @@ export interface Project {
   id: string | null;
   org_id: string | null;
   name: string;
+  slug: string | null;
   base_domain: string | null;
   created_at: string | null;
 }
