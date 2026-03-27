@@ -143,7 +143,9 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                        <div className="grid grid-cols-3 gap-4 mb-3">
                           <div className="bg-neutral-900/40 p-2 rounded">
                              <div className="text-[9px] text-neutral-600 uppercase font-bold">Time</div>
-                             <div className="text-xs font-mono text-neutral-300">{new Date(statsData.root_cause.latest_failure.time).toLocaleTimeString()}</div>
+                             <div className="text-xs font-mono text-neutral-300">
+                                {statsData.root_cause.latest_failure.time ? new Date(statsData.root_cause.latest_failure.time).toLocaleTimeString() : "N/A"}
+                             </div>
                           </div>
                           <div className="bg-neutral-900/40 p-2 rounded">
                              <div className="text-[9px] text-neutral-600 uppercase font-bold">Duration</div>
@@ -151,7 +153,9 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                           </div>
                           <div className="bg-neutral-900/40 p-2 rounded">
                              <div className="text-[9px] text-neutral-600 uppercase font-bold">Result</div>
-                             <div className="text-xs font-mono text-red-400 font-bold uppercase truncate">{statsData.root_cause.latest_failure.error.slice(0, 15)}</div>
+                             <div className="text-xs font-mono text-red-400 font-bold uppercase truncate">
+                                {statsData.root_cause.latest_failure.error?.slice(0, 20) || "UNKNOWN ERROR"}
+                             </div>
                           </div>
                        </div>
                        <button 

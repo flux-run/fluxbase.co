@@ -32,11 +32,22 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
     setTimeout(() => setCopied(false), 2000);
   };
 
-  if (!data) return <div className="animate-pulse text-sm font-mono text-neutral-500 p-8 text-center mt-20">Reconstructing deterministic execution state...</div>;
+  if (!data || !data.execution) return <div className="animate-pulse text-sm font-mono text-neutral-500 p-8 text-center mt-20">Reconstructing deterministic execution state...</div>;
 
   const exec = data.execution;
-  const reqObj = typeof exec.request === "string" ? JSON.parse(exec.request) : exec.request;
-  let resObj = typeof exec.response === "string" ? JSON.parse(exec.response) : exec.response;
+  
+  // Safe parsing helper
+  const parsePayload = (val: any) => {
+    if (typeof val !== "string") return val;
+    try {
+      return (val.startsWith('{') || val.startsWith('[')) ? JSON.parse(val) : val;
+    } catch (e) {
+      return val;
+    }
+  };
+
+  const reqObj = parsePayload(exec.request);
+  let resObj = parsePayload(exec.response);
   if (!resObj && exec.error) resObj = { error: exec.error };
 
   return (
