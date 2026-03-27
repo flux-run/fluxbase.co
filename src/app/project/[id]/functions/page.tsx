@@ -83,6 +83,7 @@ export default function FunctionsPage({ params }: { params: Promise<{ id: string
               <TableHead className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">Function Name</TableHead>
               <TableHead className="text-center font-mono text-[10px] uppercase tracking-widest text-neutral-500">Executions</TableHead>
               <TableHead className="text-center font-mono text-[10px] uppercase tracking-widest text-neutral-500">Failure Rate</TableHead>
+              <TableHead className="text-center font-mono text-[10px] uppercase tracking-widest text-neutral-500">p95</TableHead>
               <TableHead className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">Status</TableHead>
               <TableHead className="text-right font-mono text-[10px] uppercase tracking-widest text-neutral-500">Last Deployed</TableHead>
               <TableHead className="w-24" />
@@ -107,9 +108,22 @@ export default function FunctionsPage({ params }: { params: Promise<{ id: string
                   </div>
                 </TableCell>
                 <TableCell className="text-center">
-                  <div className={`flex items-center justify-center gap-1.5 text-xs font-mono ${(f.total_errors ?? 0) > 0 ? "text-red-500" : "text-neutral-600"}`}>
-                    <AlertCircle className="w-3 h-3" />
-                    {f.total_execs && f.total_execs > 0 ? (((f.total_errors ?? 0) / f.total_execs) * 100).toFixed(1) : 0}%
+                  <div className="flex flex-col items-center justify-center">
+                    <div className={`flex items-center gap-1.5 text-xs font-mono ${(f.total_errors ?? 0) > 0 ? "text-red-500" : "text-neutral-600"}`}>
+                      <AlertCircle className="w-3 h-3" />
+                      {f.total_execs && f.total_execs > 0 ? (((f.total_errors ?? 0) / f.total_execs) * 100).toFixed(1) : 0}%
+                    </div>
+                    {(f.total_errors ?? 0) > 0 && f.last_error_at && (
+                      <div className="text-[9px] text-red-500/70 mt-1 whitespace-nowrap" title={new Date(f.last_error_at).toLocaleString()}>
+                        last: {new Date(f.last_error_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell className="text-center">
+                  <div className="text-xs text-neutral-400 font-mono flex items-center justify-center gap-1">
+                    {Math.round(f.p95 || 0)}ms
+                    {f.p95 && f.p95 > 500 && <span className="text-[10px] text-yellow-500" title="Slow execution">⚠️</span>}
                   </div>
                 </TableCell>
                 <TableCell>

@@ -35,11 +35,33 @@ export type Checkpoint = BaseCheckpoint & {
   query?: string;
 };
 
+export interface FunctionStatsResult {
+  stats: {
+    total_execs: number;
+    errors: number;
+    p50: number;
+    p95: number;
+    p99: number;
+  };
+  top_errors: {
+    message: string;
+    count: number;
+    last_seen: string;
+  }[];
+  timeseries: {
+    hour: string;
+    total: number;
+    errors: number;
+  }[];
+}
+
 export interface Function extends BaseFunction {
   method?: string;
   path?: string;
   total_execs?: number;
   total_errors?: number;
+  p95?: number;
+  last_error_at?: string;
   stats?: {
     total_execs: number;
     errors: number;

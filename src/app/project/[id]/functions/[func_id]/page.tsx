@@ -3,26 +3,29 @@ import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { useFluxApi } from "@/lib/api";
 import { toast } from "sonner";
-import { Zap, Activity, AlertCircle, Clock, Globe, Terminal, Save, Play, ArrowUpRight, LucideIcon } from "lucide-react";
-import { Function, Execution, Route } from "@/types/api";
+import { Zap, Activity, AlertCircle, Clock, Globe, Terminal, Save, Play, ArrowUpRight, BarChart3, AlertOctagon, LucideIcon } from "lucide-react";
+import { Function, Execution, Route, FunctionStatsResult } from "@/types/api";
 
 export default function FunctionDetail({ params }: { params: Promise<{ id: string, func_id: string }> }) {
   const { id, func_id } = use(params);
   const api = useFluxApi(id);
   const [data, setData] = useState<Function | null>(null);
   const [executions, setExecutions] = useState<Execution[]>([]);
+  const [statsData, setStatsData] = useState<FunctionStatsResult | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
     if (!api.ready) return;
 
     try {
-      const [func, execs] = await Promise.all([
+      const [func, execs, st] = await Promise.all([
         api.getFunction(func_id),
-        api.getFunctionExecutions(func_id)
+        api.getFunctionExecutions(func_id),
+        api.getFunctionStats(func_id)
       ]);
       setData(func);
       setExecutions(execs);
+      setStatsData(st);
     } catch (err) {
       console.error("Failed to load function details:", err);
     } finally {
@@ -35,6 +38,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
     const interval = setInterval(() => {
       if (api.ready) {
         api.getFunctionExecutions(func_id).then(setExecutions).catch(console.error);
+        api.getFunctionStats(func_id).then(setStatsData).catch(console.error);
       }
     }, 3000);
     return () => clearInterval(interval);
@@ -42,10 +46,13 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
 
   if (!data) return <div className="animate-pulse text-sm font-mono text-neutral-500">Loading function orchestration...</div>;
 
+  const st = statsData?.stats;
   const stats = [
-    { name: "Executions", value: data.stats?.total_execs || 0, icon: Activity as LucideIcon },
-    { name: "Error Rate", value: `${(data.stats?.total_execs ?? 0) > 0 ? (((data.stats?.errors ?? 0) / (data.stats?.total_execs ?? 1)) * 100).toFixed(1) : 0}%`, icon: AlertCircle as LucideIcon, color: (data.stats?.errors ?? 0) > 0 ? "text-red-500" : "text-neutral-500" },
-    { name: "Avg Duration", value: `${Math.round(data.stats?.avg_duration || 0)}ms`, icon: Clock as LucideIcon },
+    { name: "Executions", value: st?.total_execs || 0, icon: Activity as LucideIcon },
+    { name: "Error Rate", value: `${(st?.total_execs ?? 0) > 0 ? (((st?.errors ?? 0) / (st?.total_execs ?? 1)) * 100).toFixed(1) : 0}%`, icon: AlertCircle as LucideIcon, color: (st?.errors ?? 0) > 0 ? "text-red-500" : "text-neutral-500" },
+    { name: "p50 Latency", value: `${Math.round(st?.p50 || 0)}ms`, icon: Clock as LucideIcon },
+    { name: "p95 Latency", value: `${Math.round(st?.p95 || 0)}ms`, icon: Clock as LucideIcon },
+    { name: "p99 Latency", value: `${Math.round(st?.p99 || 0)}ms`, icon: Clock as LucideIcon },
   ];
 
   return (
@@ -76,7 +83,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
         </div>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
         {stats.map(s => (
           <div key={s.name} className="bg-[#111] border border-neutral-800 p-6 rounded-xl">
              <div className="flex items-center justify-between mb-4">
@@ -90,6 +97,41 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         <div className="xl:col-span-2 space-y-10">
+          
+          <section className="mb-10">
+            <h3 className="text-sm font-bold uppercase tracking-widest text-neutral-500 mb-4 flex items-center gap-2">
+              <BarChart3 className="w-4 h-4" />
+              Executions (24h)
+            </h3>
+            <div className="h-40 flex items-end gap-1 bg-[#111] border border-neutral-800 rounded-xl p-4">
+              {statsData && statsData.timeseries && statsData.timeseries.length > 0 ? (() => {
+                const maxTotal = Math.max(...statsData.timeseries.map(t => Number(t.total) || 0), 10);
+                return statsData.timeseries.map((t, i) => {
+                  const total = Number(t.total) || 0;
+                  const errs = Number(t.errors) || 0;
+                  const heightPct = Math.max(2, (total / maxTotal) * 100);
+                  const errPct = total > 0 ? (errs / total) * 100 : 0;
+                  return (
+                    <div key={i} className="flex-1 flex flex-col justify-end group relative h-full">
+                      <div className="w-full bg-blue-500/20 rounded-t-sm hover:bg-blue-500/40 transition-colors relative flex flex-col justify-end" style={{ height: `${heightPct}%` }}>
+                         {errs > 0 && (
+                            <div className="w-full bg-red-500/80 rounded-t-sm" style={{ height: `${errPct}%` }} />
+                         )}
+                      </div>
+                      <div className="opacity-0 group-hover:opacity-100 absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-neutral-900 border border-neutral-700 text-xs text-white p-2 rounded pointer-events-none z-10 whitespace-nowrap shadow-xl">
+                        <div className="font-bold text-neutral-400 mb-1">{new Date(t.hour).toLocaleString()}</div>
+                        <div>Total: {total}</div>
+                        {errs > 0 && <div className="text-red-400">Errors: {errs}</div>}
+                      </div>
+                    </div>
+                  );
+                });
+              })() : (
+                <div className="w-full h-full flex items-center justify-center text-neutral-600 font-mono text-sm italic">No data returned</div>
+              )}
+            </div>
+          </section>
+
           <section>
             <div className="flex items-center justify-between mb-4">
                <h3 className="text-sm font-bold uppercase tracking-widest text-neutral-500 flex items-center gap-2">
@@ -114,8 +156,13 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                       <td className="px-4 py-3">
                         <Link href={`/project/${id}/executions/${exec.id}`} className="text-blue-500 hover:underline">{exec.id.slice(0, 8)}</Link>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 align-top">
                         <span className={`font-bold ${exec.status === 'ok' ? 'text-green-500' : 'text-red-500'}`}>{exec.status.toUpperCase()}</span>
+                        {exec.status === 'error' && exec.error && (
+                           <div className="text-[10px] text-red-400/80 mt-1 truncate max-w-[250px] font-mono" title={exec.error}>
+                             {exec.error.split('\n')[0]}
+                           </div>
+                        )}
                       </td>
                        <td className="px-4 py-3 text-neutral-500">{exec.duration_ms}ms</td>
                        <td className="px-4 py-3 text-right text-neutral-600">{new Date(exec.started_at ?? new Date().toISOString()).toLocaleTimeString()}</td>
@@ -148,6 +195,30 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                   <div className="text-neutral-700 text-sm font-mono italic">No routes mapped to this function.</div>
                 )}
              </div>
+          </section>
+
+          <section>
+            <div className="flex items-center justify-between mb-4 mt-10">
+               <h3 className="text-sm font-bold uppercase tracking-widest text-neutral-500 flex items-center gap-2">
+                 <AlertOctagon className="w-4 h-4" />
+                 Top Issues
+               </h3>
+            </div>
+            {statsData?.top_errors && statsData.top_errors.length > 0 ? (
+              <div className="flex flex-col gap-2">
+                 {statsData.top_errors.map((err, i) => (
+                  <div key={i} className="bg-[#111] border border-neutral-800 px-4 py-3 rounded-lg flex items-center justify-between font-mono text-sm">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <span className="shrink-0 px-2 py-0.5 bg-red-900/30 text-red-500 rounded border border-red-900/50 text-[10px] font-bold">{err.count}</span>
+                      <span className="text-neutral-200 truncate" title={err.message}>{err.message}</span>
+                    </div>
+                    <span className="shrink-0 text-[10px] text-neutral-500 ml-4 hidden sm:block">Last: {new Date(err.last_seen).toLocaleTimeString()}</span>
+                  </div>
+                 ))}
+              </div>
+            ) : (
+              <div className="text-neutral-700 text-sm font-mono italic p-6 border border-dashed border-neutral-800 bg-[#0a0a0a] rounded-xl text-center">No recent errors detected.</div>
+            )}
           </section>
         </div>
 
