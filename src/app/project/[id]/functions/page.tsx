@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useFluxApi } from "@/lib/api";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { Zap, Activity, AlertCircle, Plus } from "lucide-react";
+import { Zap, Activity, AlertCircle, Plus, Trash2 } from "lucide-react";
 import { 
   Table, 
   TableBody, 
@@ -26,15 +26,33 @@ export default function FunctionsPage({ params }: { params: Promise<{ id: string
   const [functions, setFunctions] = useState<Function[]>([]);
   const [loading, setLoading] = useState(true);
   const [isInitOpen, setIsInitOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!api.ready) return;
-
     api.getFunctions().then(data => {
       setFunctions(data);
       setLoading(false);
     }).catch(console.error);
   }, [id, api]);
+
+  const handleDelete = async (funcId: string) => {
+    if (confirmId !== funcId) {
+      setConfirmId(funcId);
+      return;
+    }
+    setDeletingId(funcId);
+    try {
+      await api.deleteFunction(funcId);
+      setFunctions(prev => prev.filter(f => f.id !== funcId));
+    } catch (err) {
+      console.error("Failed to delete function:", err);
+    } finally {
+      setDeletingId(null);
+      setConfirmId(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -67,42 +85,59 @@ export default function FunctionsPage({ params }: { params: Promise<{ id: string
               <TableHead className="text-center font-mono text-[10px] uppercase tracking-widest text-neutral-500">Failure Rate</TableHead>
               <TableHead className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">Status</TableHead>
               <TableHead className="text-right font-mono text-[10px] uppercase tracking-widest text-neutral-500">Last Deployed</TableHead>
+              <TableHead className="w-24" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {functions.map(f => (
-               <TableRow key={f.id} className="border-neutral-900 hover:bg-neutral-900/30 transition-colors group cursor-pointer">
-                 <TableCell>
-                    <Link href={`/project/${id}/functions/${f.id}`} className="flex flex-col">
-                      <div className="flex items-center gap-2">
-                        <Zap className="w-3.5 h-3.5 text-blue-500" />
-                        <span className="text-neutral-100 font-bold group-hover:text-blue-400 transition-colors">{f.name}</span>
-                      </div>
-                      <span className="text-[10px] text-neutral-600 font-mono mt-0.5">{f.id}</span>
-                    </Link>
-                 </TableCell>
-                 <TableCell className="text-center">
-                    <div className="flex items-center justify-center gap-1.5 text-xs text-neutral-300 font-mono">
-                      <Activity className="w-3 h-3 text-neutral-600" />
-                      {f.total_execs || 0}
-                    </div>
-                 </TableCell>
-                 <TableCell className="text-center">
-                    <div className={`flex items-center justify-center gap-1.5 text-xs font-mono ${(f.total_errors ?? 0) > 0 ? "text-red-500" : "text-neutral-600"}`}>
-                      <AlertCircle className="w-3 h-3" />
-                      {f.total_execs && f.total_execs > 0 ? (((f.total_errors ?? 0) / f.total_execs) * 100).toFixed(1) : 0}%
-                    </div>
-                 </TableCell>
-                 <TableCell>
+              <TableRow key={f.id} className="border-neutral-900 hover:bg-neutral-900/30 transition-colors group cursor-pointer">
+                <TableCell>
+                  <Link href={`/project/${id}/functions/${f.id}`} className="flex flex-col">
                     <div className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.4)]" />
-                      <Badge variant="success" className="bg-transparent border-none p-0 text-[10px] font-bold uppercase tracking-tight">Active</Badge>
+                      <Zap className="w-3.5 h-3.5 text-blue-500" />
+                      <span className="text-neutral-100 font-bold group-hover:text-blue-400 transition-colors">{f.name}</span>
                     </div>
-                 </TableCell>
-                 <TableCell className="text-right text-neutral-600 text-[11px] font-mono">
-                    {f.created_at ? new Date(f.created_at).toLocaleDateString() : 'N/A'}
-                 </TableCell>
-               </TableRow>
+                    <span className="text-[10px] text-neutral-600 font-mono mt-0.5">{f.id}</span>
+                  </Link>
+                </TableCell>
+                <TableCell className="text-center">
+                  <div className="flex items-center justify-center gap-1.5 text-xs text-neutral-300 font-mono">
+                    <Activity className="w-3 h-3 text-neutral-600" />
+                    {f.total_execs || 0}
+                  </div>
+                </TableCell>
+                <TableCell className="text-center">
+                  <div className={`flex items-center justify-center gap-1.5 text-xs font-mono ${(f.total_errors ?? 0) > 0 ? "text-red-500" : "text-neutral-600"}`}>
+                    <AlertCircle className="w-3 h-3" />
+                    {f.total_execs && f.total_execs > 0 ? (((f.total_errors ?? 0) / f.total_execs) * 100).toFixed(1) : 0}%
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.4)]" />
+                    <Badge variant="success" className="bg-transparent border-none p-0 text-[10px] font-bold uppercase tracking-tight">Active</Badge>
+                  </div>
+                </TableCell>
+                <TableCell className="text-right text-neutral-600 text-[11px] font-mono">
+                  {f.created_at ? new Date(f.created_at).toLocaleDateString() : 'N/A'}
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={deletingId === f.id}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDelete(f.id); }}
+                    className={`h-7 px-2 text-[10px] font-mono transition-all ${
+                      confirmId === f.id
+                        ? "text-red-400 bg-red-950/40 hover:bg-red-950/60 border border-red-800/50"
+                        : "text-neutral-600 hover:text-red-400 opacity-0 group-hover:opacity-100"
+                    }`}
+                  >
+                    <Trash2 className="w-3 h-3 mr-1" />
+                    {deletingId === f.id ? "Deleting…" : confirmId === f.id ? "Confirm" : "Delete"}
+                  </Button>
+                </TableCell>
+              </TableRow>
             ))}
           </TableBody>
         </Table>
@@ -116,8 +151,8 @@ export default function FunctionsPage({ params }: { params: Promise<{ id: string
         
         {!loading && functions.length === 0 && (
           <div className="p-20 text-center flex flex-col items-center border-t border-neutral-900/50">
-             <Zap className="w-8 h-8 text-neutral-900 mb-3" />
-             <p className="text-neutral-600 font-mono text-xs italic">No functions deployed in this project yet.</p>
+            <Zap className="w-8 h-8 text-neutral-900 mb-3" />
+            <p className="text-neutral-600 font-mono text-xs italic">No functions deployed in this project yet.</p>
           </div>
         )}
       </div>

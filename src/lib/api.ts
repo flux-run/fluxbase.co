@@ -105,6 +105,8 @@ export function useFluxApi(projectId?: string) {
         ),
       getFunction: (funcId: string) =>
         request<Function>(`/functions/${funcId}`, token()),
+      deleteFunction: (funcId: string) =>
+        request<{ ok: boolean }>(`/functions/${funcId}`, token(), { method: "DELETE" }),
 
       /* Executions */
       getExecutions: (id?: string, extra = "") =>
