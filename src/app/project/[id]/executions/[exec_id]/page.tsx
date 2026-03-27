@@ -116,30 +116,69 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                  
                  <div className="space-y-6 flex-1">
                      <div className="space-y-2">
-                        <h3 className="text-2xl font-black text-white tracking-tight leading-none uppercase italic">
+                        <div className="flex items-center gap-2 mb-1">
+                           <Badge className={`${
+                              data.narrative?.severity === 'critical' ? 'bg-red-500' :
+                              data.narrative?.severity === 'high' ? 'bg-orange-500' :
+                              data.narrative?.severity === 'medium' ? 'bg-yellow-500' : 'bg-emerald-500'
+                           } text-black font-black text-[9px] uppercase px-1.5 py-0 rounded-sm`}>
+                              {data.narrative?.severity || 'Healthy'}
+                           </Badge>
+                           <Badge variant="outline" className="border-neutral-800 text-neutral-400 text-[9px] uppercase font-black px-1.5 py-0">
+                              Source: {data.narrative?.source === 'user_code' ? 'User Code' : 'Flux Runtime'}
+                           </Badge>
+                           <div className="flex items-center gap-1.5 bg-white/5 px-2 py-0.5 rounded border border-white/10">
+                              <span className="text-[9px] font-bold text-neutral-500 uppercase">Confidence</span>
+                              <div className="w-12 h-1 bg-neutral-800 rounded-full overflow-hidden">
+                                 <div 
+                                    className="h-full bg-blue-500 transition-all duration-1000" 
+                                    style={{ width: `${(data.narrative?.confidence ?? 0.85) * 100}%` }}
+                                 />
+                              </div>
+                              <span className="text-[9px] font-black text-blue-400">{(data.narrative?.confidence ?? 0.85) * 100}%</span>
+                           </div>
+                        </div>
+                        <h3 className="text-3xl font-black text-white tracking-tighter leading-none uppercase italic">
                           {data.narrative?.issue || (exec.status === 'ok' ? 'Execution Optimal' : 'Critical Failure')}
                         </h3>
                         <div className="flex flex-wrap items-center gap-3">
                            <Badge variant="outline" className={`${exec.status === 'ok' ? 'border-emerald-500/30 text-emerald-500' : 'border-red-500/30 text-red-500'} text-[10px] uppercase font-black px-2 py-0.5`}>
                               {exec.status === 'ok' ? 'Success' : 'Aborted'}
                            </Badge>
-                           {data.narrative?.anomaly?.is_abnormal && (
-                              <Badge variant="outline" className="border-orange-500/30 text-orange-400 text-[10px] uppercase font-black px-2 py-0.5 animate-pulse">
-                                 Anomaly Detected
+                           {data.narrative?.pattern_history && (
+                              <Badge variant="outline" className="border-red-500/50 bg-red-500/10 text-red-400 text-[10px] uppercase font-black px-2 py-0.5 animate-pulse">
+                                 Happened {data.narrative.pattern_history.count} times in last {data.narrative.pattern_history.window_min}m
                               </Badge>
                            )}
-                           <span className="text-neutral-600 text-[10px] font-mono uppercase tracking-widest">{exec.duration_ms}ms total duration</span>
+                           <span className="text-neutral-600 text-[10px] font-mono uppercase tracking-widest">
+                              {exec.duration_ms === 0 ? 'No runtime entry' : `${exec.duration_ms}ms total duration`}
+                           </span>
                         </div>
-                        {data.narrative?.anomaly?.is_abnormal && (
-                           <p className="text-[10px] text-orange-400/80 font-mono italic">
-                              {data.narrative.anomaly.message}
-                           </p>
-                        )}
                      </div>
+
+                     {(data.narrative?.root_cause || data.narrative?.synthetic_root_cause) && (
+                        <div className={`p-4 rounded-xl space-y-2 ${exec.status === 'ok' ? 'bg-emerald-500/5 border border-emerald-500/10' : 'bg-red-500/10 border border-red-500/20'}`}>
+                           <span className={`text-[9px] font-black uppercase tracking-[0.2em] flex items-center gap-2 ${exec.status === 'ok' ? 'text-emerald-400' : 'text-red-400'}`}>
+                              <Zap className="w-3 h-3" /> {exec.status === 'ok' ? 'Execution Insight' : 'Root Cause Identified'}
+                           </span>
+                           <div className="space-y-1">
+                              {data.narrative?.root_cause && (
+                                 <p className="text-white text-lg font-bold tracking-tight">
+                                    {data.narrative.root_cause}
+                                 </p>
+                              )}
+                              {data.narrative?.synthetic_root_cause && (
+                                 <p className="text-neutral-400 text-xs leading-relaxed font-medium">
+                                    {data.narrative.synthetic_root_cause}
+                                 </p>
+                              )}
+                           </div>
+                        </div>
+                     )}
 
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-2 border-y border-neutral-900/50">
                         <div className="space-y-1">
-                           <span className="text-[10px] font-black uppercase text-neutral-500 tracking-[0.2em]">Cause & Result</span>
+                           <span className="text-[10px] font-black uppercase text-neutral-500 tracking-[0.2em]">Cause Analysis</span>
                            <p className="text-neutral-200 text-sm font-medium leading-relaxed">
                               {data.narrative?.cause || (exec.status === 'ok' 
                                 ? `Successfully processed ${exec.method} ${exec.path}. Result: status_code 200.` 
@@ -171,10 +210,35 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                            </div>
                         </div>
                         <Button onClick={copyReplay} variant="ghost" className="h-10 px-4 text-xs font-black text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 uppercase tracking-widest">
-                           {copied ? <Check className="w-4 h-4 mr-2" /> : <Zap className="w-4 h-4 mr-2" />}
-                           Replay + Debug locally
+                           <Zap className="w-4 h-4 mr-2" />
+                           Reproduce reality
                         </Button>
                      </div>
+
+                     {data.narrative?.anomaly && (
+                        <div className="pt-4 border-t border-neutral-900/50 space-y-3">
+                           <span className="text-[10px] font-black uppercase text-neutral-500 tracking-[0.2em]">Behavior compared to recent executions</span>
+                           <div className="flex items-center gap-6">
+                              <div className="space-y-0.5">
+                                 <p className="text-[10px] text-neutral-500 uppercase font-bold">24h Avg Duration</p>
+                                 <p className="text-white font-mono text-sm">{data.narrative.anomaly.avg_duration}ms</p>
+                              </div>
+                              <div className="h-8 w-px bg-neutral-900" />
+                              <div className="space-y-0.5">
+                                 <p className="text-[10px] text-neutral-500 uppercase font-bold">Current</p>
+                                 <p className={`${data.narrative.anomaly.is_abnormal ? 'text-orange-400' : 'text-emerald-400'} font-mono text-sm`}>{exec.duration_ms}ms</p>
+                              </div>
+                              <div className="h-8 w-px bg-neutral-900" />
+                              <div className="space-y-0.5">
+                                 <p className="text-[10px] text-neutral-500 uppercase font-bold">Status</p>
+                                 <p className="text-white text-xs uppercase font-black">{data.narrative.anomaly.is_abnormal ? 'Abnormal' : 'Normal'}</p>
+                              </div>
+                           </div>
+                           <p className="text-[10px] text-neutral-500 italic">
+                             {data.narrative.anomaly.message}
+                           </p>
+                        </div>
+                     )}
 
                      {data.narrative?.next_steps && data.narrative.next_steps.length > 0 && (
                         <div className="space-y-3 pt-2">

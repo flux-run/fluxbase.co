@@ -136,6 +136,17 @@ export interface ExecutionDetail {
     impact: string;
     suggestion: string;
     next_steps: string[];
+    classification: 'success' | 'critical_failure' | 'pre_runtime_failure' | 'timeout' | 'anomaly';
+    severity: 'critical' | 'high' | 'medium' | 'healthy';
+    source: 'user_code' | 'platform_runtime';
+    root_cause?: string;
+    synthetic_root_cause?: string;
+    no_runtime_entry?: boolean;
+    confidence: number;
+    pattern_history?: {
+      count: number;
+      window_min: number;
+    };
     breakdown: {
       js_ms: number;
       io_ms: number;
