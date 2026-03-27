@@ -140,7 +140,7 @@ export default function FunctionsPage({ params }: { params: Promise<{ id: string
                     variant="ghost"
                     size="sm"
                     disabled={deletingId === f.id}
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDelete(f.id); }}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); f.id && handleDelete(f.id); }}
                     className={`h-7 px-2 text-[10px] font-mono transition-all ${
                       confirmId === f.id
                         ? "text-red-400 bg-red-950/40 hover:bg-red-950/60 border border-red-800/50"

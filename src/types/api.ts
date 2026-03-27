@@ -43,9 +43,12 @@ export interface FunctionStatsResult {
     p95: number;
     p99: number;
   };
-  top_errors: {
-    message: string;
+  top_issues: {
+    id: string;
+    title: string;
+    fingerprint: string;
     count: number;
+    first_seen: string;
     last_seen: string;
   }[];
   timeseries: {
@@ -53,6 +56,13 @@ export interface FunctionStatsResult {
     total: number;
     errors: number;
   }[];
+  root_cause: {
+    issue: string;
+    impact: string;
+    cause: string;
+    confidence: number;
+    started_at: string;
+  } | null;
 }
 
 export interface Function extends BaseFunction {
@@ -79,10 +89,15 @@ export interface LogEntry extends ExecutionConsoleLog {
   args_json?: string;
 }
 
-export interface ExecutionDetail extends Execution {
+export interface ExecutionDetail {
+  execution: Execution;
+  spans: {
+    type: string;
+    label: string | null;
+    start_ms: number;
+    duration_ms: number;
+  }[];
   logs?: LogEntry[];
-  console_logs?: LogEntry[];
-  checkpoints?: Checkpoint[];
 }
 
 export interface ServiceToken {

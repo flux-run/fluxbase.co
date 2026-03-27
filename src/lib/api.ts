@@ -139,7 +139,7 @@ export function useFluxApi(projectId?: string) {
           body: JSON.stringify(updates),
         }),
       getFunctionStats: (funcId: string) =>
-        request<any>(`/stats/function/${funcId}`, token()),
+        request<any>(`/function/${funcId}/overview`, token()),
 
       /* Routes */
       getRoutes: (id?: string) =>

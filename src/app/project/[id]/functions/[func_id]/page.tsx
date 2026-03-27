@@ -95,6 +95,43 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
         ))}
       </div>
 
+      {statsData?.root_cause && (
+        <div className="bg-gradient-to-br from-red-950/40 to-black border border-red-900/50 rounded-xl p-8 relative overflow-hidden shadow-2xl">
+           <div className="absolute top-0 left-0 w-1 h-full bg-red-500 shadow-[0_0_20px_theme(colors.red.500)]" />
+           <div className="absolute top-0 right-0 p-3 opacity-20"><AlertCircle className="w-48 h-48 text-red-500" /></div>
+           <div className="relative z-10 flex flex-col md:flex-row gap-8 items-start justify-between">
+              <div className="space-y-4">
+                 <div className="flex items-center gap-2">
+                    <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1.5 uppercase tracking-wider shadow-[0_0_10px_theme(colors.red.500/50)] animate-pulse">
+                       <Zap className="w-3 h-3" />
+                       Active Anomaly
+                    </span>
+                 </div>
+                 <h3 className="text-3xl font-bold text-red-50 leading-tight max-w-2xl">{statsData.root_cause.issue}</h3>
+                 <div className="text-red-200/80 font-mono text-sm border-l-2 border-red-500/30 pl-4 py-1">
+                    <span className="block font-bold text-red-400 mb-1">Heuristic Engine Diagnosis</span>
+                    {statsData.root_cause.cause}
+                 </div>
+              </div>
+              
+              <div className="flex flex-col gap-4 w-full md:w-auto shrink-0 bg-black/40 p-5 rounded-lg border border-red-950/60 backdrop-blur-sm">
+                 <div className="flex justify-between items-center gap-8">
+                    <span className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Confidence</span>
+                    <span className="font-mono text-green-400 font-bold">{Math.round(statsData.root_cause.confidence * 100)}%</span>
+                 </div>
+                 <div className="flex justify-between items-center gap-8">
+                    <span className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Impact</span>
+                    <span className="font-mono text-red-400 font-bold">{statsData.root_cause.impact}</span>
+                 </div>
+                 <div className="flex justify-between items-center gap-8 border-t border-red-950/40 pt-4 mt-1">
+                    <span className="text-xs font-bold text-neutral-500 uppercase tracking-widest">First Seen</span>
+                    <span className="font-mono text-neutral-300 font-medium">{new Date(statsData.root_cause.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         <div className="xl:col-span-2 space-y-10">
           
@@ -204,20 +241,29 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                  Top Issues
                </h3>
             </div>
-            {statsData?.top_errors && statsData.top_errors.length > 0 ? (
+            {statsData?.top_issues && statsData.top_issues.length > 0 ? (
               <div className="flex flex-col gap-2">
-                 {statsData.top_errors.map((err, i) => (
-                  <div key={i} className="bg-[#111] border border-neutral-800 px-4 py-3 rounded-lg flex items-center justify-between font-mono text-sm">
-                    <div className="flex items-center gap-3 overflow-hidden">
-                      <span className="shrink-0 px-2 py-0.5 bg-red-900/30 text-red-500 rounded border border-red-900/50 text-[10px] font-bold">{err.count}</span>
-                      <span className="text-neutral-200 truncate" title={err.message}>{err.message}</span>
+                 {statsData.top_issues.map((issue, i) => (
+                  <div key={i} className="bg-[#111] border border-neutral-800 px-4 py-3 rounded-lg flex items-center justify-between font-mono text-sm transition hover:border-neutral-700 cursor-pointer group">
+                    <div className="flex items-center gap-4 overflow-hidden">
+                      <div className="flex flex-col items-center justify-center shrink-0 w-10 h-10 bg-red-950/30 rounded border border-red-900/40 group-hover:border-red-500/50 transition-colors">
+                        <span className="text-red-500 text-xs font-bold">{issue.count}</span>
+                        <span className="text-[8px] text-red-500/60 uppercase">Hits</span>
+                      </div>
+                      <div className="flex flex-col overflow-hidden">
+                        <span className="text-neutral-200 truncate font-semibold" title={issue.title}>{issue.title}</span>
+                        <span className="text-[10px] text-neutral-500 mt-1 uppercase tracking-wider">{issue.fingerprint.slice(0, 8)}</span>
+                      </div>
                     </div>
-                    <span className="shrink-0 text-[10px] text-neutral-500 ml-4 hidden sm:block">Last: {new Date(err.last_seen).toLocaleTimeString()}</span>
+                    <div className="shrink-0 text-right ml-4 hidden sm:block">
+                      <div className="text-xs text-neutral-400 font-medium">{new Date(issue.last_seen).toLocaleTimeString()}</div>
+                      <div className="text-[10px] text-neutral-600 mt-1">Last seen</div>
+                    </div>
                   </div>
                  ))}
               </div>
             ) : (
-              <div className="text-neutral-700 text-sm font-mono italic p-6 border border-dashed border-neutral-800 bg-[#0a0a0a] rounded-xl text-center">No recent errors detected.</div>
+              <div className="text-neutral-700 text-sm font-mono italic p-6 border border-dashed border-neutral-800 bg-[#0a0a0a] rounded-xl text-center">No recent issues detected.</div>
             )}
           </section>
         </div>
@@ -230,9 +276,9 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                 onClick={async () => {
                   try {
                     await api.updateFunction(func_id, {
-                      access_policy: data.access_policy,
-                      rate_limit_rpm: data.rate_limit_rpm,
-                      max_duration_ms: data.max_duration_ms,
+                      access_policy: data.access_policy ?? undefined,
+                      rate_limit_rpm: data.rate_limit_rpm ?? undefined,
+                      max_duration_ms: data.max_duration_ms ?? undefined,
                     });
                     toast.success("Settings updated");
                     loadData();
@@ -250,7 +296,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                <div className="space-y-2">
                   <label className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest">Access Policy</label>
                   <select 
-                    value={data.access_policy} 
+                    value={data.access_policy ?? ""} 
                     onChange={(e) => setData({ ...data, access_policy: e.target.value })}
                     className="w-full bg-black border border-neutral-800 rounded p-2 text-xs font-mono text-neutral-100 focus:border-blue-500 outline-none"
                   >
@@ -265,7 +311,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                     <label className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest">Rate Limit (RPM)</label>
                     <input 
                       type="number" 
-                      value={data.rate_limit_rpm} 
+                      value={data.rate_limit_rpm ?? ""} 
                       onChange={(e) => setData({ ...data, rate_limit_rpm: parseInt(e.target.value) })}
                       className="w-full bg-black border border-neutral-800 rounded p-2 text-xs font-mono text-neutral-100 focus:border-blue-500 outline-none" 
                     />
@@ -274,7 +320,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                     <label className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest">Timeout (ms)</label>
                     <input 
                       type="number" 
-                      value={data.max_duration_ms} 
+                      value={data.max_duration_ms ?? ""} 
                       onChange={(e) => setData({ ...data, max_duration_ms: parseInt(e.target.value) })}
                       className="w-full bg-black border border-neutral-800 rounded p-2 text-xs font-mono text-neutral-100 focus:border-blue-500 outline-none" 
                     />

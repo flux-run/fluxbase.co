@@ -93,13 +93,13 @@ export default function RealExecutionPage({ params }: { params: Promise<{ id: st
             <div className="flex items-center justify-between border-b border-neutral-900 pb-6">
                <div className="space-y-1">
                  <h1 className="text-2xl font-black font-mono tracking-tight text-white flex items-center gap-3">
-                   {data.method} {data.path}
+                   {data.execution.method} {data.execution.path}
                  </h1>
                  <p className="text-sm text-neutral-500 font-mono">{id}</p>
                </div>
-               <div className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest flex items-center gap-2 ${data.status === 'error' ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'}`}>
-                 {data.status === 'error' ? <XCircle className="w-3.5 h-3.5" /> : <Activity className="w-3.5 h-3.5" />}
-                 {data.status}
+               <div className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest flex items-center gap-2 ${data.execution.status === 'error' ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'}`}>
+                 {data.execution.status === 'error' ? <XCircle className="w-3.5 h-3.5" /> : <Activity className="w-3.5 h-3.5" />}
+                 {data.execution.status}
                </div>
             </div>
 
@@ -109,7 +109,7 @@ export default function RealExecutionPage({ params }: { params: Promise<{ id: st
                 <div className="flex items-center gap-3 font-mono text-lg font-bold text-neutral-300">
                   <span className="text-blue-500">$</span> flux why {id.slice(0, 8)}
                 </div>
-                {data.status === 'error' && (
+                {data.execution.status === 'error' && (
                   <button onClick={handleReplay} disabled={actionLoading === "replay"} className="bg-blue-500 text-white hover:bg-blue-400 disabled:opacity-50 font-bold px-6 py-2.5 rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-blue-500/20">
                     <Play className="w-4 h-4" /> {actionLoading === "replay" ? "Replaying..." : "Replay Execution"}
                   </button>
@@ -151,7 +151,7 @@ export default function RealExecutionPage({ params }: { params: Promise<{ id: st
             </div>
 
             {/* Error Actions - Patching (Strictly Real API call) */}
-            {data.status === 'error' && (
+            {data.execution.status === 'error' && (
               <div className="space-y-4 mt-8 pt-8 border-t border-neutral-900">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3 font-mono text-lg font-bold text-purple-400">
@@ -169,7 +169,7 @@ export default function RealExecutionPage({ params }: { params: Promise<{ id: st
             )}
             
             {/* Install Prompt (Success State) */}
-            {data.status === 'ok' && (
+            {data.execution.status === 'ok' && (
               <div className="mt-16 bg-blue-600/10 border border-blue-500/20 p-8 rounded-3xl flex flex-col items-center justify-center text-center space-y-6 shadow-[0_0_50px_rgba(37,99,235,0.05)] relative overflow-hidden">
                  <div className="absolute inset-0 bg-blue-600/5 blur-3xl pointer-events-none" />
                  <h2 className="text-2xl font-black text-white relative flex items-center gap-3">

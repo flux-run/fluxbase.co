@@ -151,7 +151,7 @@ export default function ProjectPage({
           execArr.find((e: Execution) => e.status === "error") ?? execArr[0];
         if (hero) {
           const detail = await api.getExecution(hero.id).catch(() => null);
-          setHeroLogs(detail?.logs ?? detail?.console_logs ?? []);
+          setHeroLogs(detail?.logs ?? []);
         }
       } catch (e: unknown) {
         const err = e instanceof Error ? e : new Error(String(e));
