@@ -180,6 +180,39 @@ export function useFluxApi(projectId?: string) {
         request<{ success: boolean }>(`/service-tokens/${tokenId}`, token(), {
           method: "DELETE",
         }),
+
+      getOrCreateDefaultToken: async (id?: string): Promise<string | null> => {
+        const pId = id ?? projectId;
+        if (!pId) return null;
+        
+        try {
+          // 1. Fetch existing tokens
+          const tokens = await request<ServiceToken[]>(`/service-tokens?project_id=${pId}`, token());
+          const existing = tokens.find(t => (t.name === "Default Service Token" || t.name === "CLI Onboarding Token") && !t.revoked);
+          
+          // 2. Check localStorage
+          const storageKey = `flux_sk_${pId}`;
+          const cachedToken = typeof window !== "undefined" ? localStorage.getItem(storageKey) : null;
+
+          if (existing && cachedToken) {
+            return cachedToken;
+          } else {
+            // Create new or refresh
+            const newToken = await request<ServiceToken & { token: string }>("/service-tokens", token(), {
+              method: "POST",
+              body: JSON.stringify({ project_id: pId, name: "Default Service Token" }),
+            });
+            if (newToken.token && typeof window !== "undefined") {
+              localStorage.setItem(storageKey, newToken.token);
+              return newToken.token;
+            }
+            return newToken.token || null;
+          }
+        } catch (err) {
+          console.error("Failed to get/create default token:", err);
+          return null;
+        }
+      },
     }),
     [token, status, projectId],
   );

@@ -186,9 +186,14 @@ export default function RoutesPage({ params }: { params: Promise<{ id: string }>
                           Edit Route
                         </DropdownMenuItem>
                         <DropdownMenuItem 
-                          onClick={() => {
+                          onClick={async () => {
                             const url = `https://${project?.slug || 'unknown'}.fluxbase.co${r.path}`;
-                            const curl = `curl -X ${r.method} '${url}' \\\n  -H 'Authorization: Bearer YOUR_TOKEN' \\\n  -H 'Content-Type: application/json'`;
+                            let authHeader = "";
+                            if (r.access_policy === "private") {
+                              const token = await api.getOrCreateDefaultToken();
+                              authHeader = `  -H 'Authorization: Bearer ${token || 'YOUR_TOKEN'}' \\\n`;
+                            }
+                            const curl = `curl -X ${r.method} '${url}' \\\n${authHeader}  -H 'Content-Type: application/json'`;
                             navigator.clipboard.writeText(curl);
                             toast.success("cURL command copied");
                           }}

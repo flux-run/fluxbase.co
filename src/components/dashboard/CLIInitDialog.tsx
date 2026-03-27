@@ -24,25 +24,8 @@ export function CLIInitDialog({ isOpen, onClose, projectId }: CLIInitDialogProps
       const getOrCreateToken = async () => {
         setLoadingToken(true);
         try {
-          // 1. Fetch existing tokens
-          const tokens = await api.getServiceTokens();
-          const existing = tokens.find(t => t.name === "CLI Onboarding Token" && !t.revoked);
-          
-          // 2. Check localStorage for the raw token string
-          const storageKey = `flux_sk_${projectId}`;
-          const cachedToken = localStorage.getItem(storageKey);
-
-          if (existing && cachedToken) {
-            // We have a token in the DB and we still have the secret locally
-            setServiceToken(cachedToken);
-          } else {
-            // Either no token in DB or we lost the secret, create a new one
-            const newToken = await api.createServiceToken("CLI Onboarding Token");
-            if (newToken.token) {
-              setServiceToken(newToken.token);
-              localStorage.setItem(storageKey, newToken.token);
-            }
-          }
+          const token = await api.getOrCreateDefaultToken();
+          if (token) setServiceToken(token);
         } catch (err) {
           console.error("Failed to provision CLI token:", err);
         } finally {
