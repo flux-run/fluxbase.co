@@ -127,8 +127,26 @@ export interface ExecutionDetail {
     label: string | null;
     start_ms: number;
     duration_ms: number;
+    metadata?: any;
   }[];
   logs?: LogEntry[];
+  narrative?: {
+    issue: string;
+    cause: string;
+    impact: string;
+    suggestion: string;
+    next_steps: string[];
+    breakdown: {
+      js_ms: number;
+      io_ms: number;
+      overhead_ms: number;
+    };
+    anomaly?: {
+      avg_duration: number;
+      is_abnormal: boolean;
+      message: string;
+    };
+  };
 }
 
 export interface ServiceToken {

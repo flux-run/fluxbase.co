@@ -58,6 +58,11 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
              <Badge variant={exec.status === 'ok' ? 'success' : 'destructive'} className="font-bold text-[10px] uppercase tracking-widest">
                {exec.status === 'ok' ? 'Success' : 'Failure'}
              </Badge>
+             {exec.error_source && (
+               <Badge variant="outline" className="border-neutral-800 text-neutral-500 font-bold text-[10px] uppercase tracking-widest">
+                 Source: {exec.error_source === 'user_code' ? 'User Code' : 'Platform Runtime'}
+               </Badge>
+             )}
              <h2 className="text-2xl font-bold text-white font-mono flex items-center">
                <span className="text-neutral-600 mr-2 text-xl">{exec.method}</span>
                {exec.path}
@@ -71,9 +76,9 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
              <span>{new Date(exec.started_at ?? new Date().toISOString()).toUTCString()}</span>
           </div>
         </div>
-        <Button variant="outline" size="sm" className="bg-neutral-900 border-neutral-800 text-xs font-bold hover:bg-neutral-800 hover:text-white h-9">
-           <ExternalLink className="w-4 h-4 mr-2" />
-           Open in CLI
+        <Button onClick={copyReplay} variant="outline" size="sm" className="bg-neutral-900 border-neutral-800 text-xs font-bold hover:bg-neutral-800 hover:text-white h-9 group/cta">
+           <Zap className="w-4 h-4 mr-2 text-blue-500 group-hover/cta:animate-pulse" />
+           Replay + Debug locally
         </Button>
       </header>
 
@@ -110,56 +115,80 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                  </div>
                  
                  <div className="space-y-6 flex-1">
-                    <div className="space-y-2">
-                       <h3 className="text-2xl font-black text-white tracking-tight leading-none uppercase italic">
-                         {exec.status === 'ok' ? 'Execution Optimal' : 'Critical Failure'}
-                       </h3>
-                       <div className="flex items-center gap-3">
-                          <Badge variant="outline" className={`${exec.status === 'ok' ? 'border-emerald-500/30 text-emerald-500' : 'border-red-500/30 text-red-500'} text-[10px] uppercase font-black px-2 py-0.5`}>
-                             {exec.status === 'ok' ? 'Success' : 'Aborted'}
-                          </Badge>
-                          <span className="text-neutral-600 text-[10px] font-mono uppercase tracking-widest">{exec.duration_ms}ms total duration</span>
-                       </div>
-                    </div>
+                     <div className="space-y-2">
+                        <h3 className="text-2xl font-black text-white tracking-tight leading-none uppercase italic">
+                          {data.narrative?.issue || (exec.status === 'ok' ? 'Execution Optimal' : 'Critical Failure')}
+                        </h3>
+                        <div className="flex flex-wrap items-center gap-3">
+                           <Badge variant="outline" className={`${exec.status === 'ok' ? 'border-emerald-500/30 text-emerald-500' : 'border-red-500/30 text-red-500'} text-[10px] uppercase font-black px-2 py-0.5`}>
+                              {exec.status === 'ok' ? 'Success' : 'Aborted'}
+                           </Badge>
+                           {data.narrative?.anomaly?.is_abnormal && (
+                              <Badge variant="outline" className="border-orange-500/30 text-orange-400 text-[10px] uppercase font-black px-2 py-0.5 animate-pulse">
+                                 Anomaly Detected
+                              </Badge>
+                           )}
+                           <span className="text-neutral-600 text-[10px] font-mono uppercase tracking-widest">{exec.duration_ms}ms total duration</span>
+                        </div>
+                        {data.narrative?.anomaly?.is_abnormal && (
+                           <p className="text-[10px] text-orange-400/80 font-mono italic">
+                              {data.narrative.anomaly.message}
+                           </p>
+                        )}
+                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-2 border-y border-neutral-900/50">
-                       <div className="space-y-1">
-                          <span className="text-[10px] font-black uppercase text-neutral-500 tracking-[0.2em]">Cause & Result</span>
-                          <p className="text-neutral-200 text-sm font-medium leading-relaxed">
-                             {exec.status === 'ok' 
-                               ? `Successfully processed ${exec.method} ${exec.path}. Result: status_code 200.` 
-                               : `Code execution encountered an error. Reason: ${exec.error ? exec.error.split('\\n')[0] : 'Unknown error'}.`}
-                          </p>
-                       </div>
-                       <div className="space-y-1">
-                          <span className="text-[10px] font-black uppercase text-neutral-500 tracking-[0.2em]">Impact Assessment</span>
-                          <p className="text-neutral-300 text-sm leading-relaxed">
-                             {exec.status === 'ok' 
-                               ? `All ${(data.spans?.length ?? 0)} recorded external steps were committed deterministically.`
-                               : `Order was NOT created. Database insert skipped to maintain consistency.`}
-                          </p>
-                       </div>
-                    </div>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-2 border-y border-neutral-900/50">
+                        <div className="space-y-1">
+                           <span className="text-[10px] font-black uppercase text-neutral-500 tracking-[0.2em]">Cause & Result</span>
+                           <p className="text-neutral-200 text-sm font-medium leading-relaxed">
+                              {data.narrative?.cause || (exec.status === 'ok' 
+                                ? `Successfully processed ${exec.method} ${exec.path}. Result: status_code 200.` 
+                                : `Code execution encountered an error. Reason: ${exec.error ? exec.error.split('\\n')[0] : 'Unknown error'}.`)}
+                           </p>
+                        </div>
+                        <div className="space-y-1">
+                           <span className="text-[10px] font-black uppercase text-neutral-500 tracking-[0.2em]">Impact Assessment</span>
+                           <p className="text-neutral-300 text-sm leading-relaxed">
+                              {data.narrative?.impact || (exec.status === 'ok' 
+                                ? `All ${(data.spans?.length ?? 0)} recorded external steps were committed deterministically.`
+                                : `Order was NOT created. Database insert skipped to maintain consistency.`)}
+                           </p>
+                        </div>
+                     </div>
 
-                    <div className="p-4 bg-white/5 rounded-2xl border border-white/10 flex items-center justify-between gap-6 group hover:border-white/20 transition-all">
-                       <div className="flex items-center gap-4">
-                          <div className="p-2 bg-blue-500/20 text-blue-400 rounded-lg">
-                             <Terminal className="w-5 h-5" />
-                          </div>
-                          <div className="space-y-0.5">
-                             <p className="text-white font-bold text-xs uppercase tracking-tight">Recommendation</p>
-                             <p className="text-neutral-400 text-xs italic">
-                                {exec.status === 'ok' 
-                                  ? 'No action required. Execution is fully traceable.'
-                                  : 'Retry this execution locally to debug the error via `flux replay`.'}
-                             </p>
-                          </div>
-                       </div>
-                       <Button onClick={copyReplay} variant="ghost" className="h-10 px-4 text-xs font-black text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 uppercase tracking-widest">
-                          {copied ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
-                          Copy Replay
-                       </Button>
-                    </div>
+                     <div className="p-4 bg-white/5 rounded-2xl border border-white/10 flex items-center justify-between gap-6 group hover:border-white/20 transition-all">
+                        <div className="flex items-center gap-4">
+                           <div className="p-2 bg-blue-500/20 text-blue-400 rounded-lg">
+                              <Terminal className="w-5 h-5" />
+                           </div>
+                           <div className="space-y-0.5">
+                              <p className="text-white font-bold text-xs uppercase tracking-tight">Intelligence Recommendation</p>
+                              <p className="text-neutral-400 text-xs italic">
+                                 {data.narrative?.suggestion || (exec.status === 'ok' 
+                                   ? 'No action required. Execution is fully traceable.'
+                                   : 'Retry this execution locally to debug the error via `flux replay`.')}
+                              </p>
+                           </div>
+                        </div>
+                        <Button onClick={copyReplay} variant="ghost" className="h-10 px-4 text-xs font-black text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 uppercase tracking-widest">
+                           {copied ? <Check className="w-4 h-4 mr-2" /> : <Zap className="w-4 h-4 mr-2" />}
+                           Replay + Debug locally
+                        </Button>
+                     </div>
+
+                     {data.narrative?.next_steps && data.narrative.next_steps.length > 0 && (
+                        <div className="space-y-3 pt-2">
+                           <span className="text-[10px] font-black uppercase text-neutral-500 tracking-[0.2em]">Next Diagnostic Steps</span>
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {data.narrative.next_steps.map((step, i) => (
+                                 <div key={i} className="flex items-start gap-3 bg-neutral-900/30 p-2.5 rounded-lg border border-neutral-800/50">
+                                    <span className="flex-shrink-0 w-5 h-5 rounded-full bg-neutral-800 flex items-center justify-center text-[10px] font-black text-neutral-400">{i + 1}</span>
+                                    <p className="text-neutral-400 text-[11px] leading-tight mt-0.5">{step}</p>
+                                 </div>
+                              ))}
+                           </div>
+                        </div>
+                     )}
                  </div>
               </div>
            </CardContent>
@@ -191,10 +220,12 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
             </h3>
             
             <div className="space-y-3">
-               {(data.spans?.length ?? 0) === 0 ? (
-                  <div className="py-12 text-center text-[10px] font-mono uppercase text-neutral-700 bg-neutral-900/10 border border-dashed border-neutral-900 rounded-xl tracking-tighter italic">
-                     No external spans recorded
-                  </div>
+                {(data.spans?.length ?? 0) === 0 ? (
+                   <div className="py-12 flex flex-col items-center justify-center text-center bg-neutral-900/10 border border-dashed border-neutral-900 rounded-xl">
+                      <Zap className="w-5 h-5 text-neutral-800 mb-2" />
+                      <span className="text-[10px] font-mono uppercase text-neutral-600 tracking-tighter italic">No external calls detected</span>
+                      <span className="text-[9px] text-neutral-700 uppercase font-bold mt-1 tracking-widest">→ Execution was fully internal</span>
+                   </div>
                ) : (
                   data.spans?.map((span, i: number) => (
                     <div key={i} className="group p-4 bg-black border border-neutral-900 rounded-xl hover:border-neutral-700 transition-all cursor-pointer">
