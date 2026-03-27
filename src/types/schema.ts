@@ -150,6 +150,9 @@ export interface Issue {
   unique_tokens: number | null;
   status: string | null;
   created_at: string | null;
+  sample_stack: string | null;
+  sample_message: string | null;
+  sample_execution_id: string | null;
 }
 
 export interface Span {
