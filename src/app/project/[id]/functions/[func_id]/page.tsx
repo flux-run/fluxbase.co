@@ -69,7 +69,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
             <span>id: {data.id}</span>
             <span className="w-1.5 h-1.5 bg-neutral-800 rounded-full" />
             <span className="text-green-500 font-bold flex items-center gap-1.5">
-               <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+               <span className="w-1.5 h-1.5 bg-green-500 rounded-full" />
                Deployed
             </span>
           </p>
