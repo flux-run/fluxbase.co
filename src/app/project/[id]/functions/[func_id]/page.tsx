@@ -982,11 +982,11 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                      <div className="mt-2 pt-2 border-t border-white/5 font-mono text-[9px]">
                                        {/* ── Header: full-width label + state ── */}
                                        <div className="flex items-center justify-between gap-2 mb-1.5">
-                                         <span className="text-neutral-600 uppercase tracking-wider">Verification</span>
+                                         <span className="text-neutral-400 uppercase tracking-wider">Verification</span>
                                          <div className="flex items-center gap-1.5">
                                            <span className={`font-black uppercase tracking-wider ${obsLabel.color}`}>{obsLabel.text}</span>
                                            {verify.confidenceScore > 0 && (
-                                             <span className="text-neutral-600 font-bold">{verify.confidenceScore}%</span>
+                                             <span className="text-neutral-400 font-bold">{verify.confidenceScore}%</span>
                                            )}
                                          </div>
                                        </div>
@@ -996,45 +996,45 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                          <div className="space-y-0.5">
                                            {/* Strategy */}
                                            <div className="flex items-start justify-between gap-1">
-                                             <span className="text-neutral-700 shrink-0">Strategy</span>
+                                             <span className="text-neutral-500 shrink-0">Strategy</span>
                                              <div className="flex flex-col items-end gap-px">
                                                <span className={`font-bold ${strategyColor}`}>{strategyLabel}</span>
-                                               <span className="text-neutral-700">{strategyDetail}</span>
+                                               <span className="text-neutral-500">{strategyDetail}</span>
                                              </div>
                                            </div>
                                            {/* Coverage bar */}
                                            {!isInfraCluster && verify.observationState !== 'verified' && verify.requiredToVerify > 0 && (
                                              <div className="flex items-center justify-between gap-1">
-                                               <span className="text-neutral-700 shrink-0">Coverage</span>
+                                               <span className="text-neutral-500 shrink-0">Coverage</span>
                                                <div className="flex items-center gap-1">
-                                                 <div className="w-12 h-1 rounded-full bg-neutral-800 overflow-hidden">
+                                                 <div className="w-12 h-1 rounded-full bg-neutral-700 overflow-hidden">
                                                    <div
-                                                     className={`h-full rounded-full transition-all ${coveragePct >= 100 ? 'bg-emerald-500' : coveragePct > 40 ? 'bg-amber-500' : 'bg-neutral-700'}`}
+                                                     className={`h-full rounded-full transition-all ${coveragePct >= 100 ? 'bg-emerald-500' : coveragePct > 40 ? 'bg-amber-500' : 'bg-neutral-600'}`}
                                                      style={{ width: `${Math.min(coveragePct, 100)}%` }}
                                                    />
                                                  </div>
-                                                 <span className="text-neutral-600">{verify.matchedTotal}/{verify.requiredToVerify}</span>
+                                                 <span className="text-neutral-400">{verify.matchedTotal}/{verify.requiredToVerify}</span>
                                                </div>
                                              </div>
                                            )}
                                            {/* Observed */}
                                            {!isInfraCluster && (
                                              <div className="flex items-center justify-between gap-1">
-                                               <span className="text-neutral-700 shrink-0">Observed</span>
+                                               <span className="text-neutral-500 shrink-0">Observed</span>
                                                {verify.matchedTotal === 0
-                                                 ? <span className="text-neutral-700">none yet</span>
-                                                 : <span className="text-neutral-500">{verify.matchedFail}f · {verify.matchedSuccess}ok</span>
+                                                 ? <span className="text-neutral-500">none yet</span>
+                                                 : <span className="text-neutral-300">{verify.matchedFail}f · {verify.matchedSuccess}ok</span>
                                                }
                                              </div>
                                            )}
                                            {/* Expected traffic baseline */}
                                            {!isInfraCluster && verify.observationState === 'not_observed' && verify.expectedByNow !== null && (
                                              <div className="flex items-start justify-between gap-1">
-                                               <span className="text-neutral-700 shrink-0">Expected</span>
+                                               <span className="text-neutral-500 shrink-0">Expected</span>
                                                <div className="flex flex-col items-end gap-px">
-                                                 <span className="text-neutral-600">~{verify.expectedByNow} by now</span>
+                                                 <span className="text-neutral-400">~{verify.expectedByNow} by now</span>
                                                  {verify.isSuspiciouslyLow && (
-                                                   <span className="text-amber-500/80 font-bold">⚠ overdue</span>
+                                                   <span className="text-amber-400 font-bold">⚠ overdue</span>
                                                  )}
                                                </div>
                                              </div>
@@ -1042,15 +1042,15 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                            {/* Fix path hit */}
                                            {!isInfraCluster && fixCoveragePct !== null && verify.observationState !== 'verified' && (
                                              <div className="flex items-start justify-between gap-1">
-                                               <span className="text-neutral-700 shrink-0">Fix path</span>
+                                               <span className="text-neutral-500 shrink-0">Fix path</span>
                                                <div className="flex flex-col items-end gap-px">
                                                  <span className={`font-bold ${
-                                                   fixCoveragePct === 0 ? 'text-neutral-600'
-                                                   : fixCoveragePct < 10 ? 'text-amber-600/80'
+                                                   fixCoveragePct === 0 ? 'text-neutral-500'
+                                                   : fixCoveragePct < 10 ? 'text-amber-500'
                                                    : 'text-amber-400'
                                                  }`}>{fixCoveragePct}%</span>
                                                  {fixCoveragePct === 0 && (
-                                                   <span className="text-red-400/50">not exercised</span>
+                                                   <span className="text-red-400/70">not exercised</span>
                                                  )}
                                                </div>
                                              </div>
@@ -1058,26 +1058,26 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                            {/* Transition signal */}
                                            {(verify.observationState === 'verified' || verify.observationState === 'likely_fixed') && verify.matchedSuccess > 0 && (
                                              <div className="flex items-center justify-between gap-1">
-                                               <span className="text-neutral-700">Transition</span>
-                                               <span className={`font-bold ${verify.observationState === 'verified' ? 'text-emerald-400' : 'text-emerald-500/70'}`}>fail → ok ✓</span>
+                                               <span className="text-neutral-500">Transition</span>
+                                               <span className={`font-bold ${verify.observationState === 'verified' ? 'text-emerald-400' : 'text-emerald-500/80'}`}>fail → ok ✓</span>
                                              </div>
                                            )}
                                            {/* Last matching exec */}
                                            {verify.lastMatchedAt && (
                                              <div className="flex items-center justify-between gap-1">
-                                               <span className="text-neutral-700 shrink-0">Last match</span>
-                                               <span className="text-neutral-500">{timeAgo(verify.lastMatchedAt)}</span>
+                                               <span className="text-neutral-500 shrink-0">Last match</span>
+                                               <span className="text-neutral-400">{timeAgo(verify.lastMatchedAt)}</span>
                                              </div>
                                            )}
                                          </div>
                                          {/* ── Right: match criteria ── */}
-                                         <div className="space-y-px border-l border-white/[0.04] pl-3">
-                                           <span className="text-neutral-700">Match criteria</span>
+                                         <div className="space-y-px border-l border-white/10 pl-3">
+                                           <span className="text-neutral-400">Match criteria</span>
                                            <div className="flex flex-col gap-px mt-0.5">
                                              {criteriaRows.map(({ label, value }) => (
                                                <div key={label} className="flex items-baseline gap-1 min-w-0">
-                                                 <span className="text-neutral-800 shrink-0">{label}:</span>
-                                                 <span className="text-neutral-500 truncate" title={value}>{value}</span>
+                                                 <span className="text-neutral-600 shrink-0">{label}:</span>
+                                                 <span className="text-neutral-300 truncate" title={value}>{value}</span>
                                                </div>
                                              ))}
                                            </div>
@@ -1085,10 +1085,10 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                        </div>
                                        {/* ── Full-width nudge + replay CTA ── */}
                                        {!isInfraCluster && verify.observationState === 'not_observed' && (
-                                         <div className="mt-1.5 pt-1.5 border-t border-white/[0.04] space-y-1">
+                                         <div className="mt-1.5 pt-1.5 border-t border-white/10 space-y-1">
                                            <div className="flex items-start gap-1.5">
-                                             <span className="text-blue-400/60 shrink-0">💡</span>
-                                             <span className="text-neutral-600 leading-tight">
+                                             <span className="text-blue-400/80 shrink-0">💡</span>
+                                             <span className="text-neutral-400 leading-tight">
                                                {verify.isSuspiciouslyLow
                                                  ? `Traffic expected but not seen${elapsedLabel} — send a test request to trigger verification`
                                                  : `No traffic yet${elapsedLabel} — send a test request to verify fix`
@@ -1098,7 +1098,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                            {verify.lastFailedExecId && (
                                              <a
                                                href={`/project/${id}/executions/${verify.lastFailedExecId}`}
-                                               className="flex items-center gap-1 text-blue-400/70 hover:text-blue-300 transition-colors cursor-pointer"
+                                               className="flex items-center gap-1 text-blue-400 hover:text-blue-300 transition-colors cursor-pointer"
                                              >
                                                <span className="text-[8px]">&#9654;</span>
                                                <span>Replay failing request ({verify.lastFailedExecId.slice(0, 8)})</span>
