@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -21,12 +22,15 @@ function GoogleIcon(props: React.SVGProps<SVGSVGElement>) {
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect") || "";
 
   const handleOAuth = (provider: string) => {
+    const suffix = redirectTo ? `?redirect=${encodeURIComponent(redirectTo)}` : "";
     if (provider === "github") {
-      window.location.href = "/api/auth/login/github";
+      window.location.href = `/api/auth/login/github${suffix}`;
     } else if (provider === "google") {
-      window.location.href = "/api/auth/login/google";
+      window.location.href = `/api/auth/login/google${suffix}`;
     }
   };
 

@@ -8,13 +8,15 @@ export async function GET(request: Request) {
   const baseUrl = `${protocol}://${origin}`;
   
   const redirectUri = `${baseUrl}/api/auth/github`;
+  const redirect = searchParams.get("redirect") || "";
+  const state = redirect ? encodeURIComponent(redirect) : "";
 
   if (!clientId) {
     console.error("[Auth] GITHUB_CLIENT_ID is not set in environment variables");
     return NextResponse.redirect(new URL("/login?error=ConfigurationError", request.url));
   }
 
-  const githubUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=user:email&redirect_uri=${redirectUri}`;
+  const githubUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=user:email&redirect_uri=${redirectUri}${state ? `&state=${state}` : ""}`;
   
   return NextResponse.redirect(githubUrl);
 }

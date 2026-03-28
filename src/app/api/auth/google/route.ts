@@ -24,6 +24,14 @@ export async function GET(request: NextRequest) {
 
     const { token, org_id } = await res.json();
 
+    // Resolve safe redirect (relative paths only)
+    const rawState = searchParams.get("state") || "";
+    let finalRedirect = "/dashboard";
+    try {
+      const decoded = decodeURIComponent(rawState);
+      if (decoded.startsWith("/")) finalRedirect = decoded;
+    } catch {}
+
     // Set secure HTTP-only cookies
     const cookieStore = await cookies();
     cookieStore.set("flux_token", token, {
@@ -42,7 +50,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(new URL(finalRedirect, request.url));
   } catch (err) {
     console.error("[Auth] Google Callback exception:", err);
     return NextResponse.redirect(new URL("/login?error=InternalError", request.url));

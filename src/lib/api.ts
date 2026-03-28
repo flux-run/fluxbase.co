@@ -183,6 +183,14 @@ export function useFluxApi(projectId?: string) {
           }),
       revokeInvite: (orgId: string, invId: string) =>
         request<{ ok: boolean }>(`/orgs/${orgId}/invitations/${invId}`, token(), { method: "DELETE" }),
+      acceptInvitation: (inviteToken: string) =>
+        request<{ ok: boolean; org_id: string }>("/invitations/accept", token(), {
+          method: "POST",
+          body: JSON.stringify({ token: inviteToken }),
+        }),
+      getInvitation: (inviteToken: string) =>
+        request<{ invitation: { id: string; email: string; role: string; org_id: string; org_name: string; org_slug: string; expires_at: string } }>(
+          `/invitations/accept?token=${encodeURIComponent(inviteToken)}`, null),
 
       /* Service Tokens */
       getServiceTokens: (id?: string) =>
