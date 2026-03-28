@@ -125,7 +125,19 @@ function parseUserStackFrames(stack?: string | null) {
 function frameLabel(frame?: { fn?: string; file: string; line: string | number; col?: string | number } | null, short = true): string | null {
   if (!frame) return null;
   const file = short ? (frame.file.split('/').pop() ?? frame.file) : frame.file;
-  return frame.col != null ? `${file}:${frame.line}:${frame.col}` : `${file}:${frame.line}`;
+  // Short form: file:line only (clean display). Long form: file:line:col.
+  const col = !short && frame.col != null && Number(frame.col) > 0 ? `:${frame.col}` : '';
+  return `${file}:${frame.line}${col}`;
+}
+function codePreview(source: string, failLine: number, context = 2): Array<{ n: number; text: string; failing: boolean }> {
+  const lines = source.split('\n');
+  const start = Math.max(0, failLine - 1 - context);
+  const end = Math.min(lines.length - 1, failLine - 1 + context);
+  return lines.slice(start, end + 1).map((text, i) => ({
+    n: start + i + 1,
+    text,
+    failing: start + i + 1 === failLine,
+  }));
 }
 
 function errorTypeToFix(errorName?: string | null, errorMessage?: string | null, errorKey?: string | null): string | null {
@@ -362,16 +374,15 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                            <Badge variant="outline" className="border-neutral-800 text-neutral-400 text-[9px] uppercase font-black px-1.5 py-0">
                               Source: {data.narrative?.source === 'user_code' ? 'User Code' : sourceLabel}
                            </Badge>
-                           <div className="flex items-center gap-1.5 bg-white/5 px-2 py-0.5 rounded border border-white/10">
-                              <span className="text-[9px] font-bold text-neutral-500 uppercase">Confidence {confidenceText}</span>
-                              <div className="w-12 h-1 bg-neutral-800 rounded-full overflow-hidden">
-                                 <div 
-                                    className="h-full bg-blue-500 transition-all duration-1000" 
-                                    style={{ width: `${(data.narrative?.confidence ?? 0.85) * 100}%` }}
-                                 />
-                              </div>
-                              <span className="text-[9px] font-black text-blue-400">{(data.narrative?.confidence ?? 0.85) * 100}%</span>
-                           </div>
+                           {userFrame ? (
+                             <div className="flex items-center gap-1.5 bg-emerald-950/20 px-2 py-0.5 rounded border border-emerald-900/30">
+                               <span className="text-[9px] font-bold text-emerald-500/80 uppercase">Exact location identified</span>
+                             </div>
+                           ) : (
+                             <div className="flex items-center gap-1.5 bg-white/5 px-2 py-0.5 rounded border border-white/10">
+                               <span className="text-[9px] font-bold text-neutral-500 uppercase">Detected at runtime</span>
+                             </div>
+                           )}
                         </div>
                         {exec.status !== 'ok' ? (
                           <div className="space-y-1.5">
@@ -384,10 +395,9 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                               {!isGenericErrorHeadline(errorHeadline) ? errorHeadline : displayIssue}
                             </h3>
                             {userFrame && (
-                              <p className="text-[12px] font-mono mt-0.5 flex items-center gap-1.5">
+                              <p className="text-[13px] font-mono mt-0.5 flex items-center gap-1.5">
                                 <span className="text-red-400/50">↳</span>
-                                <span className="text-red-300/70">{userFrame.fn ?? '<anonymous>'}</span>
-                                <span className="text-red-400/80 font-bold">{frameLabel(userFrame)}</span>
+                                <span className="text-red-400/90 font-bold">{frameLabel(userFrame)}</span>
                               </p>
                             )}
                           </div>
@@ -431,7 +441,14 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                  <div className="space-y-1">
                                     <span className="text-[10px] uppercase font-black tracking-[0.2em] text-red-300">Root Cause</span>
-                                    <p className="text-white text-sm font-semibold">{data.narrative?.root_cause || "Unhandled exception thrown in user code"}</p>
+                                    <p className="text-white text-sm font-semibold">
+                                      {data.narrative?.root_cause && !data.narrative.root_cause.toLowerCase().includes('unhandled exception thrown in user code')
+                                        ? data.narrative.root_cause
+                                        : userFrame
+                                          ? `Unhandled throw at ${frameLabel(userFrame)}`
+                                          : 'Unhandled exception in user code'
+                                      }
+                                    </p>
                                  </div>
                                  <div className="space-y-1">
                                     <span className="text-[10px] uppercase font-black tracking-[0.2em] text-red-300">Details</span>
@@ -450,33 +467,58 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                         </div>
                      )}
 
-                     {exec.status !== 'ok' && (exec.error_frames?.length ?? stackFrames.length) > 0 && (() => {
+                     {exec.status !== 'ok' && userFrame && (() => {
+                        // Try to get source from artifact for inline preview
+                        const artifactSource: string | null = (() => {
+                          try {
+                            const mods = (reqObj as any)?.artifact?.modules;
+                            return Array.isArray(mods) ? (mods[0]?.source ?? null) : null;
+                          } catch { return null; }
+                        })();
+                        const preview = artifactSource && typeof userFrame.line === 'number'
+                          ? codePreview(artifactSource, userFrame.line)
+                          : artifactSource && typeof userFrame.line === 'string'
+                            ? codePreview(artifactSource, parseInt(userFrame.line, 10))
+                            : null;
                         const displayFrames: { fn?: string; file: string; line: string | number; col?: string | number }[] =
                           exec.error_frames?.length ? exec.error_frames : stackFrames;
-                        const limit = 5;
                         return (
                           <div className="space-y-2">
-                             <button
-                               onClick={() => setShowStack(v => !v)}
-                               className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-red-400 hover:text-red-300 transition-colors"
-                             >
-                               <ChevronRight className={`w-3 h-3 transition-transform duration-200 ${showStack ? 'rotate-90' : ''}`} />
-                               Stack trace — {displayFrames.length} frame{displayFrames.length !== 1 ? 's' : ''}
-                             </button>
-                             {showStack && (
-                               <div className="bg-black/80 border border-red-900/20 rounded-lg overflow-hidden">
-                                 {displayFrames.slice(0, limit).map((frame, i) => (
-                                   <div key={i} className={`px-4 py-1.5 border-b border-neutral-900/40 last:border-0 font-mono text-[11px] flex gap-3 ${i === 0 ? 'bg-red-950/30' : ''}`}>
-                                     <span className="text-neutral-700 w-5 shrink-0 text-right">{i + 1}</span>
-                                     <div className="min-w-0">
-                                       <span className={i === 0 ? 'text-red-300' : 'text-neutral-400'}>{frame.fn ?? '<anonymous>'}</span>
-                                       {frame.file && <span className="text-neutral-700 ml-2">{frameLabel(frame)}</span>}
+                             {/* Inline code preview */}
+                             {preview && (
+                               <div className="rounded-lg overflow-hidden border border-red-900/30 bg-black/90">
+                                 <div className="px-4 py-1.5 bg-red-950/20 border-b border-red-900/20 flex items-center justify-between">
+                                   <span className="text-[10px] font-mono font-bold text-red-300">{frameLabel(userFrame)}</span>
+                                   <span className="text-[9px] text-red-400/50 uppercase font-black tracking-widest">Failure</span>
+                                 </div>
+                                 <div className="font-mono text-[12px] leading-relaxed">
+                                   {preview.map(({ n, text, failing }) => (
+                                     <div key={n} className={`flex gap-0 ${failing ? 'bg-red-950/40' : ''}`}>
+                                       <span className="select-none w-10 shrink-0 text-right pr-4 py-0.5 text-neutral-700 border-r border-neutral-900">{n}</span>
+                                       <span className={`pl-4 py-0.5 whitespace-pre ${failing ? 'text-red-300' : 'text-neutral-500'}`}>{text || ' '}</span>
                                      </div>
+                                   ))}
+                                 </div>
+                               </div>
+                             )}
+                             {/* Collapsible full stack */}
+                             {displayFrames.length > 1 && (
+                               <button
+                                 onClick={() => setShowStack(v => !v)}
+                                 className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-neutral-600 hover:text-neutral-400 transition-colors"
+                               >
+                                 <ChevronRight className={`w-3 h-3 transition-transform duration-200 ${showStack ? 'rotate-90' : ''}`} />
+                                 Full stack — {displayFrames.length} frame{displayFrames.length !== 1 ? 's' : ''}
+                               </button>
+                             )}
+                             {showStack && displayFrames.length > 1 && (
+                               <div className="bg-black/80 border border-neutral-900/60 rounded-lg overflow-hidden">
+                                 {displayFrames.map((frame, i) => (
+                                   <div key={i} className={`px-4 py-1.5 border-b border-neutral-900/40 last:border-0 font-mono text-[11px] flex gap-3 ${i === 0 ? 'bg-red-950/20' : ''}`}>
+                                     <span className="text-neutral-700 w-5 shrink-0 text-right">{i + 1}</span>
+                                     <span className={i === 0 ? 'text-red-400' : 'text-neutral-600'}>{frameLabel(frame)}</span>
                                    </div>
                                  ))}
-                                 {displayFrames.length > limit && (
-                                   <div className="px-4 py-2 text-[10px] text-neutral-600 font-mono italic">+{displayFrames.length - limit} more frames</div>
-                                 )}
                                </div>
                              )}
                           </div>
@@ -487,9 +529,13 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                         <div className="space-y-1">
                            <span className="text-[10px] font-black uppercase text-neutral-500 tracking-[0.2em]">Cause Analysis</span>
                            <p className="text-neutral-200 text-sm font-medium leading-relaxed">
-                              {data.narrative?.cause || (exec.status === 'ok' 
-                                ? `Execution completed successfully in ${exec.duration_ms}ms.` 
-                                : `Unhandled exception in ${sourceLabel.toLowerCase()}.`)}
+                              {data.narrative?.cause && !data.narrative.cause.toLowerCase().includes('unhandled exception')
+                              ? data.narrative.cause
+                              : exec.status === 'ok'
+                                ? `Execution completed successfully in ${exec.duration_ms}ms.`
+                                : userFrame
+                                  ? `Exception thrown at ${frameLabel(userFrame)}.`
+                                  : `Unhandled exception in ${sourceLabel.toLowerCase()}.`}
                            </p>
                         </div>
                         <div className="space-y-1">
@@ -510,7 +556,11 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                            <div className="space-y-0.5">
                               <p className="text-white font-bold text-xs uppercase tracking-tight">Intelligence Recommendation</p>
                               <p className="text-neutral-400 text-xs italic">
-                              {fixHint || displaySuggestion}
+                              {fixHint
+                                ? (userFrame ? `${fixHint.replace(/\.$/, '')} (${frameLabel(userFrame)}).` : fixHint)
+                                : userFrame
+                                  ? `This exception originates from ${frameLabel(userFrame)}. ${displaySuggestion.replace(/^.*?\. /, '')}`
+                                  : displaySuggestion}
                               </p>
                            </div>
                         </div>
@@ -625,12 +675,8 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                        <span className="text-[10px] font-black uppercase text-red-500 tracking-widest">Halt Reason</span>
                     </div>
                     <code className="text-[11px] text-red-400 font-mono italic whitespace-pre-wrap">
-                     {!isGenericErrorHeadline(errorHeadline) ? (
-                       <>
-                         {errorHeadline}
-                         {userFrame && <><br /><span className="text-neutral-400">at {frameLabel(userFrame, false)}</span></>}
-                       </>
-                     ) : haltReason}
+                     {!isGenericErrorHeadline(errorHeadline) ? errorHeadline : haltReason ?? 'Execution halted'}
+                     {userFrame && <><br /><span className="text-red-300/70">↳ {frameLabel(userFrame)}</span></>}
                   </code>
                   </div>
                )}
@@ -686,12 +732,7 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                      <span className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest">Response Output</span>
                   </div>
                   <pre className="p-6 text-[12px] font-mono leading-relaxed text-neutral-400 max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-thumb-neutral-800">
-                     {JSON.stringify(
-                       exec.status !== 'ok' && exec.error_frames?.[0]
-                         ? { ...resObj, frame: exec.error_frames[0] }
-                         : resObj,
-                       null, 2
-                     )}
+                     {JSON.stringify(resObj, null, 2)}
                   </pre>
                </Card>
             </div>
@@ -730,12 +771,12 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                    <Card className="flex-1 bg-red-950/10 border-red-900/30 p-4 flex items-center justify-between">
                       <div className="flex flex-col">
                         <span className="text-xs font-bold text-red-300 uppercase tracking-tighter">Failure Point</span>
-                        <code className="text-[12px] text-red-500/70 mt-1 font-mono truncate max-w-[300px]">
+                        {userFrame && (
+                          <span className="text-[12px] text-red-400 font-mono font-bold mt-0.5">↳ {frameLabel(userFrame)}</span>
+                        )}
+                        <code className="text-[11px] text-red-500/60 mt-0.5 font-mono truncate max-w-[300px]">
                           {!isGenericErrorHeadline(errorHeadline) ? errorHeadline : (haltReason ?? 'Execution aborted')}
                         </code>
-                        {userFrame && (
-                          <span className="text-[10px] text-red-400/70 font-mono font-bold mt-0.5">at {frameLabel(userFrame)}</span>
-                        )}
                       </div>
                       <span className="text-[10px] text-red-500 font-bold shrink-0">✕ ABORTED</span>
                    </Card>

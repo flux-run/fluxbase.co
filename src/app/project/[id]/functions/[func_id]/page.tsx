@@ -123,7 +123,9 @@ function parseStackFrames(stack?: string | null) {
 function frameLabel(frame?: { fn?: string; file: string; line: string | number; col?: string | number } | null, short = true): string | null {
   if (!frame) return null;
   const file = short ? (frame.file.split('/').pop() ?? frame.file) : frame.file;
-  return frame.col != null ? `${file}:${frame.line}:${frame.col}` : `${file}:${frame.line}`;
+  // Short form: file:line only. Long form: file:line:col.
+  const col = !short && frame.col != null && Number(frame.col) > 0 ? `:${frame.col}` : '';
+  return `${file}:${frame.line}${col}`;
 }
 
 function topUserFrame(stack?: string | null) {
@@ -371,17 +373,10 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
               
               <div className="flex flex-col gap-4 w-full xl:w-72 shrink-0 bg-black/40 p-5 rounded-lg border border-red-950/60 backdrop-blur-sm">
                  <div className="flex justify-between items-center gap-8">
-                    <span className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Confidence</span>
-                    <div className="flex items-center gap-2">
-                       <div className="w-20 h-1.5 bg-neutral-800 rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full ${statsData.root_cause.confidence > 0.8 ? 'bg-green-500' : statsData.root_cause.confidence > 0.5 ? 'bg-yellow-500' : 'bg-red-500'}`} 
-                            style={{ width: `${statsData.root_cause.confidence * 100}%` }} 
-                          />
-                       </div>
-                       <span className={`font-mono text-[11px] font-bold ${statsData.root_cause.confidence > 0.8 ? 'text-green-400' : statsData.root_cause.confidence > 0.5 ? 'text-yellow-400' : 'text-red-400'}`}>
-                          {confidenceText} {Math.round(statsData.root_cause.confidence * 100)}%
-                       </span>
+                    <span className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Detection</span>
+                    <div className="flex flex-col items-end gap-0.5">
+                       <span className="text-[10px] font-bold text-emerald-500 uppercase">At runtime</span>
+                       {(() => { const f = topUserFrame(statsData.root_cause.sample_stack); return f ? <span className="text-[10px] font-mono text-red-400">{frameLabel(f)}</span> : null; })()}
                     </div>
                  </div>
                  {statsData.root_cause.confidence_reason && (
