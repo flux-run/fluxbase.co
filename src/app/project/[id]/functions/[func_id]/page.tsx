@@ -326,11 +326,16 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
   const VERIFIED_EXEC_HIGH = 50;
   type VerifyState = 'active' | 'unverified' | 'verified_resolved';
   const verifyClusterState = (cluster: ReturnType<typeof buildFailureClusters>[number]): { state: VerifyState; confidence: 'high' | 'medium' | 'low'; execCount: number } => {
-    // Primary signal: backend confirms whether fingerprint appeared in current deploy's executions
+    // Primary signal: backend confirmed this fingerprint appeared in current deploy's executions
     const activeInCurrentDeploy = cluster.issues.some(i => (i as any).active_in_current_deploy === true);
     const execCount = latestSlice?.total ?? 0;
+    const currentErrors = latestSlice?.errors ?? 0;
     if (activeInCurrentDeploy) return { state: 'active', confidence: 'high', execCount };
-    // Not seen in current deploy — use exec count as evidence-of-absence confidence
+    // Fallback: if ANY errors exist in the current deploy, treat cluster as active.
+    // This covers the case where error_fingerprint isn't populated on executions,
+    // making the backend subquery return false even though failures are happening now.
+    if (currentErrors > 0) return { state: 'active', confidence: 'medium', execCount };
+    // No errors in current deploy — check if enough executions have run to trust the absence
     if (execCount >= VERIFIED_EXEC_HIGH) return { state: 'verified_resolved', confidence: 'high', execCount };
     if (execCount >= VERIFIED_EXEC_MIN) return { state: 'verified_resolved', confidence: 'medium', execCount };
     return { state: 'unverified', confidence: 'low', execCount };
