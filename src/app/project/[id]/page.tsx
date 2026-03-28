@@ -454,17 +454,12 @@ export default function ProjectPage({
                       </div>
                       {suggestedFocus.deployId && suggestedFocus.errorsAfterDeploy > 0 && (
                         <p className="text-[8px] text-neutral-700 font-mono pl-0.5">
-                          · {Math.round(suggestedFocus.errorsAfterDeploy / (suggestedFocus.errorsAfterDeploy + suggestedFocus.errorsBeforeDeploy) * 100)}% failures after deploy
+                          · {suggestedFocus.errorsBeforeDeploy === 0 ? "0" : suggestedFocus.errorsBeforeDeploy} before deploy · {suggestedFocus.errorsAfterDeploy}/{suggestedFocus.totalExecs} after
                         </p>
                       )}
                       {suggestedFocus.affectedFns.length > 1 && (
                         <p className="text-[8px] text-neutral-700 font-mono pl-0.5">
                           · consistent across {suggestedFocus.affectedFns.length} functions
-                        </p>
-                      )}
-                      {suggestedFocus.deployId && suggestedFocus.errorsBeforeDeploy === 0 && (
-                        <p className="text-[8px] text-neutral-700 font-mono pl-0.5">
-                          · no prior occurrence
                         </p>
                       )}
                     </div>
