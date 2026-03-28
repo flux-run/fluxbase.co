@@ -367,6 +367,10 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
     execCount: number; errorCount: number; failureRate: number;
     matchedTotal: number; matchedSuccess: number; matchedFail: number;
     reason: string; isDeterministic: boolean; isRegressed: boolean; pathsTracked: boolean;
+    observationState: 'not_observed' | 'partially_observed' | 'verified';
+    lastMatchedAt: string | null;
+    matchingCriteria: { codeSha: string | null; callSites: string[]; externalDep: string | null };
+    confidenceScore: number;
   } => {
     const fp               = extractClusterFingerprint(cluster);
     const pathsTracked     = fp.paths.size > 0;
@@ -392,6 +396,39 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
     const isActiveNow        = activeInCurrentDeploy || matchedFail > 0 || (!pathsTracked && currentErrors > 0);
     const isRegressed        = wasCleanInPrev && isActiveNow;
 
+    // ── Observation state: 3 tiers independent of verify state ────────────
+    const observationState: 'not_observed' | 'partially_observed' | 'verified' =
+      matchedSuccess > 0 && matchedFail === 0 && matchedTotal >= 3
+        ? 'verified'
+        : matchedTotal === 0
+        ? 'not_observed'
+        : 'partially_observed';
+    const confidenceScore =
+      observationState === 'verified'
+        ? Math.min(95, 25 + Math.round((matchedSuccess / Math.max(VERIFIED_EXEC_MIN, 1)) * 70))
+        : observationState === 'partially_observed' && isActiveNow
+        ? Math.min(90, isDeterministic
+            ? 60 + Math.round((matchedFail / Math.max(VERIFIED_EXEC_MIN, 1)) * 30)
+            : 25 + Math.round((matchedFail / Math.max(VERIFIED_EXEC_MIN, 1)) * 45))
+        : observationState === 'partially_observed'
+        ? Math.min(50, Math.round((matchedTotal / Math.max(VERIFIED_EXEC_MIN, 1)) * 50))
+        : 0;
+    // Last matching execution timestamp
+    const allMatchedExecs = currentExecs.filter(e => execMatchesFingerprint(e, fp));
+    const lastMatchedAt = allMatchedExecs.reduce<string | null>(
+      (best, e) => e.started_at && (!best || e.started_at > best) ? e.started_at : best, null
+    );
+    // Explicit matching criteria shown to the user
+    const matchingCodeSha = currentExecs.find(e => e.code_sha)?.code_sha?.slice(0, 7) ?? null;
+    const matchingCallSites = [...fp.paths].slice(0, 3);
+    const externalMatchedExec = allMatchedExecs.find(e => e.error_source?.includes('external'));
+    let matchingExternalDep: string | null = null;
+    if (externalMatchedExec?.error_message) {
+      const urlMatch = externalMatchedExec.error_message.match(/(?:https?:\/\/)?([a-z0-9\-\.]+\.[a-z]{2,}(?::\d+)?)/i);
+      matchingExternalDep = urlMatch?.[1] ?? null;
+    }
+    const matchingCriteria = { codeSha: matchingCodeSha, callSites: matchingCallSites, externalDep: matchingExternalDep };
+
     if (isActiveNow) {
       const confidence: 'high' | 'medium' | 'low' = matchedFail > 0 || activeInCurrentDeploy ? 'high' : 'medium';
       const reason = isRegressed
@@ -399,27 +436,27 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
         : isDeterministic
         ? `Deterministic — fails ${failureRate}% across ${execCount} exec${execCount !== 1 ? 's' : ''}`
         : `Reproducible · ${execCount} exec${execCount !== 1 ? 's' : ''}, ${failureRate}% failure rate`;
-      return { state: isRegressed ? 'regressed' : 'active', confidence, execCount, errorCount: currentErrors, failureRate, matchedTotal, matchedSuccess, matchedFail, reason, isDeterministic, isRegressed, pathsTracked };
+      return { state: isRegressed ? 'regressed' : 'active', confidence, execCount, errorCount: currentErrors, failureRate, matchedTotal, matchedSuccess, matchedFail, reason, isDeterministic, isRegressed, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore };
     }
 
     // No active failures — determine if the same scenario was exercised successfully
     if (matchedTotal >= 3) {
       const confidence: 'high' | 'medium' | 'low' = matchedTotal >= 15 ? 'high' : matchedTotal >= 5 ? 'medium' : 'low';
       const reason = `Verified — ${matchedSuccess} exec${matchedSuccess !== 1 ? 's' : ''} on same path, no recurrence`;
-      return { state: 'verified_fixed', confidence, execCount, errorCount: 0, failureRate: 0, matchedTotal, matchedSuccess, matchedFail: 0, reason, isDeterministic: false, isRegressed: false, pathsTracked };
+      return { state: 'verified_fixed', confidence, execCount, errorCount: 0, failureRate: 0, matchedTotal, matchedSuccess, matchedFail: 0, reason, isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore };
     }
     if (execCount >= VERIFIED_EXEC_HIGH)
       return { state: 'verified_fixed', confidence: 'medium', execCount, errorCount: 0, failureRate: 0, matchedTotal, matchedSuccess, matchedFail: 0,
-        reason: `Not reproduced across ${execCount} execs — path not yet exercised`, isDeterministic: false, isRegressed: false, pathsTracked };
+        reason: `Not reproduced across ${execCount} execs — path not yet exercised`, isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore };
     if (execCount >= VERIFIED_EXEC_MIN)
       return { state: 'verified_fixed', confidence: 'low', execCount, errorCount: 0, failureRate: 0, matchedTotal, matchedSuccess, matchedFail: 0,
-        reason: `Not reproduced across ${execCount} execs — insufficient path coverage`, isDeterministic: false, isRegressed: false, pathsTracked };
+        reason: `Not reproduced across ${execCount} execs — insufficient path coverage`, isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore };
 
     return { state: 'unverified', confidence: 'low', execCount, errorCount: 0, failureRate: 0, matchedTotal, matchedSuccess, matchedFail: 0,
       reason: pathsTracked
         ? `Failure path not yet exercised in current deploy (${execCount}/${VERIFIED_EXEC_MIN} execs)`
         : `Only ${execCount} of ${VERIFIED_EXEC_MIN} executions needed to verify`,
-      isDeterministic: false, isRegressed: false, pathsTracked };
+      isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore };
   };
 
   const st = statsData?.stats;
@@ -821,84 +858,74 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                      </div>
                                    );
                                  })}
-                                 {/* ── Footer: consequence hint + verify state on one strip */}
-                                 {/* ── Verification block — explicit state for this failure mode */}
+                                 {/* ── Verification block: 3-state truth tracking ── */}
                                  {(() => {
-                                   const execBasis = verify.matchedTotal > 0
-                                     ? `based on ${verify.matchedTotal} matching execution${verify.matchedTotal !== 1 ? 's' : ''}`
-                                     : verify.execCount > 0
-                                     ? `observed across ${verify.execCount} execution${verify.execCount !== 1 ? 's' : ''}`
-                                     : null;
-                                   if (verify.state === 'active' || verify.state === 'regressed') {
-                                     const detLabel = verify.isDeterministic
-                                       ? `Deterministic (${execBasis ?? `${verify.execCount} exec${verify.execCount !== 1 ? 's' : ''}`})`
-                                       : `Reproducible · ${verify.failureRate}% failure rate`;
-                                     return (
-                                       <div className="mt-2 pt-2 border-t border-white/5 font-mono text-[9px] space-y-0.5">
-                                         <div className="flex items-center justify-between gap-2">
-                                           <span className="text-neutral-600 uppercase tracking-wider">Verification</span>
-                                           <span className="font-black text-red-500 uppercase tracking-wider">NOT VERIFIED</span>
-                                         </div>
-                                         <div className="flex items-center justify-between gap-2">
-                                           <span className="text-neutral-700">Failure pattern</span>
-                                           <span className={`font-bold ${verify.isDeterministic ? 'text-red-400' : 'text-red-400/70'}`}>{detLabel}</span>
-                                         </div>
-                                         <div className="flex items-center justify-between gap-2">
-                                           <span className="text-neutral-700">Matched executions</span>
-                                           <span className="text-neutral-500">{verify.matchedFail} failure{verify.matchedFail !== 1 ? 's' : ''} · {verify.matchedSuccess} success{verify.matchedSuccess !== 1 ? 'es' : ''}</span>
-                                         </div>
-                                         {verify.isRegressed && (
-                                           <div className="flex items-center justify-between gap-2">
-                                             <span className="text-neutral-700">Regression</span>
-                                             <span className="font-bold text-orange-400">Previously fixed, re-emerged</span>
-                                           </div>
-                                         )}
-                                       </div>
-                                     );
-                                   }
-                                   if (verify.state === 'unverified') {
-                                     return (
-                                       <div className="mt-2 pt-2 border-t border-white/5 font-mono text-[9px] space-y-0.5">
-                                         <div className="flex items-center justify-between gap-2">
-                                           <span className="text-neutral-600 uppercase tracking-wider">Verification</span>
-                                           <span className="font-black text-amber-500 uppercase tracking-wider">UNKNOWN</span>
-                                         </div>
-                                         <div className="flex items-center justify-between gap-2">
-                                           <span className="text-neutral-700">Reason</span>
-                                           <span className="text-neutral-500">
-                                             {verify.pathsTracked
-                                               ? 'failure path not yet exercised in current deploy'
-                                               : `only ${verify.execCount} of ${VERIFIED_EXEC_MIN} execs needed`}
-                                           </span>
-                                         </div>
-                                         <div className="flex items-center justify-between gap-2">
-                                           <span className="text-neutral-700">Matched executions</span>
-                                           <span className="text-neutral-500">{verify.matchedTotal} of scenario seen</span>
-                                         </div>
-                                       </div>
-                                     );
-                                   }
-                                   // verified_fixed
-                                   const signal = verify.matchedSuccess > 0
-                                     ? `${verify.matchedSuccess} success on same path`
-                                     : `${verify.execCount} execs, no recurrence`;
+                                   const obsLabel = (() => {
+                                     if (verify.observationState === 'not_observed')
+                                       return { text: 'NOT OBSERVED', color: 'text-neutral-500' };
+                                     if (verify.observationState === 'verified')
+                                       return { text: 'VERIFIED', color: verify.confidence === 'high' ? 'text-emerald-400' : 'text-emerald-600/70' };
+                                     // partially_observed
+                                     if (verify.state === 'regressed') return { text: 'REGRESSION', color: 'text-orange-400' };
+                                     if (verify.state === 'active')    return { text: 'STILL FAILING', color: 'text-red-500' };
+                                     return { text: 'PARTIALLY OBSERVED', color: 'text-amber-500' };
+                                   })();
+                                   const stateDesc =
+                                     verify.observationState === 'not_observed'
+                                       ? (verify.pathsTracked
+                                           ? 'failure path not yet exercised in current deploy'
+                                           : `${verify.execCount} of ${VERIFIED_EXEC_MIN} matching executions needed`)
+                                     : verify.observationState === 'verified'
+                                       ? `${verify.matchedSuccess} success on same path${verify.matchedFail === 0 ? ' · no recurrence' : ''}`
+                                     : verify.state === 'regressed' ? 'previously fixed · re-emerged in current deploy'
+                                     : verify.state === 'active'
+                                       ? `${verify.matchedFail} matching failure${verify.matchedFail !== 1 ? 's' : ''} observed`
+                                     : `${verify.matchedTotal} matching exec${verify.matchedTotal !== 1 ? 's' : ''} · awaiting more coverage`;
+                                   const { codeSha, callSites, externalDep } = verify.matchingCriteria;
+                                   const hasAnyCriteria = codeSha || callSites.length > 0 || externalDep;
                                    return (
                                      <div className="mt-2 pt-2 border-t border-white/5 font-mono text-[9px] space-y-0.5">
+                                       {/* Label + confidence % */}
                                        <div className="flex items-center justify-between gap-2">
                                          <span className="text-neutral-600 uppercase tracking-wider">Verification</span>
-                                         <span className={`font-black uppercase tracking-wider ${verify.confidence === 'high' ? 'text-emerald-400' : 'text-emerald-600/70'}`}>VERIFIED FIXED</span>
+                                         <div className="flex items-center gap-1.5">
+                                           <span className={`font-black uppercase tracking-wider ${obsLabel.color}`}>{obsLabel.text}</span>
+                                           {verify.confidenceScore > 0 && (
+                                             <span className="text-neutral-600 font-bold">{verify.confidenceScore}%</span>
+                                           )}
+                                         </div>
                                        </div>
+                                       {/* State description */}
+                                       <div className="flex items-start justify-between gap-2">
+                                         <span className="text-neutral-700 shrink-0">Status</span>
+                                         <span className="text-neutral-500 text-right">{stateDesc}</span>
+                                       </div>
+                                       {/* Matching criteria */}
+                                       <div className="flex items-start justify-between gap-2">
+                                         <span className="text-neutral-700 shrink-0 leading-tight">Match criteria<br/><span className="text-neutral-800">(path + inputs)</span></span>
+                                         <div className="flex flex-col items-end gap-0.5">
+                                           {codeSha    ? <span className="text-neutral-600">version {codeSha}</span> : null}
+                                           {callSites[0] ? <span className="text-neutral-600 truncate max-w-[130px]" title={callSites[0]}>{callSites[0]}</span> : null}
+                                           {externalDep  ? <span className="text-neutral-600">{externalDep}</span> : null}
+                                           {!hasAnyCriteria && <span className="text-neutral-700">error type + source</span>}
+                                         </div>
+                                       </div>
+                                       {/* Execution counts */}
                                        <div className="flex items-center justify-between gap-2">
-                                         <span className="text-neutral-700">Matched executions</span>
-                                         <span className="text-emerald-500/80 font-bold">{signal}</span>
+                                         <span className="text-neutral-700">Matching executions</span>
+                                         <span className="text-neutral-500">{verify.matchedFail} failure{verify.matchedFail !== 1 ? 's' : ''} · {verify.matchedSuccess} success{verify.matchedSuccess !== 1 ? 'es' : ''}</span>
                                        </div>
-                                       <div className="flex items-center justify-between gap-2">
-                                         <span className="text-neutral-700">Confidence</span>
-                                         <span className={`font-bold uppercase ${verify.confidence === 'high' ? 'text-emerald-500' : verify.confidence === 'medium' ? 'text-yellow-600' : 'text-neutral-500'}`}>{verify.confidence}</span>
-                                       </div>
-                                       {verify.matchedSuccess > 0 && (
+                                       {/* Last matching execution */}
+                                       {verify.lastMatchedAt && (
                                          <div className="flex items-center justify-between gap-2">
-                                           <span className="text-neutral-700">Transition observed</span>
+                                           <span className="text-neutral-700">Last matching exec</span>
+                                           <span className="text-neutral-500">{timeAgo(verify.lastMatchedAt)}</span>
+                                         </div>
+                                       )}
+                                       {/* Verified: transition signal */}
+                                       {verify.observationState === 'verified' && verify.matchedSuccess > 0 && (
+                                         <div className="flex items-center justify-between gap-2">
+                                           <span className="text-neutral-700">Transition</span>
                                            <span className="text-emerald-400 font-bold">failure → success ✓</span>
                                          </div>
                                        )}
