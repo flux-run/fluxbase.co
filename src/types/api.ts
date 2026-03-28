@@ -291,3 +291,21 @@ export interface ProjectOverviewResult {
     trafficImpactPct: number;
   };
 }
+
+export type IncidentStatus = 'active' | 'investigating' | 'resolved';
+
+export interface IncidentActivityEvent {
+  id: string;
+  type: 'system' | 'comment' | 'ai';
+  text: string;
+  actor?: string;
+  ts: string;
+}
+
+export interface IncidentState {
+  status: IncidentStatus;
+  owner: string;
+  checkedActions: number[];
+  activity: IncidentActivityEvent[];
+  updated_at?: string;
+}

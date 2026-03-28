@@ -1,9 +1,9 @@
 "use client";
 import { use, useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, CheckCircle2, AlertTriangle, Info, Zap, Terminal, MessageSquare, User, Clock, Bot, ChevronDown } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, AlertTriangle, Info, Zap, Terminal, MessageSquare, Clock, Bot, ChevronDown } from "lucide-react";
 import { useFluxApi } from "@/lib/api";
-import { ProjectOverviewResult, Execution } from "@/types/api";
+import { ProjectOverviewResult, Execution, IncidentStatus, IncidentActivityEvent } from "@/types/api";
 import { useTeam, avatarColor } from "@/lib/teamStore";
 
 function timeAgo(d: string) {
@@ -41,26 +41,7 @@ function SectionCard({ title, children }: { title: string; children: React.React
   );
 }
 
-type IncidentStatus = 'active' | 'investigating' | 'resolved';
-
-type ActivityEvent = {
-  id: string;
-  /** system = automated event · comment = human freeform · ai = AI response */
-  type: 'system' | 'comment' | 'ai';
-  text: string;
-  /** human actor — when set on a system event it renders as a human-action row */
-  actor?: string;
-  ts: string;
-};
-
-function initActivity(title: string, firstSeen: string): ActivityEvent[] {
-  return [{
-    id: 'system-started',
-    type: 'system',
-    text: 'Incident detected',
-    ts: firstSeen,
-  }];
-}
+type ActivityEvent = IncidentActivityEvent;
 
 /** Generate an AI reply to a user comment based on incident context */
 function generateAiReply(
@@ -288,6 +269,7 @@ export default function IncidentDetailPage({
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [owner, setOwnerState] = useState<string>('');
   const [commentDraft, setCommentDraft] = useState('');
+  const [stateHydrated, setStateHydrated] = useState(false);
   const { users: teamUsers } = useTeam();
   const [ownerDropdownOpen, setOwnerDropdownOpen] = useState(false);
 
@@ -347,38 +329,54 @@ export default function IncidentDetailPage({
     };
   }, [overview, title]);
 
-  // Load all persisted state once title is ready
+  // Load persisted incident collaboration state from backend.
   useEffect(() => {
-    const savedStatus = localStorage.getItem(`incident-status:${title}`);
-    if (savedStatus === 'active' || savedStatus === 'investigating' || savedStatus === 'resolved') {
-      setIncidentStatus(savedStatus);
-    }
-    const savedChecks = localStorage.getItem(`incident-checks:${title}`);
-    if (savedChecks) {
-      try { setCheckedActions(new Set(JSON.parse(savedChecks))); } catch {}
-    }
-    const savedOwner = localStorage.getItem(`incident-owner:${title}`) ?? '';
-    setOwnerState(savedOwner);
-    const savedActivity = localStorage.getItem(`incident-activity:${title}`);
-    if (savedActivity) {
-      try { setActivity(JSON.parse(savedActivity)); } catch {}
-    }
-  }, [title]);
+    if (!api.ready) return;
+    let cancelled = false;
+
+    api
+      .getIncidentState(id, title)
+      .then((res) => {
+        if (cancelled) return;
+        const state = res?.state;
+        if (state) {
+          setIncidentStatus(state.status);
+          setOwnerState(state.owner ?? '');
+          setCheckedActions(new Set((state.checkedActions ?? []).map((n) => Number(n)).filter((n) => Number.isFinite(n))));
+          setActivity(Array.isArray(state.activity) ? state.activity : []);
+        }
+      })
+      .catch(() => {
+        // Keep UI usable even if persistence temporarily fails.
+      })
+      .finally(() => {
+        if (!cancelled) setStateHydrated(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [api, id, title]);
+
+  // Persist incident collaboration state to backend after initial hydration.
+  useEffect(() => {
+    if (!api.ready || !stateHydrated) return;
+    const timer = setTimeout(() => {
+      api.saveIncidentState(id, title, {
+        status: incidentStatus,
+        owner,
+        checkedActions: [...checkedActions],
+        activity,
+      }).catch(() => {
+        // Save failures are non-blocking; next change retries automatically.
+      });
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [api, id, title, stateHydrated, incidentStatus, owner, checkedActions, activity]);
 
   const persistActivity = useCallback((events: ActivityEvent[]) => {
     setActivity(events);
-    localStorage.setItem(`incident-activity:${title}`, JSON.stringify(events));
-  }, [title]);
-
-  // Seed the "incident started" event once data arrives (deduped by id)
-  const seedActivity = useCallback((firstSeen: string) => {
-    setActivity(prev => {
-      if (prev.some(e => e.id === 'system-started')) return prev;
-      const seeded = [initActivity(title, firstSeen)[0], ...prev];
-      localStorage.setItem(`incident-activity:${title}`, JSON.stringify(seeded));
-      return seeded;
-    });
-  }, [title]);
+  }, []);
 
   const updateStatus = useCallback((s: IncidentStatus, currentActivity: ActivityEvent[]) => {
     setIncidentStatus(prev => {
@@ -414,13 +412,11 @@ export default function IncidentDetailPage({
       persistActivity([...currentActivity, ...evs]);
       return s;
     });
-    localStorage.setItem(`incident-status:${title}`, s);
-  }, [title, persistActivity, group, owner]);
+  }, [persistActivity, group, owner]);
 
   const assignOwner = useCallback((name: string, currentActivity: ActivityEvent[]) => {
     const trimmed = name.trim();
     setOwnerState(trimmed);
-    localStorage.setItem(`incident-owner:${title}`, trimmed);
     if (!trimmed) return;
     const who = owner || 'Someone';
     const ev: ActivityEvent = {
@@ -431,7 +427,7 @@ export default function IncidentDetailPage({
       ts: new Date().toISOString(),
     };
     persistActivity([...currentActivity, ev]);
-  }, [title, persistActivity, owner]);
+  }, [persistActivity, owner]);
 
   const addComment = useCallback((text: string, currentActivity: ActivityEvent[]) => {
     const trimmed = text.trim();
@@ -517,10 +513,9 @@ export default function IncidentDetailPage({
     setCheckedActions(prev => {
       const next = new Set(prev);
       next.has(i) ? next.delete(i) : next.add(i);
-      localStorage.setItem(`incident-checks:${title}`, JSON.stringify([...next]));
       return next;
     });
-  }, [title]);
+  }, []);
 
   const pinToTimeline = useCallback((text: string, currentActivity: ActivityEvent[]) => {
     const ev: ActivityEvent = {
@@ -594,11 +589,9 @@ export default function IncidentDetailPage({
       }
 
       if (!toAdd.length) return prev;
-      const merged = [...toAdd, ...prev].sort(
+      return [...toAdd, ...prev].sort(
         (a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime()
       );
-      localStorage.setItem(`incident-activity:${title}`, JSON.stringify(merged));
-      return merged;
     });
   }, [group, title]);
 

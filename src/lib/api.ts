@@ -9,6 +9,7 @@ import type {
   Route,
   ServiceToken,
   ProjectOverviewResult,
+  IncidentState,
 } from "@/types/api";
 import { useAuth } from "@/components/auth/AuthProvider";
 
@@ -135,6 +136,31 @@ export function useFluxApi(projectId?: string) {
         request<any>(`/function/${funcId}/overview`, token()),
       getDeployments: (funcId: string) =>
         request<any[]>(`/functions/${funcId}/deployments`, token()).catch(() => []),
+      getIncidentState: (projectId: string, title: string) =>
+        request<{ state: IncidentState | null }>(
+          `/incidents/state?project_id=${projectId}&title=${encodeURIComponent(title)}`,
+          token(),
+        ),
+      saveIncidentState: (
+        projectId: string,
+        title: string,
+        state: {
+          status: "active" | "investigating" | "resolved";
+          owner: string;
+          checkedActions: number[];
+          activity: {
+            id: string;
+            type: "system" | "comment" | "ai";
+            text: string;
+            actor?: string;
+            ts: string;
+          }[];
+        },
+      ) =>
+        request<{ ok: boolean }>(`/incidents/state`, token(), {
+          method: "PUT",
+          body: JSON.stringify({ project_id: projectId, title, ...state }),
+        }),
 
       /* Routes */
       getRoutes: (id?: string) =>
