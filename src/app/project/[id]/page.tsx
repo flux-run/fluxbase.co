@@ -91,9 +91,10 @@ export default function ProjectPage({
   type IncidentGroup = {
     cls: string;
     incidents: ProjectOverviewResult["incidents"];
-    combinedImpact: number; // sum of failureRatePct * totalExecs
+    combinedImpact: number; // failureRate × execs × recencyWeight
     maxTrafficPct: number;
     affectedFns: string[];
+    trafficContributionPct: number; // this group's share of all impacted traffic
   };
 
   const incidentGroups = useMemo((): IncidentGroup[] => {
@@ -104,16 +105,27 @@ export default function ProjectPage({
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(inc);
     }
+    const totalErrors = overview.incidents.reduce((s, i) => s + i.totalErrors, 0) || 1;
+    const overallTrafficImpactPct = overview.health?.trafficImpactPct ?? 0;
+    const recencyWeight = (lastSeen: string) => {
+      const hoursAgo = (Date.now() - new Date(lastSeen).getTime()) / 3_600_000;
+      return hoursAgo < 1 ? 1.5 : hoursAgo < 6 ? 1.2 : hoursAgo < 24 ? 1.0 : 0.7;
+    };
     return [...map.entries()]
-      .map(([cls, incs]) => ({
-        cls,
-        incidents: incs,
-        combinedImpact: incs.reduce((s, i) => s + i.failureRatePct * i.totalExecs, 0),
-        maxTrafficPct: Math.max(...incs.map((i) => i.trafficImpactPct)),
-        affectedFns: [...new Set(incs.map((i) => i.functionName))],
-      }))
+      .map(([cls, incs]) => {
+        const groupErrors = incs.reduce((s, i) => s + i.totalErrors, 0);
+        const topLastSeen = incs.reduce((t, i) => i.lastSeen > t ? i.lastSeen : t, incs[0].lastSeen);
+        return {
+          cls,
+          incidents: incs,
+          combinedImpact: incs.reduce((s, i) => s + i.failureRatePct * i.totalExecs, 0) * recencyWeight(topLastSeen),
+          maxTrafficPct: Math.max(...incs.map((i) => i.trafficImpactPct)),
+          affectedFns: [...new Set(incs.map((i) => i.functionName))],
+          trafficContributionPct: Math.round((groupErrors / totalErrors) * overallTrafficImpactPct),
+        };
+      })
       .sort((a, b) => b.combinedImpact - a.combinedImpact);
-  }, [overview?.incidents]);
+  }, [overview?.incidents, overview?.health]);
 
   // Suggested focus: the group with highest combined impact, cross-referenced with regressions
   const suggestedFocus = useMemo(() => {
@@ -128,9 +140,11 @@ export default function ProjectPage({
       cls: top.cls,
       affectedFns: top.affectedFns,
       trafficImpactPct: top.maxTrafficPct,
+      trafficContributionPct: top.trafficContributionPct,
       failureRatePct: topInc.failureRatePct,
       isRegression,
       topFunctionId: topInc.functionId,
+      topFunctionName: topInc.functionName,
       deployId: topInc.deployId,
     };
   }, [incidentGroups, isBroken, overview]);
@@ -178,6 +192,11 @@ export default function ProjectPage({
                 ? `${health!.functionsFailing} function${health!.functionsFailing !== 1 ? "s" : ""} failing`
                 : `0 incidents · 0 failing · 0% traffic impacted`}
             </p>
+            {isBroken && incidentGroups.length > 0 && (
+              <p className="text-[9px] text-neutral-700 font-mono mt-0.5">
+                {incidentGroups.slice(0, 3).map((g, i) => `${i > 0 ? " · " : ""}${g.cls}: ${g.trafficContributionPct}%`).join("")}
+              </p>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-3 shrink-0">
@@ -223,9 +242,9 @@ export default function ProjectPage({
               <span className="text-[9px] font-black uppercase tracking-widest text-red-400">
                 Fix This First
               </span>
-              {suggestedFocus.isRegression && (
-                <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded border text-orange-300 border-orange-800/50 bg-orange-950/50">
-                  Started after deploy
+              {suggestedFocus.isRegression && suggestedFocus.deployId && (
+                <span className="text-[8px] font-mono px-1.5 py-0.5 rounded border text-orange-300 border-orange-800/50 bg-orange-950/50">
+                  ↑ after deploy {suggestedFocus.deployId}
                 </span>
               )}
             </div>
@@ -273,12 +292,36 @@ export default function ProjectPage({
               </div>
             )}
 
-            <div className="flex items-center justify-between pt-1">
-              <p className="text-[9px] text-neutral-700 font-mono">
-                {suggestedFocus.trafficImpactPct}% of traffic impacted · impact = {suggestedFocus.cls} failure
+            {/* Fix this first because */}
+            <div className="space-y-0.5 mt-1">
+              <p className="text-[9px] text-neutral-600 font-mono">
+                <span className="text-red-500/60 mr-1 select-none">·</span>
+                {suggestedFocus.trafficContributionPct > 0
+                  ? `${suggestedFocus.trafficContributionPct}% of all impacted traffic`
+                  : `${suggestedFocus.trafficImpactPct}% of function traffic impacted`}
               </p>
-              <span className="text-[10px] font-bold text-red-300 flex items-center gap-1 group-hover:gap-2 transition-all">
-                Investigate <ArrowRight className="w-3 h-3" />
+              {suggestedFocus.isRegression && suggestedFocus.deployId && (
+                <p className="text-[9px] text-neutral-600 font-mono">
+                  <span className="text-red-500/60 mr-1 select-none">·</span>
+                  started after deploy {suggestedFocus.deployId}
+                </p>
+              )}
+              {suggestedFocus.failureRatePct >= 80 && (
+                <p className="text-[9px] text-neutral-600 font-mono">
+                  <span className="text-red-500/60 mr-1 select-none">·</span>
+                  deterministic — every request fails
+                </p>
+              )}
+              {suggestedFocus.affectedFns.length > 1 && (
+                <p className="text-[9px] text-neutral-600 font-mono">
+                  <span className="text-red-500/60 mr-1 select-none">·</span>
+                  cross-function — {suggestedFocus.affectedFns.length} services affected
+                </p>
+              )}
+            </div>
+            <div className="flex items-center justify-end pt-1.5">
+              <span className="text-[10px] font-bold text-red-300 flex items-center gap-1.5 group-hover:gap-2.5 transition-all">
+                Investigate {suggestedFocus.topFunctionName} <ArrowRight className="w-3 h-3" />
               </span>
             </div>
           </div>
@@ -513,7 +556,7 @@ export default function ProjectPage({
                         />
                       </div>
                       <span className="text-[8px] font-bold text-neutral-600 tabular-nums shrink-0">
-                        {item.progress}/{item.required}
+                        {item.progress} seen · need {item.required}
                       </span>
                     </div>
                   </div>
