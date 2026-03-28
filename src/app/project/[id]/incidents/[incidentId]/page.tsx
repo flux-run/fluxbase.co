@@ -1,7 +1,7 @@
 "use client";
 import { use, useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, CheckCircle2, AlertTriangle, Info, Zap, Terminal } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, AlertTriangle, Info, Zap, Terminal, MessageSquare, User, Clock } from "lucide-react";
 import { useFluxApi } from "@/lib/api";
 import { ProjectOverviewResult, Execution } from "@/types/api";
 
@@ -41,6 +41,29 @@ function SectionCard({ title, children }: { title: string; children: React.React
 }
 
 type IncidentStatus = 'active' | 'investigating' | 'resolved';
+
+type ActivityEvent = {
+  id: string;
+  type: 'system' | 'comment';
+  text: string;
+  author?: string;
+  ts: string;
+};
+
+function initActivity(title: string, firstSeen: string): ActivityEvent[] {
+  return [{
+    id: 'system-started',
+    type: 'system',
+    text: 'Incident detected',
+    ts: firstSeen,
+  }];
+}
+
+function formatTs(ts: string) {
+  const d = new Date(ts);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' · ' +
+    d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
 
 function generateSuggestedFix(errorClass: string, title: string): { summary: string; causes: string[]; actions: string[] } | null {
   const t = title.toLowerCase();
@@ -193,22 +216,89 @@ export default function IncidentDetailPage({
   const [notFound, setNotFound] = useState(false);
   const [incidentStatus, setIncidentStatus] = useState<IncidentStatus>('active');
   const [checkedActions, setCheckedActions] = useState<Set<number>>(new Set());
+  const [activity, setActivity] = useState<ActivityEvent[]>([]);
+  const [owner, setOwnerState] = useState<string>('');
+  const [commentDraft, setCommentDraft] = useState('');
+  const [ownerDraft, setOwnerDraft] = useState('');
+  const [editingOwner, setEditingOwner] = useState(false);
 
+  // Load all persisted state once title is ready
   useEffect(() => {
-    const saved = localStorage.getItem(`incident-status:${title}`);
-    if (saved === 'active' || saved === 'investigating' || saved === 'resolved') {
-      setIncidentStatus(saved);
+    const savedStatus = localStorage.getItem(`incident-status:${title}`);
+    if (savedStatus === 'active' || savedStatus === 'investigating' || savedStatus === 'resolved') {
+      setIncidentStatus(savedStatus);
     }
     const savedChecks = localStorage.getItem(`incident-checks:${title}`);
     if (savedChecks) {
       try { setCheckedActions(new Set(JSON.parse(savedChecks))); } catch {}
     }
+    const savedOwner = localStorage.getItem(`incident-owner:${title}`) ?? '';
+    setOwnerState(savedOwner);
+    setOwnerDraft(savedOwner);
+    const savedActivity = localStorage.getItem(`incident-activity:${title}`);
+    if (savedActivity) {
+      try { setActivity(JSON.parse(savedActivity)); } catch {}
+    }
   }, [title]);
 
-  const updateStatus = useCallback((s: IncidentStatus) => {
+  const persistActivity = useCallback((events: ActivityEvent[]) => {
+    setActivity(events);
+    localStorage.setItem(`incident-activity:${title}`, JSON.stringify(events));
+  }, [title]);
+
+  // Seed the "incident started" event once data arrives (deduped by id)
+  const seedActivity = useCallback((firstSeen: string) => {
+    setActivity(prev => {
+      if (prev.some(e => e.id === 'system-started')) return prev;
+      const seeded = [initActivity(title, firstSeen)[0], ...prev];
+      localStorage.setItem(`incident-activity:${title}`, JSON.stringify(seeded));
+      return seeded;
+    });
+  }, [title]);
+
+  const updateStatus = useCallback((s: IncidentStatus, currentActivity: ActivityEvent[]) => {
     setIncidentStatus(s);
     localStorage.setItem(`incident-status:${title}`, s);
-  }, [title]);
+    const label = s === 'investigating' ? 'Marked as Investigating'
+      : s === 'resolved' ? 'Marked as Resolved'
+      : 'Reopened as Active';
+    const ev: ActivityEvent = {
+      id: `system-status-${Date.now()}`,
+      type: 'system',
+      text: label,
+      ts: new Date().toISOString(),
+    };
+    persistActivity([...currentActivity, ev]);
+  }, [title, persistActivity]);
+
+  const assignOwner = useCallback((name: string, currentActivity: ActivityEvent[]) => {
+    const trimmed = name.trim();
+    setOwnerState(trimmed);
+    localStorage.setItem(`incident-owner:${title}`, trimmed);
+    setEditingOwner(false);
+    if (!trimmed) return;
+    const ev: ActivityEvent = {
+      id: `system-owner-${Date.now()}`,
+      type: 'system',
+      text: `Assigned to ${trimmed}`,
+      ts: new Date().toISOString(),
+    };
+    persistActivity([...currentActivity, ev]);
+  }, [title, persistActivity]);
+
+  const addComment = useCallback((text: string, currentActivity: ActivityEvent[]) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    const ev: ActivityEvent = {
+      id: `comment-${Date.now()}`,
+      type: 'comment',
+      text: trimmed,
+      author: owner || 'You',
+      ts: new Date().toISOString(),
+    };
+    persistActivity([...currentActivity, ev]);
+    setCommentDraft('');
+  }, [owner, persistActivity]);
 
   const toggleAction = useCallback((i: number) => {
     setCheckedActions(prev => {
@@ -238,8 +328,7 @@ export default function IncidentDetailPage({
         .slice(0, 8);
       setExecutions(failing);
       setLoading(false);
-    });
-  }, [api.ready, id, title]);
+    });  }, [api.ready, id, title]);
 
   const group = useMemo(() => {
     if (!overview?.incidents) return null;
@@ -295,6 +384,11 @@ export default function IncidentDetailPage({
       severity,
     };
   }, [overview, title]);
+
+  // Seed activity once first-seen is known (after group is computed)
+  useEffect(() => {
+    if (group?.firstSeen) seedActivity(group.firstSeen);
+  }, [group?.firstSeen, seedActivity]);
 
   if (loading) {
     return (
@@ -495,7 +589,7 @@ export default function IncidentDetailPage({
         </button>
         {incidentStatus === 'active' && (
           <button
-            onClick={() => updateStatus('investigating')}
+            onClick={() => updateStatus('investigating', activity)}
             className="flex items-center gap-1.5 text-[10px] font-black text-amber-400 hover:text-amber-300 border border-amber-900/50 hover:border-amber-700/60 rounded-lg px-3 py-1.5 transition-all"
           >
             <Zap className="w-3 h-3" /> Mark investigating
@@ -503,13 +597,55 @@ export default function IncidentDetailPage({
         )}
         {incidentStatus === 'investigating' && (
           <button
-            onClick={() => updateStatus('resolved')}
+            onClick={() => updateStatus('resolved', activity)}
             className="flex items-center gap-1.5 text-[10px] font-black text-emerald-400 hover:text-emerald-300 border border-emerald-900/50 hover:border-emerald-700/60 rounded-lg px-3 py-1.5 transition-all"
           >
             <CheckCircle2 className="w-3 h-3" /> Mark resolved
           </button>
         )}
       </div>
+
+      {/* Resolution Validation banner */}
+      {incidentStatus === 'resolved' && (
+        <div className={`rounded-xl border overflow-hidden ${
+          totalErrors === 0
+            ? 'border-emerald-700/50 bg-emerald-950/15'
+            : 'border-amber-700/50 bg-amber-950/15'
+        }`}>
+          <div className="px-5 py-3 flex items-center gap-3">
+            {totalErrors === 0 ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            ) : (
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+            )}
+            <div className="flex-1 min-w-0">
+              <p className={`text-sm font-black ${
+                totalErrors === 0 ? 'text-emerald-200' : 'text-amber-200'
+              }`}>
+                {totalErrors === 0
+                  ? 'No errors recorded — resolution looks valid'
+                  : `⚠ Errors still occurring (${totalErrors} total) — verify the fix is deployed`}
+              </p>
+              <p className="text-[10px] text-neutral-500 font-mono mt-0.5">
+                {failureRatePct > 0
+                  ? `Current failure rate: ${failureRatePct}% (${totalErrors}/${totalExecs} execs)`
+                  : `Failure rate: 0% across ${totalExecs} executions`}
+                {rateBeforePct !== null && rateAfterPct !== null && (
+                  <span className="ml-2 text-neutral-600">
+                    · was {rateBeforePct}% before deploy
+                  </span>
+                )}
+              </p>
+            </div>
+            <button
+              onClick={() => updateStatus('active', activity)}
+              className="shrink-0 text-[9px] font-black text-neutral-500 hover:text-neutral-300 border border-neutral-800/60 hover:border-neutral-600 rounded-lg px-2.5 py-1.5 transition-all"
+            >
+              Reopen
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Impact Summary — decision-grade metrics */}
       <div className="grid grid-cols-4 gap-2">
@@ -779,7 +915,7 @@ export default function IncidentDetailPage({
                 {(['active', 'investigating', 'resolved'] as IncidentStatus[]).map(s => (
                   <button
                     key={s}
-                    onClick={() => updateStatus(s)}
+                    onClick={() => updateStatus(s, activity)}
                     className={`flex-1 text-[8px] font-black uppercase tracking-widest px-1.5 py-1.5 rounded border transition-all ${
                       incidentStatus === s
                         ? s === 'active'       ? 'bg-red-950/60 border-red-800/60 text-red-400'
@@ -792,11 +928,42 @@ export default function IncidentDetailPage({
                   </button>
                 ))}
               </div>
-              {/* Ownership metadata */}
-              <div className="space-y-1.5 pt-0.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[9px] text-neutral-600 font-mono">Owner</span>
-                  <span className="text-[9px] text-neutral-500 font-mono">Unassigned</span>
+              {/* Ownership */}
+              <div className="space-y-2 pt-0.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[9px] text-neutral-600 font-mono shrink-0">Owner</span>
+                  {editingOwner ? (
+                    <form
+                      className="flex items-center gap-1 flex-1 justify-end"
+                      onSubmit={e => { e.preventDefault(); assignOwner(ownerDraft, activity); }}
+                    >
+                      <input
+                        autoFocus
+                        value={ownerDraft}
+                        onChange={e => setOwnerDraft(e.target.value)}
+                        placeholder="name or @handle"
+                        className="text-[9px] font-mono bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-300 placeholder-neutral-700 w-28 outline-none focus:border-neutral-500"
+                      />
+                      <button type="submit" className="text-[9px] font-black text-cyan-500 hover:text-cyan-400 px-1.5 transition-colors">Save</button>
+                      <button type="button" onClick={() => { setEditingOwner(false); setOwnerDraft(owner); }} className="text-[9px] text-neutral-600 hover:text-neutral-400 px-1 transition-colors">✕</button>
+                    </form>
+                  ) : (
+                    <button
+                      onClick={() => setEditingOwner(true)}
+                      className="flex items-center gap-1.5 group"
+                    >
+                      {owner ? (
+                        <>
+                          <span className="w-4 h-4 rounded-full bg-neutral-700 flex items-center justify-center shrink-0">
+                            <User className="w-2.5 h-2.5 text-neutral-400" />
+                          </span>
+                          <span className="text-[9px] font-bold text-neutral-300 font-mono">{owner}</span>
+                        </>
+                      ) : (
+                        <span className="text-[9px] text-neutral-600 font-mono group-hover:text-neutral-400 transition-colors">Unassigned · assign →</span>
+                      )}
+                    </button>
+                  )}
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-[9px] text-neutral-600 font-mono">Service</span>
@@ -901,6 +1068,83 @@ export default function IncidentDetailPage({
               </div>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Activity & Comments — full width collaboration layer */}
+      <div className="rounded-xl border border-neutral-800/60 bg-neutral-950/60 overflow-hidden">
+        <div className="px-4 py-2.5 border-b border-neutral-800/40 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <MessageSquare className="w-3 h-3 text-neutral-500" />
+            <span className="text-[9px] font-black uppercase tracking-widest text-neutral-500">Activity</span>
+          </div>
+          <span className="text-[8px] text-neutral-700 font-mono">{activity.length} event{activity.length !== 1 ? 's' : ''}</span>
+        </div>
+
+        {/* Timeline */}
+        <div className="px-4 pt-3 pb-1 space-y-0">
+          {activity.length === 0 && (
+            <p className="text-[10px] text-neutral-700 font-mono py-2">No activity yet.</p>
+          )}
+          {[...activity].reverse().map((event, idx, arr) => (
+            <div key={event.id} className="flex gap-3 relative">
+              {/* connector line */}
+              {idx < arr.length - 1 && (
+                <div className="absolute left-[11px] top-5 bottom-0 w-px bg-neutral-800/60" />
+              )}
+              {/* dot */}
+              <div className={`mt-1 shrink-0 w-[22px] h-[22px] rounded-full border flex items-center justify-center z-10 ${
+                event.type === 'comment'
+                  ? 'bg-neutral-800 border-neutral-700'
+                  : 'bg-neutral-900 border-neutral-800'
+              }`}>
+                {event.type === 'comment' ? (
+                  <User className="w-2.5 h-2.5 text-neutral-500" />
+                ) : (
+                  <Clock className="w-2.5 h-2.5 text-neutral-600" />
+                )}
+              </div>
+              <div className="flex-1 pb-4 min-w-0">
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  {event.type === 'comment' && event.author && (
+                    <span className="text-[10px] font-black text-neutral-300">{event.author}</span>
+                  )}
+                  <span className={`text-[10px] font-mono ${
+                    event.type === 'system' ? 'text-neutral-500' : 'text-neutral-300'
+                  }`}>{event.text}</span>
+                  <span className="text-[9px] text-neutral-700 font-mono shrink-0">{formatTs(event.ts)}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Comment input */}
+        <div className="px-4 pb-4 pt-1 border-t border-neutral-800/40 mt-2">
+          <div className="flex gap-2 items-end">
+            <div className="flex-1">
+              <textarea
+                value={commentDraft}
+                onChange={e => setCommentDraft(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    addComment(commentDraft, activity);
+                  }
+                }}
+                placeholder={`Add a comment${owner ? ` as ${owner}` : ''}… (Enter to send)`}
+                rows={2}
+                className="w-full text-[10px] font-mono bg-neutral-900/60 border border-neutral-800 hover:border-neutral-700 focus:border-neutral-600 rounded-lg px-3 py-2 text-neutral-300 placeholder-neutral-700 outline-none transition-colors resize-none"
+              />
+            </div>
+            <button
+              onClick={() => addComment(commentDraft, activity)}
+              disabled={!commentDraft.trim()}
+              className="shrink-0 text-[9px] font-black text-neutral-400 hover:text-white disabled:text-neutral-700 disabled:cursor-not-allowed border border-neutral-800 hover:border-neutral-600 disabled:border-neutral-800/40 rounded-lg px-3 py-2 transition-all mb-[1px]"
+            >
+              Send
+            </button>
+          </div>
         </div>
       </div>
     </div>
