@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
-import type { Checkpoint, ExecutionConsoleLog } from "@/types/api";
+import type { Checkpoint, ExecutionConsoleLog, LogEntry } from "@/types/api";
 import type { Execution } from "@/types/api";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -309,7 +309,28 @@ function EventRow({ event, seq }: { event: TimelineEvent; seq: number }) {
 interface ExecutionTimelineProps {
   execution: Execution;
   checkpoints?: Checkpoint[];
-  logs?: ExecutionConsoleLog[];
+  logs?: LogEntry[];
+}
+
+function buildLogLabel(log: LogEntry): { label: string; extraDetail?: React.ReactNode } {
+  if (log.args_json) {
+    try {
+      const args = JSON.parse(log.args_json) as unknown[];
+      if (Array.isArray(args) && args.length > 0) {
+        const firstStr = typeof args[0] === "string" ? args[0] : JSON.stringify(args[0]);
+        const label = `console.${log.level}(${truncate(firstStr, 90)})`;
+        const extraDetail =
+          args.length > 1 ? <JsonBlock data={args} /> : undefined;
+        return { label, extraDetail };
+      }
+    } catch { /* ignore malformed args_json */ }
+  }
+  // Fall back: if message looks like just a level name, wrap it too
+  const looksLikeLevelOnly = ["log", "info", "warn", "error", "debug"].includes(log.message.trim().toLowerCase());
+  if (looksLikeLevelOnly) {
+    return { label: `console.${log.level}()` };
+  }
+  return { label: log.message };
 }
 
 export function ExecutionTimeline({ execution, checkpoints = [], logs = [] }: ExecutionTimelineProps) {
@@ -349,15 +370,19 @@ export function ExecutionTimeline({ execution, checkpoints = [], logs = [] }: Ex
   // in seq order, interleaved with checkpoints by approximating position.
 
   // Build log events — seq IS the call_index (same shared counter as IO ops)
-  const logEvents: TimelineEvent[] = logs.map((log) => ({
-    key: `log-${log.seq}`,
-    kind: "log" as const,
-    index: log.seq,
-    label: log.message,
-    badge: log.level !== "log" && log.level !== "info" ? log.level.toUpperCase() : undefined,
-    badgeColor: log.level === "error" ? "text-red-400" : log.level === "warn" ? "text-yellow-400" : undefined,
-    isError: log.level === "error",
-  }));
+  const logEvents: TimelineEvent[] = logs.map((log) => {
+    const { label, extraDetail } = buildLogLabel(log);
+    return {
+      key: `log-${log.seq}`,
+      kind: "log" as const,
+      index: log.seq,
+      label,
+      badge: log.level !== "log" && log.level !== "info" ? log.level.toUpperCase() : undefined,
+      badgeColor: log.level === "error" ? "text-red-400" : log.level === "warn" ? "text-yellow-400" : undefined,
+      isError: log.level === "error",
+      detail: extraDetail,
+    };
+  });
 
   // Build checkpoint events
   const cpEvents: TimelineEvent[] = checkpoints
