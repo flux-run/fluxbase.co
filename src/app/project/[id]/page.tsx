@@ -182,16 +182,20 @@ export default function ProjectPage({
     const isRecurring = top.incidents.some(i => i.isRecurring);
     // Deploy mode — rate-based classification of what this deploy did to the incident
     //   introduced : 0 errors before, errors after  → new bug from this deploy
-    //   regressed  : after-rate ≥ 2× before-rate    → deploy made it worse
+    //   regressed  : after-rate ≥ 1.25× before-rate → deploy made it worse
     //   improved   : after-rate ≤ 0.5× before-rate  → deploy improved it
     //   unchanged  : similar rates before and after  → persistent, deploy had no effect
     const rateAfter  = execsAfterDeploy  > 0 ? errorsAfterDeploy  / execsAfterDeploy  : null;
     const rateBefore = execsBeforeDeploy > 0 ? errorsBeforeDeploy / execsBeforeDeploy : null;
+    const rateAfterPct  = rateAfter  !== null ? Math.round(rateAfter  * 100) : null;
+    const rateBeforePct = rateBefore !== null ? Math.round(rateBefore * 100) : null;
+    // Flag low post-deploy sample — conclusions are weaker with < 10 execs after
+    const postDeploySampleLow = execsAfterDeploy > 0 && execsAfterDeploy < 10;
     const deployMode: 'introduced' | 'regressed' | 'improved' | 'unchanged' | null =
       !topInc.deployId ? null
       : errorsAfterDeploy === 0 && errorsBeforeDeploy === 0 ? null
       : errorsBeforeDeploy === 0 ? 'introduced'
-      : rateAfter !== null && rateBefore !== null && rateAfter >= rateBefore * 2 ? 'regressed'
+      : rateAfter !== null && rateBefore !== null && rateAfter >= rateBefore * 1.25 ? 'regressed'
       : rateAfter !== null && rateBefore !== null && rateAfter <= rateBefore * 0.5 ? 'improved'
       : 'unchanged';
     return {
@@ -223,6 +227,9 @@ export default function ProjectPage({
       deployMode,
       execsAfterDeploy,
       execsBeforeDeploy,
+      rateAfterPct,
+      rateBeforePct,
+      postDeploySampleLow,
     };
   }, [incidentGroups, isBroken, overview]);
 
@@ -447,14 +454,20 @@ export default function ProjectPage({
                           <span className="text-red-500/50 mr-1.5 select-none">·</span>
                           {suggestedFocus.deployMode === 'introduced'
                             ? 'no failures before this deploy'
-                            : suggestedFocus.deployMode === 'regressed'
-                            ? 'failure rate increased after deploy'
-                            : suggestedFocus.deployMode === 'improved'
-                            ? 'failure rate decreased after deploy'
-                            : suggestedFocus.deployMode === 'unchanged'
-                            ? 'failure rate unchanged by deploy'
+                            : suggestedFocus.deployMode === 'regressed' && suggestedFocus.rateBeforePct !== null && suggestedFocus.rateAfterPct !== null
+                            ? `failure rate increased after deploy (${suggestedFocus.rateBeforePct}% → ${suggestedFocus.rateAfterPct}%)`
+                            : suggestedFocus.deployMode === 'improved' && suggestedFocus.rateBeforePct !== null && suggestedFocus.rateAfterPct !== null
+                            ? `failure rate decreased after deploy (${suggestedFocus.rateBeforePct}% → ${suggestedFocus.rateAfterPct}%)`
+                            : suggestedFocus.deployMode === 'unchanged' && suggestedFocus.rateBeforePct !== null && suggestedFocus.rateAfterPct !== null
+                            ? `failure rate before and after deploy (${suggestedFocus.rateBeforePct}% → ${suggestedFocus.rateAfterPct}%)`
                             : 'active around this deployment'}
                         </p>
+                        {suggestedFocus.postDeploySampleLow && (
+                          <p className="text-[9px] text-neutral-600 font-mono">
+                            <span className="text-neutral-700/50 mr-1.5 select-none">·</span>
+                            <span className="text-neutral-600">low sample size after deploy ({suggestedFocus.execsAfterDeploy} executions)</span>
+                          </p>
+                        )}
                         <p className="text-[9px] font-mono">
                           <span className="text-red-500/50 mr-1.5 select-none">·</span>
                           {suggestedFocus.deployMode === 'introduced' && (
@@ -467,7 +480,9 @@ export default function ProjectPage({
                             <span className="text-emerald-500/70 font-black">→ improved by this deployment</span>
                           )}
                           {suggestedFocus.deployMode === 'unchanged' && (
-                            <span className="text-amber-500/70 font-black">→ persistent failure — unchanged by deployment</span>
+                            <span className="text-amber-500/70 font-black">
+                              → persistent failure — {suggestedFocus.postDeploySampleLow ? 'no evidence of improvement after deployment' : 'unchanged by deployment'}
+                            </span>
                           )}
                           {!suggestedFocus.deployMode && (
                             <span className="text-orange-500/70 font-black">→ likely caused by this deployment</span>
