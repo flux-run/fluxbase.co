@@ -167,13 +167,16 @@ export default function ProjectPage({
       topInc.deployedAt && firstSeen
         ? Math.round((new Date(firstSeen).getTime() - new Date(topInc.deployedAt).getTime()) / 60000)
         : null;
+    // Compute failure rate from actual aggregated counts — prevents 100% rate with 29/42 counts mismatch
+    const computedFailureRatePct = totalExecs > 0 ? Math.round((totalErrors / totalExecs) * 100) : topInc.failureRatePct;
+    const confidenceLabel = totalExecs >= 20 ? "High" : totalExecs >= 5 ? "Medium" : "Low";
     return {
       title: topInc.title,
       cls: top.cls,
       affectedFns: top.affectedFns,
       trafficImpactPct: top.maxTrafficPct,
       trafficContributionPct: top.trafficContributionPct,
-      failureRatePct: topInc.failureRatePct,
+      failureRatePct: computedFailureRatePct,
       isRegression,
       topFunctionId: topInc.functionId,
       topFunctionName: topInc.functionName,
@@ -187,6 +190,7 @@ export default function ProjectPage({
       firstSeen,
       trafficPct,
       usersPer10,
+      confidenceLabel,
     };
   }, [incidentGroups, isBroken, overview]);
 
@@ -354,21 +358,18 @@ export default function ProjectPage({
                         <span className="text-neutral-600"> — ~{suggestedFocus.usersPer10} in 10 users affected</span>
                       )}
                     </p>
-                    {/* 3. relative comparison — why this over others */}
-                    {incidentGroups.length > 1 && suggestedFocus.impactMultiple !== null ? (
-                      <p className="text-[9px] text-neutral-500 font-mono">
-                        <span className="text-red-500/50 mr-1.5 select-none">·</span>
-                        {suggestedFocus.impactMultiple}× more impactful than next issue
-                        {suggestedFocus.secondTrafficPct !== null && (
-                          <span className="text-neutral-600"> — next affects only {suggestedFocus.secondTrafficPct}% traffic</span>
-                        )}
-                      </p>
-                    ) : incidentGroups.length === 1 ? (
-                      <p className="text-[9px] text-neutral-500 font-mono">
-                        <span className="text-red-500/50 mr-1.5 select-none">·</span>
-                        only active incident
-                      </p>
-                    ) : null}
+                    {/* 3. relative comparison — always show, wording adapts */}
+                    <p className="text-[9px] text-neutral-500 font-mono">
+                      <span className="text-red-500/50 mr-1.5 select-none">·</span>
+                      {incidentGroups.length === 1
+                        ? "only active incident"
+                        : suggestedFocus.impactMultiple !== null && suggestedFocus.impactMultiple > 1.2
+                        ? `${suggestedFocus.impactMultiple}× larger than next issue`
+                        : `highest-impact of ${incidentGroups.length} active incidents`}
+                      {incidentGroups.length > 1 && suggestedFocus.secondTrafficPct !== null && (
+                        <span className="text-neutral-600"> — next: {suggestedFocus.secondTrafficPct}% traffic</span>
+                      )}
+                    </p>
                     {/* 4. timing + deploy causality with +Xm offset */}
                     <p className="text-[9px] text-neutral-500 font-mono">
                       <span className="text-red-500/50 mr-1.5 select-none">·</span>
@@ -386,6 +387,16 @@ export default function ProjectPage({
                         cross-function — {suggestedFocus.affectedFns.length} services affected
                       </p>
                     )}
+                    {/* confidence footer */}
+                    <div className="flex items-center gap-1.5 pt-1.5 mt-0.5 border-t border-red-900/20">
+                      <span className="text-[8px] font-black text-neutral-700 uppercase tracking-widest">Confidence:</span>
+                      <span className={`text-[8px] font-black ${
+                        suggestedFocus.confidenceLabel === "High" ? "text-emerald-500" :
+                        suggestedFocus.confidenceLabel === "Medium" ? "text-amber-400" :
+                        "text-neutral-500"
+                      }`}>{suggestedFocus.confidenceLabel}</span>
+                      <span className="text-[8px] text-neutral-700 font-mono">({suggestedFocus.totalExecs} samples)</span>
+                    </div>
                   </div>
                   <div className="flex items-center justify-end pt-1">
                     <span className="text-[10px] font-bold text-red-300 flex items-center gap-1.5 group-hover:gap-2.5 transition-all">
@@ -486,7 +497,10 @@ export default function ProjectPage({
                         onClick={() => router.push(`/project/${id}/functions/${topInc.functionId}`)}
                         className={`group border rounded-lg px-2.5 py-2 cursor-pointer transition-all ${tierStyle}`}
                       >
-                        <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                        <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                          <span className={`text-[9px] font-black tabular-nums w-3.5 shrink-0 ${
+                            tier === 'critical' ? "text-red-700" : tier === 'high' ? "text-orange-800" : "text-neutral-700"
+                          }`}>{gi + 1}.</span>
                           <ErrorClassBadge cls={group.cls} />
                           {tier === 'critical' && (
                             <span className="text-[7px] font-black uppercase px-1 py-0.5 rounded border text-red-300 border-red-700/60 bg-red-950/60 flex items-center gap-0.5">
@@ -496,10 +510,13 @@ export default function ProjectPage({
                           {tier === 'high' && (
                             <span className="text-[7px] font-black uppercase px-1 py-0.5 rounded border text-orange-400 border-orange-800/50 bg-orange-950/50">High</span>
                           )}
-                          <div className={`ml-auto font-black tabular-nums text-base leading-none ${
-                            tier === 'critical' ? "text-red-400" : tier === 'high' ? "text-orange-400" : "text-amber-500/80"
+                          {tier === 'medium' && (
+                            <span className="text-[7px] font-black uppercase px-1 py-0.5 rounded border text-neutral-500 border-neutral-700/40 bg-neutral-900/60">Low</span>
+                          )}
+                          <div className={`ml-auto font-black tabular-nums shrink-0 ${
+                            tier === 'critical' ? "text-sm text-red-400" : tier === 'high' ? "text-[11px] text-orange-400" : "text-[11px] text-neutral-500"
                           }`}>
-                            {topInc.failureRatePct}%
+                            {group.trafficContributionPct > 0 ? `${group.trafficContributionPct}%` : `${topInc.failureRatePct}%`}
                           </div>
                         </div>
                         <p className={`font-bold leading-tight truncate text-[11px] ${
@@ -549,7 +566,7 @@ export default function ProjectPage({
                         <div className="flex-1 h-1 bg-neutral-900 rounded-full overflow-hidden">
                           <div className="h-full bg-amber-500/60 rounded-full transition-all duration-500" style={{ width: `${item.progressPct}%` }} />
                         </div>
-                        <span className="text-[7px] font-bold text-neutral-600 tabular-nums shrink-0">{item.progress}/{item.required}</span>
+                        <span className="text-[7px] font-bold text-neutral-600 tabular-nums shrink-0 whitespace-nowrap">{item.progress} of {item.required}</span>
                       </div>
                     </div>
                   ))}
