@@ -369,7 +369,7 @@ export default function ProjectPage({
                       {suggestedFocus.usersPer10 > 0 ? (
                         <>
                           impacts ~{suggestedFocus.usersPer10} in 10 users
-                          <span className="text-neutral-700"> ({suggestedFocus.trafficPct}% of traffic)</span>
+                          <span className="text-neutral-700 ml-1">({suggestedFocus.trafficPct}% of traffic)</span>
                         </>
                       ) : (
                         `${suggestedFocus.trafficPct}% of impacted traffic`
@@ -389,8 +389,8 @@ export default function ProjectPage({
                         <span className="text-neutral-600"> — next: {suggestedFocus.secondTrafficPct}% traffic</span>
                       )}
                     </p>
-                    {/* dominance: show when this group accounts for essentially all traffic */}
-                    {incidentGroups.length > 1 && suggestedFocus.trafficPct >= 80 && (
+                    {/* dominance: show when this group owns essentially all failing traffic */}
+                    {suggestedFocus.trafficPct >= 80 && (
                       <p className="text-[9px] text-neutral-500 font-mono">
                         <span className="text-red-500/50 mr-1.5 select-none">·</span>
                         primary incident — accounts for {suggestedFocus.trafficPct === 100 ? "all" : "most"} failing traffic
@@ -442,7 +442,7 @@ export default function ProjectPage({
                         <span className="text-neutral-700"> · fix may be incomplete</span>
                       </p>
                     )}
-                    {/* confidence footer */}
+                    {/* confidence footer — evidence-based reasoning, not just sample count */}
                     <div className="pt-1.5 mt-0.5 border-t border-red-900/20 space-y-0.5">
                       <div className="flex items-center gap-1.5">
                         <span className="text-[8px] font-black text-neutral-700 uppercase tracking-widest">Confidence:</span>
@@ -451,11 +451,20 @@ export default function ProjectPage({
                           suggestedFocus.confidenceLabel === "Medium" ? "text-amber-400" :
                           "text-neutral-500"
                         }`}>{suggestedFocus.confidenceLabel}</span>
-                        <span className="text-[8px] text-neutral-700 font-mono">({suggestedFocus.totalExecs} samples)</span>
                       </div>
-                      {suggestedFocus.errorsAfterDeploy > 0 && (
+                      {suggestedFocus.deployId && suggestedFocus.errorsAfterDeploy > 0 && (
                         <p className="text-[8px] text-neutral-700 font-mono pl-0.5">
-                          {suggestedFocus.totalErrors}/{suggestedFocus.totalExecs} executions failing · {suggestedFocus.errorsBeforeDeploy === 0 ? "none" : suggestedFocus.errorsBeforeDeploy} before deploy
+                          · {Math.round(suggestedFocus.errorsAfterDeploy / (suggestedFocus.errorsAfterDeploy + suggestedFocus.errorsBeforeDeploy) * 100)}% failures after deploy
+                        </p>
+                      )}
+                      {suggestedFocus.affectedFns.length > 1 && (
+                        <p className="text-[8px] text-neutral-700 font-mono pl-0.5">
+                          · consistent across {suggestedFocus.affectedFns.length} functions
+                        </p>
+                      )}
+                      {suggestedFocus.deployId && suggestedFocus.errorsBeforeDeploy === 0 && (
+                        <p className="text-[8px] text-neutral-700 font-mono pl-0.5">
+                          · no prior occurrence
                         </p>
                       )}
                     </div>
