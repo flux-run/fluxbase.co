@@ -356,7 +356,13 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
           <>
             <span className="text-[11px] font-mono text-neutral-500">JS: {data.narrative.breakdown.js_ms}ms</span>
             <span className="text-[11px] font-mono text-neutral-500">IO: {data.narrative.breakdown.io_ms}ms</span>
-            <span className="text-[11px] font-mono text-neutral-500">Overhead: ~{data.narrative.breakdown.overhead_ms}ms</span>
+            <span className={`text-[11px] font-mono ${
+              exec.duration_ms && data.narrative.breakdown.overhead_ms / exec.duration_ms > 0.5
+                ? 'text-orange-400'
+                : 'text-neutral-500'
+            }`}>
+              Overhead: {data.narrative.breakdown.overhead_ms}ms{exec.duration_ms ? ` (${Math.round(data.narrative.breakdown.overhead_ms / exec.duration_ms * 100)}%)` : ''}
+            </span>
           </>
         ) : exec.client_ip ? (
           <span className="text-[11px] font-mono text-neutral-600">{exec.client_ip}</span>
@@ -513,15 +519,19 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
       </section>
 
       {/* 4. REPLAY COMMAND */}
-      <div className="flex items-center gap-3 px-4 py-3 bg-neutral-950 border border-neutral-800 rounded-lg">
-        <Terminal className="w-3.5 h-3.5 text-neutral-600 shrink-0" />
-        <code className="text-[11px] font-mono text-neutral-300 flex-1 select-all">flux replay {exec_id}</code>
-        <button
-          onClick={copyReplay}
-          className="flex items-center gap-1.5 text-[10px] font-mono text-neutral-500 hover:text-white transition-colors"
-        >
-          {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-        </button>
+      <div className="flex flex-col gap-1.5 px-4 py-3 bg-neutral-950 border border-neutral-800 rounded-lg">
+        <span className="text-[9px] font-black uppercase tracking-widest text-neutral-600">Replay this exact execution locally</span>
+        <div className="flex items-center gap-3">
+          <Terminal className="w-3.5 h-3.5 text-neutral-600 shrink-0" />
+          <code className="text-[11px] font-mono text-neutral-300 flex-1 select-all">flux replay {exec_id}</code>
+          <button
+            onClick={copyReplay}
+            className="flex items-center gap-1.5 text-[10px] font-mono text-neutral-500 hover:text-white transition-colors"
+            title="Copy replay command"
+          >
+            {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+          </button>
+        </div>
       </div>
 
       {/* 5. RAW CONTEXT — collapsible, tabbed */}

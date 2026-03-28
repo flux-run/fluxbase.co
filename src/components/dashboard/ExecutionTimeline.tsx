@@ -262,20 +262,31 @@ const KIND_META: Record<TimelineEvent["kind"], { icon: string; color: string; bg
 
 // ── EventRow ──────────────────────────────────────────────────────────────────
 
-function EventRow({ event, seq }: { event: TimelineEvent; seq: number }) {
+function EventRow({ event, seq, isLast, isSlow }: { event: TimelineEvent; seq: number; isLast: boolean; isSlow: boolean }) {
   const [open, setOpen] = useState(false);
   const meta = KIND_META[event.kind];
   const hasDetail = !!event.detail;
-  const durLabel = event.durationMs != null
-    ? event.durationMs > 0 ? `${event.durationMs}ms` : "0ms"
-    : null;
+  // Always show duration — default to 0ms for events without a recorded duration
+  const durationMs = event.durationMs ?? 0;
+  const durLabel = durationMs > 0 ? `${durationMs}ms` : "0ms";
+  const durColor = isSlow
+    ? "text-orange-400 font-bold"
+    : durationMs > 0 ? "text-neutral-400" : "text-neutral-700";
 
   return (
-    <div className="group">
+    <div className="group relative">
+      {/* connector line — skip on last row */}
+      {!isLast && (
+        <span className="absolute left-[28px] top-[38px] bottom-0 w-px bg-neutral-800/70 pointer-events-none" />
+      )}
+
       <div
-        className={`flex items-center gap-3 px-4 py-3 transition-colors ${
+        className={`relative flex items-center gap-3 px-4 py-3 transition-colors ${
           hasDetail ? "cursor-pointer hover:bg-neutral-900/70" : ""
-        } ${event.isError ? "bg-red-950/20 hover:bg-red-950/30" : ""}`}
+        } ${
+          isSlow ? "bg-orange-950/10 hover:bg-orange-950/20" :
+          event.isError ? "bg-red-950/20 hover:bg-red-950/30" : ""
+        }`}
         onClick={() => hasDetail && setOpen((o) => !o)}
       >
         {/* seq number */}
@@ -291,7 +302,9 @@ function EventRow({ event, seq }: { event: TimelineEvent; seq: number }) {
         {/* label */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={`text-[12px] font-mono ${event.isError ? "text-red-300" : "text-neutral-100"} truncate`}>
+            <span className={`text-[12px] font-mono ${
+              event.isError ? "text-red-300" : isSlow ? "text-orange-200" : "text-neutral-100"
+            } truncate`}>
               {event.label}
             </span>
             {event.badge && (
@@ -302,16 +315,15 @@ function EventRow({ event, seq }: { event: TimelineEvent; seq: number }) {
             {event.sublabel && (
               <span className="text-[10px] font-mono text-neutral-600 shrink-0">{event.sublabel}</span>
             )}
+            {isSlow && (
+              <span className="text-[9px] font-black uppercase tracking-widest text-orange-500/80 shrink-0">slow</span>
+            )}
           </div>
         </div>
 
-        {/* duration — always shown, 0ms in muted style */}
+        {/* duration — always shown */}
         <div className="shrink-0 flex items-center gap-2 ml-auto">
-          {durLabel !== null && (
-            <span className={`text-[11px] font-mono tabular-nums ${
-              event.durationMs && event.durationMs > 0 ? "text-neutral-400" : "text-neutral-700"
-            }`}>{durLabel}</span>
-          )}
+          <span className={`text-[11px] font-mono tabular-nums ${durColor}`}>{durLabel}</span>
           {hasDetail && (
             <span className="text-neutral-700 group-hover:text-neutral-400 transition-colors">
               {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
@@ -486,10 +498,19 @@ export function ExecutionTimeline({ execution, checkpoints = [], logs = [] }: Ex
     );
   }
 
+  // Find the slowest IO step to highlight (only meaningful if > 0ms)
+  const maxDur = Math.max(0, ...events.map(e => e.durationMs ?? 0));
+
   return (
     <div className="divide-y divide-neutral-900/60">
       {events.map((event, i) => (
-        <EventRow key={event.key} event={event} seq={i + 1} />
+        <EventRow
+          key={event.key}
+          event={event}
+          seq={i + 1}
+          isLast={i === events.length - 1}
+          isSlow={maxDur > 0 && (event.durationMs ?? 0) === maxDur && maxDur >= 10}
+        />
       ))}
     </div>
   );
