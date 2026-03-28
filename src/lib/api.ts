@@ -35,16 +35,6 @@ async function request<T = unknown>(
   return res.json();
 }
 
-export async function fetchApi<T = unknown>(
-  endpoint: string,
-  options: RequestInit & { token?: string } = {},
-): Promise<T> {
-  const token =
-    options.token ||
-    (typeof window !== "undefined" ? localStorage.getItem("flux_token") : null);
-  return request<T>(endpoint, token, options);
-}
-
 export function getStoredToken() {
   return typeof window !== "undefined"
     ? localStorage.getItem("flux_token")
@@ -173,6 +163,26 @@ export function useFluxApi(projectId?: string) {
         }),
       getOrgMembers: (orgId: string) =>
         request<OrgMember[]>(`/orgs/${orgId}/members`, token()),
+
+      /* Team management */
+      getTeam: (orgId: string) =>
+        request<{ members: { id: string; email: string; role: string }[]; pending: { id: string; email: string; role: string; created_at: string }[] }>(
+          `/orgs/${orgId}/team`, token()),
+      updateMemberRole: (orgId: string, userId: string, role: string) =>
+        request<{ ok: boolean }>(`/orgs/${orgId}/team/${userId}`, token(), {
+          method: "PATCH",
+          body: JSON.stringify({ role }),
+        }),
+      removeMember: (orgId: string, userId: string) =>
+        request<{ ok: boolean }>(`/orgs/${orgId}/team/${userId}`, token(), { method: "DELETE" }),
+      sendInvite: (orgId: string, email: string, role: string) =>
+        request<{ ok: boolean; invitation_id: string; email_sent: boolean; email_error: string | null }>(
+          `/orgs/${orgId}/invitations`, token(), {
+            method: "POST",
+            body: JSON.stringify({ email, role }),
+          }),
+      revokeInvite: (orgId: string, invId: string) =>
+        request<{ ok: boolean }>(`/orgs/${orgId}/invitations/${invId}`, token(), { method: "DELETE" }),
 
       /* Service Tokens */
       getServiceTokens: (id?: string) =>

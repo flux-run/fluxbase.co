@@ -1,9 +1,9 @@
 "use client";
 import { use, useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Users, UserPlus, X, ChevronDown, Trash2, Mail, Loader2 } from "lucide-react";
-import { useTeam, avatarColor, TeamRole, TeamUser } from "@/lib/teamStore";
-import { fetchApi } from "@/lib/api";
+import { ArrowLeft, Users, UserPlus, X, Trash2, Mail, Loader2 } from "lucide-react";
+import { avatarColor, TeamRole } from "@/lib/teamStore";
+import { useFluxApi } from "@/lib/api";
 
 type ApiMember = { id: string; email: string; role: string };
 type ApiPending = { id: string; email: string; role: string; created_at: string };
@@ -14,81 +14,35 @@ const ROLES: { value: TeamRole; label: string; desc: string }[] = [
   { value: "viewer",   label: "Viewer",   desc: "Read-only access" },
 ];
 
-function Avatar({ name, size = "md" }: { name: string; size?: "sm" | "md" | "lg" }) {
-  const sz = size === "sm" ? "w-6 h-6 text-[9px]" : size === "lg" ? "w-10 h-10 text-sm" : "w-8 h-8 text-[11px]";
+function Avatar({ name }: { name: string }) {
   return (
-    <div className={`${sz} rounded-full flex items-center justify-center font-black shrink-0 ${avatarColor(name)}`}>
+    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black shrink-0 text-[11px] ${avatarColor(name)}`}>
       {name[0]?.toUpperCase() ?? "?"}
     </div>
   );
 }
 
-function RoleSelect({ value, onChange, disabled }: { value: TeamRole; onChange: (r: TeamRole) => void; disabled?: boolean }) {
-  const [open, setOpen] = useState(false);
-  const current = ROLES.find(r => r.value === value)!;
-  return (
-    <div className="relative">
-      <button
-        onClick={() => !disabled && setOpen(o => !o)}
-        disabled={disabled}
-        className={`flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded border transition-colors ${
-          disabled ? "text-neutral-600 border-transparent cursor-default" :
-          "text-neutral-300 border-neutral-800 hover:border-neutral-600 bg-neutral-900/60"
-        }`}
-      >
-        {current.label}
-        {!disabled && <ChevronDown className="w-3 h-3 text-neutral-600" />}
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1 z-20 w-52 rounded-xl border border-neutral-800 bg-neutral-950 shadow-xl overflow-hidden">
-            {ROLES.map(r => (
-              <button
-                key={r.value}
-                onClick={() => { onChange(r.value); setOpen(false); }}
-                className={`w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-neutral-900 transition-colors ${
-                  r.value === value ? "bg-neutral-900/60" : ""
-                }`}
-              >
-                <div className="flex-1">
-                  <p className={`text-[10px] font-black ${r.value === value ? "text-white" : "text-neutral-300"}`}>{r.label}</p>
-                  <p className="text-[9px] text-neutral-600 font-mono mt-0.5">{r.desc}</p>
-                </div>
-                {r.value === value && <span className="text-[8px] text-blue-400 font-black mt-0.5">✓</span>}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function InviteModal({ orgId, onClose, onSuccess }: {
+function InviteModal({ orgId, api, onClose, onSuccess }: {
   orgId: string;
+  api: ReturnType<typeof useFluxApi>;
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const [email, setEmail] = useState("");
-  const [role, setRole]   = useState<TeamRole>("engineer");
+  const [email, setEmail]     = useState("");
+  const [role, setRole]       = useState<TeamRole>("engineer");
   const [sending, setSending] = useState(false);
-  const [sent, setSent]   = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [sent, setSent]       = useState(false);
+  const [error, setError]     = useState<string | null>(null);
 
-  // map frontend roles → backend roles
   const backendRole = role === "owner" ? "admin" : role === "engineer" ? "member" : "viewer";
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !orgId) return;
+    if (!email.trim()) return;
     setSending(true);
     setError(null);
     try {
-      await fetchApi(`/orgs/${orgId}/invitations`, {
-        method: "POST",
-        body: JSON.stringify({ email: email.trim(), role: backendRole }),
-      });
+      await api.sendInvite(orgId, email.trim(), backendRole);
       setSent(true);
       onSuccess();
       setTimeout(onClose, 1400);
@@ -106,7 +60,7 @@ function InviteModal({ orgId, onClose, onSuccess }: {
         <div className="px-6 py-4 border-b border-neutral-800/60 flex items-center justify-between">
           <div>
             <p className="text-sm font-black text-white">Invite team member</p>
-            <p className="text-[10px] text-neutral-600 font-mono mt-0.5">They'll be added with invited status</p>
+            <p className="text-[10px] text-neutral-600 font-mono mt-0.5">An invite link will be sent to their email</p>
           </div>
           <button onClick={onClose} className="text-neutral-600 hover:text-neutral-300 transition-colors">
             <X className="w-4 h-4" />
@@ -173,71 +127,58 @@ function InviteModal({ orgId, onClose, onSuccess }: {
 
 export default function TeamPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const router = useRouter();
-  const { users: localUsers, updateRole, removeUser } = useTeam();
+  const router  = useRouter();
+  const api     = useFluxApi(id);
   const [showInvite, setShowInvite] = useState(false);
-  const [apiMembers, setApiMembers] = useState<ApiMember[]>([]);
-  const [apiPending, setApiPending] = useState<ApiPending[]>([]);
-  const [orgId, setOrgId] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [members, setMembers]       = useState<ApiMember[]>([]);
+  const [pending, setPending]       = useState<ApiPending[]>([]);
+  const [loadError, setLoadError]   = useState<string | null>(null);
 
-  // Load org_id from localStorage (set by OrgSwitcher after login)
-  useEffect(() => {
-    const stored = typeof window !== "undefined" ? localStorage.getItem("current_org_id") : null;
-    setOrgId(stored);
-  }, []);
+  const orgId = typeof window !== "undefined"
+    ? localStorage.getItem("current_org_id") ?? ""
+    : "";
 
   const loadTeam = useCallback(async () => {
     if (!orgId) return;
     try {
-      const data = await fetchApi<{ members: ApiMember[]; pending: ApiPending[] }>(`/orgs/${orgId}/team`);
-      setApiMembers(data.members);
-      setApiPending(data.pending);
+      const data = await api.getTeam(orgId);
+      setMembers(data.members);
+      setPending(data.pending);
       setLoadError(null);
     } catch (err: any) {
       setLoadError(err.message);
     }
-  }, [orgId]);
+  }, [api, orgId]);
 
-  useEffect(() => { loadTeam(); }, [loadTeam]);
+  useEffect(() => { if (api.ready) loadTeam(); }, [api.ready, loadTeam]);
 
   const handleRoleChange = async (userId: string, role: string) => {
-    if (!orgId) return;
     try {
-      await fetchApi(`/orgs/${orgId}/team/${userId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ role }),
-      });
+      await api.updateMemberRole(orgId, userId, role);
       await loadTeam();
-    } catch (err: any) {
-      alert(err.message);
-    }
+    } catch (err: any) { alert(err.message); }
   };
 
-  const handleRemove = async (userId: string, name: string) => {
-    if (!orgId || !confirm(`Remove ${name} from the team?`)) return;
+  const handleRemove = async (userId: string, email: string) => {
+    if (!confirm(`Remove ${email} from the team?`)) return;
     try {
-      await fetchApi(`/orgs/${orgId}/team/${userId}`, { method: "DELETE" });
+      await api.removeMember(orgId, userId);
       await loadTeam();
-    } catch (err: any) {
-      alert(err.message);
-    }
+    } catch (err: any) { alert(err.message); }
   };
 
   const handleRevokeInvite = async (invId: string) => {
-    if (!orgId || !confirm("Revoke this invitation?")) return;
+    if (!confirm("Revoke this invitation?")) return;
     try {
-      await fetchApi(`/orgs/${orgId}/invitations/${invId}`, { method: "DELETE" });
+      await api.revokeInvite(orgId, invId);
       await loadTeam();
-    } catch (err: any) {
-      alert(err.message);
-    }
+    } catch (err: any) { alert(err.message); }
   };
 
-  // Role display mapping (backend → display)
-  const roleLabel = (r: string) => r === "admin" ? "Admin" : r === "owner" ? "Owner" : r === "viewer" ? "Viewer" : "Member";
+  const roleLabel = (r: string) =>
+    ({ owner: "Owner", admin: "Admin", member: "Member", viewer: "Viewer" }[r] ?? r);
 
-  const ownerCount = apiMembers.filter(m => m.role === "owner" || m.role === "admin").length;
+  const ownerCount = members.filter(m => m.role === "owner" || m.role === "admin").length;
 
   return (
     <div className="py-6 max-w-2xl space-y-6">
@@ -257,7 +198,7 @@ export default function TeamPage({ params }: { params: Promise<{ id: string }> }
             <Users className="w-4 h-4 text-neutral-400" />
             <h1 className="text-base font-black text-white">Team</h1>
             <span className="text-[9px] font-black text-neutral-600 bg-neutral-900 border border-neutral-800 rounded-full px-2 py-0.5">
-              {apiMembers.length + apiPending.length}
+              {members.length + pending.length}
             </span>
           </div>
           <p className="text-[11px] text-neutral-600 font-mono">Manage who has access to this project.</p>
@@ -276,14 +217,16 @@ export default function TeamPage({ params }: { params: Promise<{ id: string }> }
         <p className="text-[10px] text-red-400 font-mono bg-red-950/30 border border-red-900/40 rounded-xl px-4 py-3">{loadError}</p>
       )}
       <div className="rounded-xl border border-neutral-800/60 overflow-hidden">
-        {apiMembers.length === 0 && !loadError && (
-          <div className="px-4 py-6 text-center text-[10px] text-neutral-600 font-mono">Loading members…</div>
+        {members.length === 0 && pending.length === 0 && !loadError && (
+          <div className="px-4 py-6 text-center text-[10px] text-neutral-600 font-mono">
+            {api.ready ? "No members yet" : "Loading…"}
+          </div>
         )}
-        {apiMembers.map((u, i) => (
+        {members.map((u, i) => (
           <div
             key={u.id}
             className={`flex items-center gap-4 px-4 py-3.5 ${
-              i < apiMembers.length - 1 || apiPending.length > 0 ? "border-b border-neutral-800/40" : ""
+              i < members.length - 1 || pending.length > 0 ? "border-b border-neutral-800/40" : ""
             } hover:bg-neutral-900/30 transition-colors group`}
           >
             <Avatar name={u.email} />
@@ -314,10 +257,10 @@ export default function TeamPage({ params }: { params: Promise<{ id: string }> }
             </button>
           </div>
         ))}
-        {apiPending.map((inv, i) => (
+        {pending.map((inv, i) => (
           <div
             key={inv.id}
-            className={`flex items-center gap-4 px-4 py-3.5 ${i < apiPending.length - 1 ? "border-b border-neutral-800/40" : ""} hover:bg-neutral-900/30 transition-colors group`}
+            className={`flex items-center gap-4 px-4 py-3.5 ${i < pending.length - 1 ? "border-b border-neutral-800/40" : ""} hover:bg-neutral-900/30 transition-colors group`}
           >
             <Avatar name={inv.email} />
             <div className="flex-1 min-w-0">
@@ -354,6 +297,7 @@ export default function TeamPage({ params }: { params: Promise<{ id: string }> }
       {showInvite && orgId && (
         <InviteModal
           orgId={orgId}
+          api={api}
           onClose={() => setShowInvite(false)}
           onSuccess={loadTeam}
         />
