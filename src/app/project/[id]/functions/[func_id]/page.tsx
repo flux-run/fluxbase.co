@@ -523,14 +523,20 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                        const clusters = buildFailureClusters(statsData.top_issues ?? []);
                        if (clusters.length === 0) return null;
                        const totalFails = clusters.reduce((s, c) => s + c.totalHits, 0);
+                       const hasUserErrors = clusters.some(c => c.cls === 'user');
+                       const topCluster = clusters[0];
 
                        return (
                          <div className="space-y-3">
                            <div className="flex items-center gap-2">
-                             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500">Failure Patterns</span>
-                             <span className="text-[9px] font-bold text-neutral-700 border border-neutral-800 px-1.5 py-0.5 rounded">
-                               {clusters.length} independent type{clusters.length > 1 ? 's' : ''}
+                             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500">
+                               {clusters.length} independent failure mode{clusters.length > 1 ? 's' : ''} detected
                              </span>
+                             {clusters.length > 1 && (
+                               <span className="text-[9px] font-bold text-neutral-700 border border-neutral-800 px-1.5 py-0.5 rounded">
+                                 ⚠ Independent failures (no shared root cause)
+                               </span>
+                             )}
                            </div>
                            {clusters.map((cluster, ci) => {
                              const meta = ERROR_CLASS_META[cluster.cls];
@@ -563,7 +569,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                        className="flex items-center justify-between gap-3 cursor-pointer group/issue py-0.5"
                                      >
                                        <span
-                                         className={`font-mono text-[12px] truncate group-hover/issue:underline text-neutral-200`}
+                                         className="font-mono text-[12px] truncate group-hover/issue:underline text-neutral-200"
                                          title={issLoc ? `${iss.title} → ${issLoc}` : iss.title}
                                        >
                                          {issLabel}
@@ -573,9 +579,44 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                      </div>
                                    );
                                  })}
+                                 {/* Infra: execution consequence chain */}
+                                 {cluster.cls === 'infra' && (
+                                   <div className="mt-2 pt-2 border-t border-orange-800/30 font-mono text-[10px] space-y-0.5">
+                                     <div className="text-neutral-600">→ execution could not start</div>
+                                     <div className="text-neutral-600">→ no user code executed</div>
+                                     <div className="text-orange-400/70 pt-0.5">Fix: run <span className="font-bold">flux deploy</span> to upload a build artifact</div>
+                                   </div>
+                                 )}
+                                 {/* External: full consequence chain when user errors also present */}
+                                 {cluster.cls === 'external' && hasUserErrors && (
+                                   <div className="mt-2 pt-2 border-t border-blue-800/30 font-mono text-[10px] space-y-1">
+                                     <div className="text-blue-400/60">→ not handled in user code</div>
+                                     <div className="text-blue-400/40">→ execution aborted</div>
+                                   </div>
+                                 )}
+                                 {/* User: explicit throw hint */}
+                                 {cluster.cls === 'user' && (
+                                   <div className="mt-2 pt-2 border-t border-yellow-800/30 font-mono text-[10px] text-neutral-600">
+                                     → explicitly thrown in user code
+                                   </div>
+                                 )}
                                </div>
                              );
                            })}
+                           {/* Suggested focus — most impactful cluster drives the recommendation */}
+                           {clusters.length > 1 && (
+                             <div className="flex items-start gap-2 bg-neutral-950/60 border border-neutral-800/60 rounded-lg px-3 py-2.5 mt-1">
+                               <Lightbulb className="w-3 h-3 text-blue-400 shrink-0 mt-0.5" />
+                               <div className="text-[10px] text-neutral-400">
+                                 <span className="font-bold text-blue-400">Suggested focus: </span>
+                                 address{' '}
+                                 <span className={`font-bold ${ERROR_CLASS_META[topCluster.cls].color}`}>
+                                   {ERROR_CLASS_META[topCluster.cls].label}
+                                 </span>{' '}
+                                 first — affects {Math.round((topCluster.totalHits / totalFails) * 100)}% of failures
+                               </div>
+                             </div>
+                           )}
                          </div>
                        );
                      })()}
@@ -620,15 +661,78 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                         </div>
                      )}
 
-                     {anomalySuggestion && (
-                        <div className="bg-blue-500/10 border border-blue-500/20 rounded p-3 text-xs text-blue-300 flex items-start gap-2 max-w-lg shadow-inner">
-                           <Lightbulb className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-                           <div>
+                     {anomalySuggestion && (() => {
+                        // Build structured action steps from the failure patterns
+                        const clusters = buildFailureClusters(statsData.top_issues ?? []);
+                        const steps: Array<{ label: string; hint: string; color: string }> = [];
+
+                        const userCluster = clusters.find(c => c.cls === 'user');
+                        const externalCluster = clusters.find(c => c.cls === 'external');
+                        const infraCluster = clusters.find(c => c.cls === 'infra');
+                        const runtimeCluster = clusters.find(c => c.cls === 'runtime');
+
+                        // Order: most impactful first (clusters already sorted by totalHits)
+                        for (const cluster of clusters) {
+                          if (cluster.cls === 'user') {
+                            const loc = frameLabel(topUserFrame(cluster.issues[0]?.sample_stack));
+                            steps.push({
+                              label: `Fix user error${loc ? ` (${loc})` : ''}`,
+                              hint: `remove or guard the throw${loc ? ` at ${loc}` : ''}`,
+                              color: 'text-yellow-400',
+                            });
+                          } else if (cluster.cls === 'external') {
+                            const loc = frameLabel(topUserFrame(cluster.issues[0]?.sample_stack));
+                            steps.push({
+                              label: 'Handle external failures',
+                              hint: `wrap fetch in try/catch${loc ? ` at ${loc}` : ''} and handle the error response`,
+                              color: 'text-blue-400',
+                            });
+                          } else if (cluster.cls === 'infra') {
+                            steps.push({
+                              label: 'Fix deployment',
+                              hint: 'run: flux deploy',
+                              color: 'text-orange-400',
+                            });
+                          } else if (cluster.cls === 'runtime') {
+                            const loc = frameLabel(topUserFrame(cluster.issues[0]?.sample_stack));
+                            steps.push({
+                              label: 'Fix runtime error',
+                              hint: `add null checks or validate input${loc ? ` at ${loc}` : ''} before use`,
+                              color: 'text-red-400',
+                            });
+                          }
+                        }
+
+                        if (steps.length === 0) return (
+                          <div className="bg-blue-500/10 border border-blue-500/20 rounded p-3 text-xs text-blue-300 flex items-start gap-2 max-w-lg shadow-inner">
+                            <Lightbulb className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                            <div>
                               <span className="font-bold text-blue-400 block mb-0.5">Recommended Action</span>
                               {anomalySuggestion}
-                           </div>
-                        </div>
-                     )}
+                            </div>
+                          </div>
+                        );
+
+                        return (
+                          <div className="bg-blue-500/5 border border-blue-800/30 rounded-lg p-4 max-w-xl">
+                            <div className="flex items-center gap-2 mb-3">
+                              <Lightbulb className="w-3.5 h-3.5 text-blue-400" />
+                              <span className="text-[10px] font-black uppercase tracking-widest text-blue-400">Recommended Actions</span>
+                            </div>
+                            <ol className="space-y-2">
+                              {steps.map((step, si) => (
+                                <li key={si} className="flex items-start gap-3">
+                                  <span className="text-[9px] font-black text-neutral-600 border border-neutral-800 rounded-full w-4 h-4 flex items-center justify-center shrink-0 mt-0.5">{si + 1}</span>
+                                  <div>
+                                    <div className={`text-[11px] font-bold ${step.color}`}>{step.label}</div>
+                                    <div className="text-[10px] text-neutral-600 font-mono mt-0.5">→ {step.hint}</div>
+                                  </div>
+                                </li>
+                              ))}
+                            </ol>
+                          </div>
+                        );
+                     })()}
                   </div>
                   
                   <div className="flex flex-col gap-4 w-full xl:w-64 shrink-0 bg-black/40 p-5 rounded-lg border border-red-950/60 backdrop-blur-sm">
@@ -639,8 +743,17 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                            {(() => { const f = topUserFrame(statsData.root_cause.sample_stack); return f ? <span className="text-[10px] font-mono text-red-400">{frameLabel(f)}</span> : null; })()}
                         </div>
                      </div>
+                     <div className="flex justify-between items-center gap-8">
+                        <span className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Confidence</span>
+                        <span className={`text-[10px] font-black uppercase ${
+                          statsData.root_cause.confidence >= 0.85 ? 'text-emerald-500' :
+                          statsData.root_cause.confidence >= 0.65 ? 'text-yellow-500' : 'text-neutral-500'
+                        }`}>
+                          {confidenceText}
+                        </span>
+                     </div>
                      {statsData.root_cause.confidence_reason && (
-                        <div className="text-[11px] text-neutral-500 leading-relaxed">
+                        <div className="text-[10px] text-neutral-600 leading-relaxed font-mono">
                            {statsData.root_cause.confidence_reason}
                         </div>
                      )}
@@ -653,6 +766,18 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                            <span className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Users</span>
                            <span className="font-mono text-neutral-300 font-bold">{statsData.impact_stats.unique_ips} IPs</span>
                         </div>
+                     )}
+                     {isRegression && firstFailAfterDeploy && (
+                       <div className="bg-amber-950/30 border border-amber-800/40 rounded p-2.5 space-y-1">
+                         <div className="text-[9px] font-black uppercase tracking-widest text-amber-500">Regression Detected</div>
+                         {(() => {
+                           const regressedIssue = statsData.top_issues?.[0];
+                           const label = regressedIssue ? compactIssueLabel(regressedIssue.title, regressedIssue.error_source) : null;
+                           return label ? (
+                             <div className="text-[10px] font-mono text-amber-400/80">{label} introduced in latest deploy</div>
+                           ) : null;
+                         })()}
+                       </div>
                      )}
                      <div className="bg-red-500/5 rounded p-3 border border-red-500/10">
                         <div className="text-[10px] text-neutral-600 uppercase font-bold mb-1">Timeline</div>
@@ -864,9 +989,20 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
             {statsData?.top_issues && statsData.top_issues.length > 0 ? (() => {
               const clusters = buildFailureClusters(statsData.top_issues);
               const totalFails = clusters.reduce((s, c) => s + c.totalHits, 0);
+              const hasUserErrors = clusters.some(c => c.cls === 'user');
+              const topCluster = clusters[0];
 
               return (
                 <div className="space-y-3">
+                  {/* Section header */}
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[10px] font-black uppercase tracking-[0.18em] text-neutral-600">
+                      {clusters.length} independent failure mode{clusters.length > 1 ? 's' : ''} detected
+                    </span>
+                    {clusters.length > 1 && (
+                      <span className="text-[9px] font-bold text-neutral-700 border border-neutral-800 px-1.5 py-0.5 rounded">⚠ not related</span>
+                    )}
+                  </div>
                   {clusters.map((cluster, ci) => {
                     const meta = ERROR_CLASS_META[cluster.cls];
                     const pct = totalFails > 0 ? Math.round((cluster.totalHits / totalFails) * 100) : 0;
@@ -896,7 +1032,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                             <div
                               key={i}
                               onClick={() => setFilter(filter === issue.title ? null : issue.title)}
-                              className={`bg-[#111] border-x border-b ${meta.border} ${filter === issue.title ? 'ring-1 ring-inset ' + meta.border : ''} px-4 py-3 flex items-center justify-between font-mono text-sm transition hover:bg-neutral-900/30 cursor-pointer group last:rounded-b-lg`}
+                              className={`bg-[#111] border-x ${meta.border} ${filter === issue.title ? 'ring-1 ring-inset ' + meta.border : ''} px-4 py-3 flex items-center justify-between font-mono text-sm transition hover:bg-neutral-900/30 cursor-pointer group`}
                             >
                               <div className="flex items-center gap-4 overflow-hidden">
                                 <div className={`flex flex-col items-center justify-center shrink-0 w-10 h-10 rounded border ${meta.bg} ${meta.border}`}>
@@ -923,9 +1059,40 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                             </div>
                           );
                         })}
+                        {/* Consequence footer — infra and external get extra context */}
+                        {(cluster.cls === 'infra' || (cluster.cls === 'external' && hasUserErrors)) && (
+                          <div className={`border-x border-b ${meta.border} px-4 py-2 font-mono text-[10px] text-neutral-600 space-y-0.5 ${meta.bg} rounded-b-lg`}>
+                            {cluster.cls === 'infra' ? (
+                              <>
+                                <div>→ execution could not start</div>
+                                <div>→ no user code executed</div>
+                              </>
+                            ) : (
+                              <div>→ unhandled in user code</div>
+                            )}
+                          </div>
+                        )}
+                        {/* Close rounded bottom when no consequence footer */}
+                        {!(cluster.cls === 'infra' || (cluster.cls === 'external' && hasUserErrors)) && (
+                          <div className={`border-x border-b ${meta.border} h-1 rounded-b-lg`} />
+                        )}
                       </div>
                     );
                   })}
+                  {/* Suggested focus */}
+                  {clusters.length > 1 && (
+                    <div className="flex items-start gap-2 bg-neutral-950 border border-neutral-800/60 rounded-lg px-3 py-2.5">
+                      <Lightbulb className="w-3 h-3 text-blue-400 shrink-0 mt-0.5" />
+                      <div className="text-[10px] text-neutral-400">
+                        <span className="font-bold text-blue-400">Suggested focus: </span>
+                        address{' '}
+                        <span className={`font-bold ${ERROR_CLASS_META[topCluster.cls].color}`}>
+                          {ERROR_CLASS_META[topCluster.cls].label}
+                        </span>{' '}
+                        first — affects {Math.round((topCluster.totalHits / totalFails) * 100)}% of failures
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })() : (
