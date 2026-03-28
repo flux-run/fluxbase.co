@@ -47,6 +47,27 @@ function methodColor(method: string) {
   }
 }
 
+/** Decode `__FLUX_B64:<base64>` → plain string, otherwise return as-is. */
+function decodeFluxBody(s: string): string {
+  const PREFIX = "__FLUX_B64:";
+  if (!s.startsWith(PREFIX)) return s;
+  try {
+    return atob(s.slice(PREFIX.length));
+  } catch {
+    return s;
+  }
+}
+
+/** Pretty-print a string: decode flux encoding, then JSON-format if valid. */
+function prettyBody(raw: string): string {
+  const decoded = decodeFluxBody(raw);
+  try {
+    return JSON.stringify(JSON.parse(decoded), null, 2);
+  } catch {
+    return decoded;
+  }
+}
+
 function JsonBlock({ data }: { data: unknown }) {
   return (
     <pre className="text-[10px] font-mono text-neutral-400 bg-black/60 rounded p-3 overflow-x-auto max-h-48 scrollbar-thin scrollbar-thumb-neutral-800 leading-relaxed">
@@ -413,15 +434,48 @@ export function ExecutionTimeline({ execution, checkpoints = [], logs = [] }: Ex
       ) : undefined,
     });
   } else if (execution.response_status) {
+    // Parse the runtime envelope to extract the actual net_response sent to the user
+    let netResponse: Record<string, unknown> | null = null;
+    if (execution.response_body) {
+      try {
+        const envelope = JSON.parse(execution.response_body) as Record<string, unknown>;
+        const nr = (envelope?.result as Record<string, unknown>)?.net_response as Record<string, unknown> | undefined;
+        if (nr) {
+          netResponse = nr;
+        }
+      } catch { /* ignore */ }
+    }
+    const resHeaders = netResponse?.headers as Record<string, string> | undefined;
+    const resBody = netResponse?.body as string | undefined;
+    let prettyBodyStr: string | undefined;
+    if (resBody) {
+      prettyBodyStr = prettyBody(resBody);
+    }
+    const previewLabel = prettyBodyStr
+      ? truncate(prettyBodyStr.replace(/\s+/g, " "), 80)
+      : "Response sent";
     events.push({
       key: "response",
       kind: "response",
       index: 99999,
-      label: execution.response_body ? truncate(execution.response_body, 100) : "Response sent",
+      label: previewLabel,
       badge: String(execution.response_status),
       badgeColor: statusColor(execution.response_status),
-      detail: execution.response_body ? (
-        <pre className="text-[10px] font-mono text-neutral-400 bg-black/60 rounded p-3 overflow-x-auto max-h-48 scrollbar-thin scrollbar-thumb-neutral-800  whitespace-pre-wrap">{execution.response_body}</pre>
+      detail: (resHeaders || prettyBodyStr) ? (
+        <div className="space-y-3">
+          {resHeaders && (
+            <div>
+              <div className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest mb-1">Headers</div>
+              <JsonBlock data={resHeaders} />
+            </div>
+          )}
+          {prettyBodyStr && (
+            <div>
+              <div className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest mb-1">Body</div>
+              <pre className="text-[10px] font-mono text-neutral-400 bg-black/60 rounded p-3 overflow-x-auto max-h-64 scrollbar-thin scrollbar-thumb-neutral-800 whitespace-pre-wrap leading-relaxed">{prettyBodyStr}</pre>
+            </div>
+          )}
+        </div>
       ) : undefined,
     });
   }
