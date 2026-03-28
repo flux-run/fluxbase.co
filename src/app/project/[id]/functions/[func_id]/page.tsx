@@ -796,26 +796,28 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                        );
                      })()}
 
-                     {/* Latest Failure Snapshot — compact single row */}
+                     {/* Latest Failure Snapshot */}
                      {statsData.root_cause.latest_failure && (
-                        <div className="flex items-center gap-3 bg-black/40 border border-neutral-800/60 rounded-lg px-3 py-2 font-mono text-[10px]">
-                           <Activity className="w-3 h-3 text-neutral-600 shrink-0" />
-                           <span className="text-neutral-600 shrink-0">
-                             {statsData.root_cause.latest_failure.time
-                               ? new Date(statsData.root_cause.latest_failure.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-                               : 'N/A'}
-                           </span>
-                           <span className="text-neutral-700 shrink-0">{statsData.root_cause.latest_failure.duration}</span>
-                           <span className="text-red-400 truncate font-bold">
+                        <div className="bg-black/40 border border-neutral-800/60 rounded-lg px-3 py-2 font-mono text-[10px]">
+                           <div className="flex items-center gap-2 mb-1">
+                             <Activity className="w-3 h-3 text-neutral-600 shrink-0" />
+                             <span className="text-neutral-600 shrink-0">
+                               {statsData.root_cause.latest_failure.time
+                                 ? new Date(statsData.root_cause.latest_failure.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                                 : 'N/A'}
+                             </span>
+                             <span className="text-neutral-700 shrink-0">{statsData.root_cause.latest_failure.duration}</span>
+                             <button
+                               onClick={(e) => { e.stopPropagation(); setSelectedExecId(statsData.root_cause!.latest_failure!.id); setIsDrawerOpen(true); }}
+                               className="ml-auto text-blue-500 hover:text-blue-400 flex items-center gap-1 shrink-0 transition-colors"
+                             >
+                               trace <ArrowUpRight className="w-3 h-3" />
+                             </button>
+                           </div>
+                           <div className="text-red-400 font-bold break-all leading-relaxed">
                              {statsData.root_cause.latest_failure.error || 'Unknown error'}
                              {(() => { const loc = frameLabel(topUserFrame(statsData.root_cause.sample_stack)); return loc ? <span className="text-red-400/60 font-normal"> · {loc}</span> : null; })()}
-                           </span>
-                           <button
-                             onClick={(e) => { e.stopPropagation(); setSelectedExecId(statsData.root_cause!.latest_failure!.id); setIsDrawerOpen(true); }}
-                             className="ml-auto text-blue-500 hover:text-blue-400 flex items-center gap-1 shrink-0 transition-colors"
-                           >
-                             trace <ArrowUpRight className="w-3 h-3" />
-                           </button>
+                           </div>
                         </div>
                      )}
 
@@ -874,12 +876,14 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                         return (
                           <div className="flex items-start gap-2 border-t border-neutral-800/40 pt-2">
                             <Lightbulb className="w-2.5 h-2.5 text-blue-400/60 shrink-0 mt-0.5" />
-                            <div className="flex flex-wrap gap-x-4 gap-y-1">
+                            <div className="flex flex-col gap-1">
                               {steps.map((step, si) => (
-                                <div key={si} className="flex items-center gap-1 font-mono text-[9px]">
-                                  <span className="text-neutral-700">{si + 1}.</span>
-                                  <span className={`font-bold ${step.color}`}>{step.label}</span>
-                                  <span className="text-neutral-700">→ {step.hint}</span>
+                                <div key={si} className="flex items-start gap-1 font-mono text-[9px]">
+                                  <span className="text-neutral-700 shrink-0">{si + 1}.</span>
+                                  <div>
+                                    <span className={`font-bold ${step.color}`}>{step.label}</span>
+                                    <span className="text-neutral-700"> → {step.hint}</span>
+                                  </div>
                                 </div>
                               ))}
                             </div>
