@@ -313,7 +313,7 @@ function EventRow({ event, seq, isLast, isSlow }: { event: TimelineEvent; seq: n
               </span>
             )}
             {event.sublabel && (
-              <span className="text-[10px] font-mono text-neutral-600 shrink-0">{event.sublabel}</span>
+              <span className={`text-[10px] font-mono shrink-0 ${event.isError ? "text-red-400/70" : "text-neutral-600"}`}>{event.sublabel}</span>
             )}
             {isSlow && (
               <span className="text-[9px] font-black uppercase tracking-widest text-orange-500/80 shrink-0">slow · highest step</span>
@@ -435,11 +435,50 @@ export function ExecutionTimeline({ execution, checkpoints = [], logs = [] }: Ex
   if (execution.status === "error") {
     const errMsg = execution.error_message || execution.error || "Unhandled exception";
     const errName = execution.error_name;
+
+    // Pick the first user-code frame for call-site attribution
+    const isInternalFile = (f: string) =>
+      f.startsWith("ext:") || f.startsWith("deno:") || f.startsWith("node:") ||
+      f.startsWith("flux:") || f.includes("internal/");
+    const callSiteFrame = (execution.error_frames ?? []).find(f => !isInternalFile(f.file));
+    const callSite = callSiteFrame
+      ? `${callSiteFrame.file.split("/").pop() ?? callSiteFrame.file}:${callSiteFrame.line}`
+      : null;
+
+    // Build a compact, scannable label that surfaces the failing op + context
+    // instead of repeating the full verbose error message.
+    const compactErrLabel = (() => {
+      const msg = errMsg.toLowerCase();
+      // fetch() failed → extract domain + failure reason for context
+      if (msg.includes("fetch failed") || msg.includes("failed to fetch")) {
+        const urlMatch = errMsg.match(/https?:\/\/([^/\s:]+)/);
+        const domain = urlMatch ? urlMatch[1] : null;
+        const hint = msg.includes("dns") || msg.includes("resolve") ? " (DNS failed)"
+          : msg.includes("timeout") ? " (timeout)"
+          : msg.includes("refused") || msg.includes("econnrefused") ? " (connection refused)"
+          : msg.includes("certificate") || msg.includes("ssl") || msg.includes("tls") ? " (TLS error)"
+          : "";
+        return domain ? `fetch → ${domain}${hint}` : `fetch failed${hint}`;
+      }
+      if (msg.includes("dns") || msg.includes("resolve")) return "DNS lookup failed";
+      if (msg.includes("timeout")) return "Request timed out";
+      if (msg.includes("connection refused") || msg.includes("econnrefused")) return "Connection refused";
+      if (msg.includes("certificate") || msg.includes("ssl") || msg.includes("tls")) return "TLS / certificate error";
+      // SyntaxError, ReferenceError etc — show name + short message
+      if (errName && errName !== "Error") {
+        const short = errMsg.length > 60 ? errMsg.slice(0, 60) + "…" : errMsg;
+        return `${errName}: ${short}`;
+      }
+      // Generic — truncate long messages
+      return errMsg.length > 80 ? errMsg.slice(0, 80) + "…" : errMsg;
+    })();
+
     events.push({
       key: "error",
       kind: "error",
       index: 99999,
-      label: errName ? `${errName}: ${errMsg}` : errMsg,
+      label: compactErrLabel,
+      sublabel: callSite ? `→ ${callSite}` : undefined,
       isError: true,
       detail: execution.error_stack ? (
         <pre className="text-[10px] font-mono text-red-400/80 bg-black/60 rounded p-3 overflow-x-auto max-h-48 scrollbar-thin scrollbar-thumb-neutral-800 leading-snug whitespace-pre-wrap">{execution.error_stack}</pre>
