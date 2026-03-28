@@ -131,10 +131,21 @@ export default function ProjectPage({
   const suggestedFocus = useMemo(() => {
     if (!isBroken || incidentGroups.length === 0) return null;
     const top = incidentGroups[0];
+    const second = incidentGroups[1] ?? null;
     const topInc = top.incidents[0];
     const isRegression = overview!.brokenAfterDeploy.some((b) =>
       top.incidents.some((i) => i.functionId === b.functionId)
     );
+    // How many times more impactful than the next group?
+    const impactMultiple = second && second.combinedImpact > 0
+      ? Math.round((top.combinedImpact / second.combinedImpact) * 10) / 10
+      : null;
+    const secondTrafficPct = second?.trafficContributionPct ?? null;
+    // Total errors across all incidents for this group (for "33/33 execs" wording)
+    const totalErrors = top.incidents.reduce((s, i) => s + i.totalErrors, 0);
+    const totalExecs = top.incidents.reduce((s, i) => s + i.totalExecs, 0);
+    // First seen = earliest firstSeen across incidents in the group
+    const firstSeen = top.incidents.reduce((t, i) => i.firstSeen < t ? i.firstSeen : t, top.incidents[0].firstSeen);
     return {
       title: topInc.title,
       cls: top.cls,
@@ -146,6 +157,11 @@ export default function ProjectPage({
       topFunctionId: topInc.functionId,
       topFunctionName: topInc.functionName,
       deployId: topInc.deployId,
+      impactMultiple,
+      secondTrafficPct,
+      totalErrors,
+      totalExecs,
+      firstSeen,
     };
   }, [incidentGroups, isBroken, overview]);
 
@@ -293,28 +309,40 @@ export default function ProjectPage({
             )}
 
             {/* Fix this first because */}
-            <div className="space-y-0.5 mt-1">
-              <p className="text-[9px] text-neutral-600 font-mono">
-                <span className="text-red-500/60 mr-1 select-none">·</span>
+            <div className="space-y-1 mt-1 border-t border-red-900/30 pt-2.5">
+              <p className="text-[8px] font-black uppercase tracking-widest text-neutral-700 mb-1.5">Why this first</p>
+              {/* Quantitative failure rate */}
+              <p className="text-[9px] text-neutral-500 font-mono">
+                <span className="text-red-500/50 mr-1.5 select-none">·</span>
+                {suggestedFocus.failureRatePct === 100
+                  ? `100% failure rate — ${suggestedFocus.totalErrors.toLocaleString()}/${suggestedFocus.totalExecs.toLocaleString()} executions failing`
+                  : suggestedFocus.failureRatePct >= 80
+                  ? `${suggestedFocus.failureRatePct}% failure rate (${suggestedFocus.totalErrors.toLocaleString()}/${suggestedFocus.totalExecs.toLocaleString()} execs)`
+                  : `${suggestedFocus.failureRatePct}% failure rate · ${suggestedFocus.totalErrors.toLocaleString()} errors in 24h`}
+              </p>
+              {/* Traffic contribution */}
+              <p className="text-[9px] text-neutral-500 font-mono">
+                <span className="text-red-500/50 mr-1.5 select-none">·</span>
                 {suggestedFocus.trafficContributionPct > 0
                   ? `${suggestedFocus.trafficContributionPct}% of all impacted traffic`
                   : `${suggestedFocus.trafficImpactPct}% of function traffic impacted`}
+                {suggestedFocus.impactMultiple !== null && suggestedFocus.impactMultiple > 1.5 && (
+                  <span className="text-neutral-700 ml-1">
+                    ({suggestedFocus.impactMultiple}x more than next{suggestedFocus.secondTrafficPct ? ` · next: ${suggestedFocus.secondTrafficPct}%` : ""})
+                  </span>
+                )}
               </p>
-              {suggestedFocus.isRegression && suggestedFocus.deployId && (
-                <p className="text-[9px] text-neutral-600 font-mono">
-                  <span className="text-red-500/60 mr-1 select-none">·</span>
-                  started after deploy {suggestedFocus.deployId}
-                </p>
-              )}
-              {suggestedFocus.failureRatePct >= 80 && (
-                <p className="text-[9px] text-neutral-600 font-mono">
-                  <span className="text-red-500/60 mr-1 select-none">·</span>
-                  deterministic — every request fails
-                </p>
-              )}
+              {/* Time dimension */}
+              <p className="text-[9px] text-neutral-500 font-mono">
+                <span className="text-red-500/50 mr-1.5 select-none">·</span>
+                first seen {timeAgo(suggestedFocus.firstSeen)}
+                {suggestedFocus.isRegression && suggestedFocus.deployId && (
+                  <span className="text-neutral-600"> — after deploy {suggestedFocus.deployId}</span>
+                )}
+              </p>
               {suggestedFocus.affectedFns.length > 1 && (
-                <p className="text-[9px] text-neutral-600 font-mono">
-                  <span className="text-red-500/60 mr-1 select-none">·</span>
+                <p className="text-[9px] text-neutral-500 font-mono">
+                  <span className="text-red-500/50 mr-1.5 select-none">·</span>
                   cross-function — {suggestedFocus.affectedFns.length} services affected
                 </p>
               )}
@@ -426,24 +454,30 @@ export default function ProjectPage({
           <div className="space-y-2">
             {incidentGroups.map((group, gi) => {
               const topInc = group.incidents[0];
-              const isTopPriority = gi === 0;
+              const tier = gi === 0 ? 'critical' : gi === 1 ? 'high' : 'medium';
+              const tierStyle = {
+                critical: "border-red-800/60 bg-red-950/30 hover:border-red-700/80 hover:bg-red-950/40",
+                high:     "border-orange-900/50 bg-orange-950/20 hover:border-orange-800/60 hover:bg-orange-950/30",
+                medium:   "border-neutral-800/40 bg-neutral-900/20 hover:border-neutral-700/50 hover:bg-neutral-900/30",
+              }[tier];
               return (
                 <div
                   key={group.cls}
                   onClick={() => router.push(`/project/${id}/functions/${topInc.functionId}`)}
-                  className={`group border rounded-xl px-4 py-3.5 cursor-pointer transition-all ${
-                    isTopPriority
-                      ? "border-red-800/60 bg-red-950/30 hover:border-red-700/80 hover:bg-red-950/40"
-                      : "border-red-900/40 bg-red-950/15 hover:border-red-800/60 hover:bg-red-950/25"
-                  }`}
+                  className={`group border rounded-xl px-4 py-3.5 cursor-pointer transition-all ${tierStyle}`}
                 >
                   <div className="flex items-start gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                         <ErrorClassBadge cls={group.cls} />
-                        {isTopPriority && (
+                        {tier === 'critical' && (
                           <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded border text-red-300 border-red-700/60 bg-red-950/60 flex items-center gap-0.5">
-                            <Target className="w-2 h-2" /> Fix first
+                            <Target className="w-2 h-2" /> Critical
+                          </span>
+                        )}
+                        {tier === 'high' && (
+                          <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded border text-orange-400 border-orange-800/50 bg-orange-950/50">
+                            High
                           </span>
                         )}
                         {topInc.deployId && (
@@ -453,7 +487,11 @@ export default function ProjectPage({
                         )}
                       </div>
 
-                      <p className={`font-bold leading-tight truncate mb-1.5 ${isTopPriority ? "text-[13px] text-red-100" : "text-[12px] text-red-200/80"}`}>
+                      <p className={`font-bold leading-tight truncate mb-1.5 ${
+                          tier === 'critical' ? "text-[13px] text-red-100" :
+                          tier === 'high' ? "text-[12px] text-orange-200/90" :
+                          "text-[12px] text-neutral-300/80"
+                        }`}>
                         {topInc.title}
                       </p>
 
@@ -486,20 +524,22 @@ export default function ProjectPage({
                     <div className="shrink-0 text-right">
                       <div
                         className={`font-black tabular-nums leading-none ${
-                          isTopPriority ? "text-2xl" : "text-lg"
+                          tier === 'critical' ? "text-2xl" : "text-lg"
                         } ${
-                          topInc.failureRatePct >= 50
-                            ? "text-red-400"
-                            : topInc.failureRatePct >= 20
-                            ? "text-red-500/80"
-                            : "text-orange-400/80"
+                          tier === 'critical' ? "text-red-400" :
+                          tier === 'high' ? "text-orange-400" :
+                          "text-amber-500/80"
                         }`}
                       >
                         {topInc.failureRatePct}%
                       </div>
                       <div className="text-[8px] text-neutral-700 mt-0.5">failure rate</div>
-                      {group.maxTrafficPct > 0 && (
-                        <div className="text-[8px] text-neutral-600 mt-0.5">{group.maxTrafficPct}% traffic</div>
+                      {group.trafficContributionPct > 0 && (
+                        <div className={`text-[8px] mt-0.5 ${
+                          tier === 'critical' ? "text-red-600/70" :
+                          tier === 'high' ? "text-orange-700/70" :
+                          "text-neutral-600"
+                        }`}>{group.trafficContributionPct}% traffic</div>
                       )}
                     </div>
                     <ChevronRight className="w-3.5 h-3.5 text-neutral-800 shrink-0 self-center opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -548,16 +588,24 @@ export default function ProjectPage({
                     <p className="text-[11px] text-neutral-400 leading-tight truncate mb-2">
                       {item.title}
                     </p>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1 bg-neutral-900 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-amber-500/60 rounded-full transition-all duration-500"
-                          style={{ width: `${item.progressPct}%` }}
-                        />
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-1 bg-neutral-900 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-amber-500/60 rounded-full transition-all duration-500"
+                            style={{ width: `${item.progressPct}%` }}
+                          />
+                        </div>
+                        <span className="text-[8px] font-bold text-amber-600/80 tabular-nums shrink-0">
+                          {item.progressPct}%
+                        </span>
                       </div>
-                      <span className="text-[8px] font-bold text-neutral-600 tabular-nums shrink-0">
-                        {item.progress} seen · need {item.required}
-                      </span>
+                      <p className="text-[8px] text-neutral-700 font-mono">
+                        {item.progress}/{item.required} executions observed
+                        {item.required - item.progress > 0
+                          ? ` · ${item.required - item.progress} more needed`
+                          : " · threshold reached"}
+                      </p>
                     </div>
                   </div>
                   <ChevronRight className="w-3.5 h-3.5 text-neutral-800 shrink-0 self-center opacity-0 group-hover:opacity-100 transition-opacity" />
