@@ -1,13 +1,14 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Zap, Activity, Repeat, Settings, Globe } from "lucide-react";
+import { LayoutDashboard, Zap, Activity, Repeat, Settings, Globe, AlertTriangle } from "lucide-react";
 
 export function Sidebar({ projectId }: { projectId: string }) {
   const pathname = usePathname();
 
   const nav = [
     { name: "Overview", href: `/project/${projectId}`, icon: LayoutDashboard },
+    { name: "Incidents", href: `/project/${projectId}/incidents`, icon: AlertTriangle },
     { name: "Functions", href: `/project/${projectId}/functions`, icon: Zap },
     { name: "Executions", href: `/project/${projectId}/executions`, icon: Activity },
     { name: "Routes", href: `/project/${projectId}/routes`, icon: Globe },
