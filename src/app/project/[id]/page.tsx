@@ -468,12 +468,6 @@ export default function ProjectPage({
                             <span className="text-neutral-400">low sample size after deploy ({suggestedFocus.execsAfterDeploy} executions)</span>
                           </p>
                         )}
-                        {suggestedFocus.deployMode === 'regressed' && suggestedFocus.postDeploySampleLow && (
-                          <p className="text-[9px] font-mono">
-                            <span className="text-red-500/60 mr-1.5 select-none">·</span>
-                            <span className="text-orange-400/80 font-black">→ possible regression (low impact confidence)</span>
-                          </p>
-                        )}
                         <p className="text-[9px] font-mono">
                           <span className="text-red-500/60 mr-1.5 select-none">·</span>
                           {suggestedFocus.deployMode === 'introduced' && (
@@ -482,7 +476,7 @@ export default function ProjectPage({
                           {suggestedFocus.deployMode === 'regressed' && (
                             <span className="text-orange-300 font-black">
                               {suggestedFocus.postDeploySampleLow
-                                ? '→ failure rate increased after deployment'
+                                ? <>failure rate increased after deployment{suggestedFocus.rateBeforePct !== null && suggestedFocus.rateAfterPct !== null ? ` (${suggestedFocus.rateBeforePct}% → ${suggestedFocus.rateAfterPct}%)` : ''}</>
                                 : '→ worsened by this deployment'}
                             </span>
                           )}
@@ -498,6 +492,12 @@ export default function ProjectPage({
                             <span className="text-orange-400 font-black">→ likely caused by this deployment</span>
                           )}
                         </p>
+                        {suggestedFocus.deployMode === 'regressed' && suggestedFocus.postDeploySampleLow && (
+                          <p className="text-[9px] font-mono">
+                            <span className="text-red-500/60 mr-1.5 select-none">·</span>
+                            <span className="text-orange-400/80 font-black">→ possible regression (low impact confidence)</span>
+                          </p>
+                        )}
                       </>
                     ) : (
                       <p className="text-[9px] text-neutral-300 font-mono">
@@ -551,7 +551,7 @@ export default function ProjectPage({
                           </div>
                           {suggestedFocus.postDeploySampleLow && (
                             <p className="text-[8px] text-neutral-500 font-mono pl-0.5">
-                              · reason: insufficient post-deploy data ({suggestedFocus.execsAfterDeploy} executions)
+                              · reason: limited post-deploy data ({suggestedFocus.execsAfterDeploy} executions)
                             </p>
                           )}
                         </>
