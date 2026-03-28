@@ -3,7 +3,7 @@ import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { useFluxApi } from "@/lib/api";
 import { toast } from "sonner";
-import { Zap, Activity, AlertCircle, Clock, Globe, Terminal, Save, Play, ArrowUpRight, BarChart3, AlertOctagon, LucideIcon, Lightbulb, User } from "lucide-react";
+import { Zap, Activity, AlertCircle, Clock, Globe, Terminal, Save, Play, ArrowUpRight, BarChart3, AlertOctagon, LucideIcon, Lightbulb, User, AlertTriangle, ChevronDown, ChevronUp, GitCommit } from "lucide-react";
 import { Function, Execution, Route, FunctionStatsResult } from "@/types/api";
 import { ExecutionDetailDrawer } from "@/components/dashboard/ExecutionDetailDrawer";
 
@@ -100,9 +100,102 @@ function confidenceLabel(confidence?: number) {
   return "Low";
 }
 
+function timeAgo(iso: string): string {
+  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+function compactIssueLabel(title: string, errorSource?: string | null): string {
+  const raw = title.trim();
+  const msg = raw.toLowerCase();
+  if (msg.includes("fetch failed") || msg.includes("failed to fetch")) {
+    const urlMatch = raw.match(/https?:\/\/([^/\s:]+)/);
+    const domain = urlMatch ? urlMatch[1] : null;
+    const hint = msg.includes("dns") || msg.includes("resolve") ? " (DNS failed)"
+      : msg.includes("timeout") ? " (timeout)"
+      : msg.includes("refused") || msg.includes("econnrefused") ? " (connection refused)"
+      : msg.includes("certificate") || msg.includes("ssl") || msg.includes("tls") ? " (TLS error)"
+      : "";
+    return domain ? `fetch → ${domain}${hint}` : `fetch failed${hint}`;
+  }
+  if (msg.includes("dns") || (msg.includes("resolve") && !msg.includes("promise"))) return "DNS lookup failed";
+  if (msg.includes("timeout")) return "Request timed out";
+  if (msg.includes("connection refused") || msg.includes("econnrefused")) return "Connection refused";
+  if (msg.includes("certificate") || (msg.includes("ssl") && !msg.includes("ssl_")) || msg.includes(" tls ")) return "TLS / certificate error";
+  const namedErr = raw.match(/^(ReferenceError|TypeError|SyntaxError|RangeError|URIError|EvalError):\s*(.+)/);
+  if (namedErr) {
+    const short = namedErr[2].length > 60 ? namedErr[2].slice(0, 60) + "…" : namedErr[2];
+    const src = errorSource === "user_code" ? " (user code)" : errorSource === "platform_runtime" ? " (runtime)" : "";
+    return `${namedErr[1]}: ${short}${src}`;
+  }
+  return raw.length > 80 ? raw.slice(0, 80) + "…" : raw;
+}
+
 function isInternalFrame(file: string): boolean {
   return file.includes('ext:') || file.includes('deno:') || file.includes('node:') ||
     file.includes('internal/') || file.startsWith('flux:');
+}
+
+type ErrorClass = 'infra' | 'external' | 'runtime' | 'user';
+
+const ERROR_CLASS_META: Record<ErrorClass, {
+  label: string; icon: string;
+  color: string; bg: string; border: string; dimColor: string;
+  description: string;
+}> = {
+  infra:    { label: 'Infra Failure',    icon: '⚙️', color: 'text-orange-400', dimColor: 'text-orange-400/60', bg: 'bg-orange-950/20', border: 'border-orange-800/50', description: 'Deployment or artifact issue' },
+  external: { label: 'External Failure', icon: '🌐', color: 'text-blue-400',   dimColor: 'text-blue-400/60',   bg: 'bg-blue-950/20',   border: 'border-blue-800/50',   description: 'Outside dependency failed' },
+  runtime:  { label: 'Runtime Error',    icon: '⚡',  color: 'text-red-400',    dimColor: 'text-red-400/60',    bg: 'bg-red-950/20',    border: 'border-red-800/50',    description: 'JavaScript engine error' },
+  user:     { label: 'User Code Error',  icon: '💥', color: 'text-yellow-400', dimColor: 'text-yellow-400/60', bg: 'bg-yellow-950/20', border: 'border-yellow-800/50', description: 'Thrown by your code' },
+};
+
+// Priority order for cause chains: infra → external → runtime → user
+const CLASS_ORDER: ErrorClass[] = ['infra', 'external', 'runtime', 'user'];
+
+function classifyError(title: string, errorSource?: string | null, errorType?: string | null): ErrorClass {
+  const t = title.toLowerCase();
+  const type = (errorType ?? '').toLowerCase();
+  const src = errorSource ?? '';
+  if (type.includes('no_artifact') || t.includes('no_artifact') || src.includes('executor') || t.includes('boot failed')) return 'infra';
+  if (t.includes('fetch failed') || t.includes('failed to fetch') || t.includes('dns') ||
+      t.includes('connection refused') || t.includes('econnrefused') || t.includes('timeout') ||
+      t.includes('certificate') || t.includes('tls') || t.includes('ssl') ||
+      src === 'platform_runtime') return 'external';
+  if (src === 'user_code') return 'user';
+  return 'runtime';
+}
+
+// Group top_issues by code_sha into independent failure clusters, each with
+// a cause-chain ordered by CLASS_ORDER. Clusters with no causal dependency
+// are kept separate — no cross-cluster arrows are ever drawn.
+function buildFailureClusters(issues: FunctionStatsResult['top_issues']): Array<{
+  codeSha: string;
+  totalHits: number;
+  layers: Array<{ cls: ErrorClass; issues: FunctionStatsResult['top_issues'] }>;
+}> {
+  const bySha = issues.reduce<Record<string, FunctionStatsResult['top_issues']>>((acc, iss) => {
+    const key = iss.code_sha ?? '__unknown__';
+    (acc[key] ??= []).push(iss);
+    return acc;
+  }, {});
+
+  return Object.entries(bySha)
+    .map(([sha, shaIssues]) => {
+      const totalHits = shaIssues.reduce((s, i) => s + i.count, 0);
+      const layers = CLASS_ORDER
+        .map(cls => ({
+          cls,
+          issues: shaIssues.filter(iss => classifyError(iss.title, iss.error_source, iss.error_type) === cls),
+        }))
+        .filter(l => l.issues.length > 0);
+      return { codeSha: sha, totalHits, layers };
+    })
+    .sort((a, b) => b.totalHits - a.totalHits);
 }
 
 function parseStackFrames(stack?: string | null) {
@@ -143,6 +236,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
   const [selectedExecId, setSelectedExecId] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [filter, setFilter] = useState<string | null>(null);
+  const [anomalyExpanded, setAnomalyExpanded] = useState(false);
 
   const loadData = async () => {
     if (!api.ready) return;
@@ -179,7 +273,40 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
   if (!data) return <div className="animate-pulse text-sm font-mono text-neutral-500">Loading function orchestration...</div>;
 
   const latestDeployment = deploymentList[0] ?? null;
+  const prevDeployment = deploymentList[1] ?? null;
   const bootFailed = latestDeployment?.status === 'boot_failed';
+
+  // Deployment diff — compare fail rates across the two most recent deploys
+  const execsByDeploy = executions.reduce<Record<string, Execution[]>>((acc, e) => {
+    const key = e.code_sha ?? '__unknown__';
+    (acc[key] ??= []).push(e);
+    return acc;
+  }, {});
+  const deploySlice = (sha: string | null | undefined) => {
+    if (!sha) return null;
+    const group = execsByDeploy[sha] ?? [];
+    const total = group.length;
+    const errors = group.filter(e => e.status !== 'ok').length;
+    return { total, errors, rate: total > 0 ? errors / total : 0, execs: group };
+  };
+  const latestSlice = deploySlice(latestDeployment?.artifact_id);
+  const prevSlice = deploySlice(prevDeployment?.artifact_id);
+  const isRegression = !!(latestSlice && prevSlice && latestSlice.rate > 0.1 && prevSlice.rate < 0.1);
+  const deployVersionLabel = deploymentList.length > 0 ? `v${deploymentList.length}` : null;
+  // First failure after latest deploy
+  const firstFailAfterDeploy = latestSlice
+    ? [...latestSlice.execs]
+        .filter(e => e.status !== 'ok' && e.started_at)
+        .sort((a, b) => new Date(a.started_at!).getTime() - new Date(b.started_at!).getTime())[0] ?? null
+    : null;
+  const deployedAt = latestDeployment ? new Date(latestDeployment.created_at).getTime() : null;
+  const firstFailDelaySec = (firstFailAfterDeploy?.started_at && deployedAt)
+    ? Math.max(0, Math.floor((new Date(firstFailAfterDeploy.started_at).getTime() - deployedAt) / 1000))
+    : null;
+  // Most-hit failing path in latest deploy
+  const latestFailPaths = (latestSlice?.execs ?? []).filter(e => e.status !== 'ok').map(e => e.path);
+  const pathCounts = latestFailPaths.reduce<Record<string, number>>((acc, p) => { acc[p] = (acc[p] ?? 0) + 1; return acc; }, {});
+  const topFailPath = Object.entries(pathCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 
   const st = statsData?.stats;
   const stats = [
@@ -221,11 +348,27 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
     <div className="space-y-10 pb-20">
       <header className="flex justify-between items-start border-b border-neutral-900 pb-8">
         <div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
              <div className="p-1.5 bg-blue-600/10 border border-blue-600/20 rounded">
                 <Zap className="w-5 h-5 text-blue-500" />
              </div>
              <h2 className="text-3xl font-bold text-white tracking-tight">{data.name}</h2>
+             {latestDeployment?.artifact_id && (
+               <span className={`inline-flex items-center gap-1.5 text-[11px] font-mono px-2 py-0.5 rounded border ${
+                 bootFailed ? 'text-red-400 border-red-900/60 bg-red-950/30'
+                 : isRegression ? 'text-amber-400 border-amber-800/50 bg-amber-950/20'
+                 : 'text-neutral-500 border-neutral-800 bg-neutral-900'
+               }`} title={`Artifact: ${latestDeployment.artifact_id}`}>
+                 <GitCommit className="w-3 h-3" />
+                 {deployVersionLabel} • {latestDeployment.artifact_id.slice(0, 7)}
+                 {bootFailed && <span className="text-red-500 font-bold ml-0.5">!</span>}
+               </span>
+             )}
+             {isRegression && (
+               <span className="inline-flex items-center gap-1 text-[10px] font-mono text-amber-400 px-1.5 py-0.5 rounded border border-amber-800/50 bg-amber-950/20">
+                 <AlertTriangle className="w-3 h-3" /> broke after deploy
+               </span>
+             )}
           </div>
           <p className="text-neutral-500 font-mono text-sm mt-3 flex items-center gap-4">
             <span>id: {data.id}</span>
@@ -244,6 +387,53 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
           <button className="bg-neutral-100 text-black px-4 py-1.5 rounded-md font-semibold text-sm hover:bg-neutral-300 transition">Logs</button>
         </div>
       </header>
+
+      {/* What Changed panel — only shown when we have 2+ deployments with execution data */}
+      {latestDeployment && (latestSlice || prevSlice) && (
+        <div className={`rounded-xl border px-5 py-4 ${
+          isRegression ? 'bg-amber-950/10 border-amber-800/40' : 'bg-[#111] border-neutral-800'
+        }`}>
+          <div className="flex items-center gap-2 mb-3">
+            <AlertTriangle className={`w-3.5 h-3.5 ${isRegression ? 'text-amber-400' : 'text-neutral-600'}`} />
+            <span className="text-[10px] font-black uppercase tracking-[0.18em] text-neutral-500">What Changed</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div>
+              <div className="text-[9px] text-neutral-600 uppercase font-bold mb-0.5">Latest Deploy</div>
+              <div className="font-mono text-xs text-neutral-200">{latestDeployment.artifact_id.slice(0, 7)}</div>
+              <div className="text-[10px] text-neutral-600 mt-0.5">{timeAgo(latestDeployment.created_at)}</div>
+            </div>
+            {latestSlice && (
+              <div>
+                <div className="text-[9px] text-neutral-600 uppercase font-bold mb-0.5">Current version</div>
+                <div className={`font-mono text-xs font-bold ${latestSlice.rate > 0.1 ? 'text-red-400' : 'text-emerald-500'}`}>
+                  {latestSlice.errors === 0 ? '✓ 0 failures' : `❌ ${latestSlice.errors}/${latestSlice.total} failed`}
+                </div>
+                {latestSlice.rate > 0 && latestSlice.total > 0 && (
+                  <div className="text-[10px] text-neutral-600">{Math.round(latestSlice.rate * 100)}% error rate</div>
+                )}
+              </div>
+            )}
+            {prevSlice && prevDeployment && (
+              <div>
+                <div className="text-[9px] text-neutral-600 uppercase font-bold mb-0.5">Previous ({prevDeployment.artifact_id.slice(0, 7)})</div>
+                <div className={`font-mono text-xs font-bold ${prevSlice.rate > 0.1 ? 'text-red-400' : 'text-emerald-600'}`}>
+                  {prevSlice.errors === 0 ? '✓ healthy' : `${prevSlice.errors}/${prevSlice.total} failed`}
+                </div>
+              </div>
+            )}
+            {firstFailDelaySec !== null && (
+              <div>
+                <div className="text-[9px] text-neutral-600 uppercase font-bold mb-0.5">First failure</div>
+                <div className="font-mono text-xs text-neutral-300">
+                  {firstFailDelaySec < 60 ? `${firstFailDelaySec}s` : `${Math.floor(firstFailDelaySec / 60)}m`} after deploy
+                </div>
+                {topFailPath && <div className="text-[10px] text-neutral-600 font-mono mt-0.5 truncate" title={topFailPath}>{topFailPath}</div>}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {bootFailed && (
         <div className="bg-red-950/40 border border-red-900/60 rounded-xl p-5 flex items-start gap-3">
@@ -274,153 +464,308 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
       </div>
 
       {statsData?.root_cause && (
-        <div 
-          onClick={() => setFilter(filter === activeIssue ? null : activeIssue)}
-          className={`bg-gradient-to-br from-red-950/40 to-black border ${filter === activeIssue ? 'border-red-500 ring-1 ring-red-500' : 'border-red-900/50'} rounded-xl p-8 relative overflow-hidden shadow-2xl transition-all cursor-pointer group hover:scale-[1.01]`}
-        >
-           <div className="absolute top-0 left-0 w-1 h-full bg-red-500 shadow-[0_0_20px_theme(colors.red.500)]" />
-           <div className="absolute top-0 right-0 p-3 opacity-20"><AlertCircle className="w-48 h-48 text-red-500" /></div>
-           <div className="relative z-10 flex flex-col xl:flex-row gap-8 items-start justify-between">
-              <div className="space-y-4 flex-1">
-                 <div className="flex items-center gap-2">
-                    <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1.5 uppercase tracking-wider shadow-[0_0_10px_theme(colors.red.500/50)] animate-pulse">
-                       <Zap className="w-3 h-3" />
-                       Active Anomaly
+        <div className="bg-gradient-to-br from-red-950/40 to-black border border-red-900/50 rounded-xl overflow-hidden shadow-2xl">
+          {/* Collapsed headline — always visible */}
+          <button
+            onClick={() => setAnomalyExpanded(v => !v)}
+            className="w-full flex items-center justify-between gap-4 px-6 py-4 hover:bg-red-950/20 transition-colors text-left group"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1.5 uppercase tracking-wider shadow-[0_0_10px_theme(colors.red.500/50)] animate-pulse shrink-0">
+                <Zap className="w-3 h-3" />
+                Active Anomaly
+              </span>
+              {/* Semantic headline derived from root cluster */}
+              {(() => {
+                const clusters = buildFailureClusters(statsData.top_issues ?? []);
+                const rootLayer = clusters[0]?.layers[0];
+                if (!rootLayer) {
+                  const frame = topUserFrame(statsData.root_cause.sample_stack);
+                  const loc = frameLabel(frame);
+                  return (
+                    <>
+                      <span className="text-base font-bold text-red-100 font-mono truncate">{activeIssue}</span>
+                      {loc && <span className="text-red-400/70 text-[11px] font-mono shrink-0">↳ {loc}</span>}
+                    </>
+                  );
+                }
+                const rootMeta = ERROR_CLASS_META[rootLayer.cls];
+                const topIss = rootLayer.issues[0];
+                const label = compactIssueLabel(topIss.title, topIss.error_source);
+                const totalFails = (statsData.top_issues ?? []).reduce((s, i) => s + i.count, 0);
+                const errorPct = (st?.total_execs ?? 0) > 0
+                  ? `${Math.round((totalFails / (st?.total_execs ?? 1)) * 100)}%`
+                  : null;
+                const clusterCount = clusters.length;
+                return (
+                  <>
+                    <span className={`text-[10px] font-black uppercase tracking-wider ${rootMeta.color} shrink-0`}>
+                      {rootMeta.label}
                     </span>
-                    {filter && (
-                      <span className="bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
-                         Filtering Active
+                    <span className="text-sm font-bold text-red-100 font-mono truncate">
+                      {label}
+                      {errorPct && <span className="text-red-400/70 font-normal"> · affecting {errorPct}</span>}
+                    </span>
+                    {clusterCount > 1 && (
+                      <span className="text-[9px] font-bold text-neutral-600 shrink-0 border border-neutral-800 px-1.5 py-0.5 rounded">
+                        {clusterCount} groups
                       </span>
                     )}
-                 </div>
-                 <h3 className="text-3xl font-bold text-red-50 leading-tight max-w-2xl">{activeIssue}</h3>
-                 {(() => {
-                   const frame = topUserFrame(statsData.root_cause.sample_stack);
-                   return frame ? (
-                     <p className="text-red-400/80 text-[12px] font-mono font-bold -mt-1">↳ {frameLabel(frame)}</p>
-                   ) : null;
-                 })()}
-                 <div className="text-red-200/80 font-mono text-sm border-l-2 border-red-500/30 pl-4 py-1 space-y-1">
-                    <span className="block font-bold text-red-400 mb-1">Detected Cause</span>
-                    {statsData.root_cause.cause}
-                    {statsData.root_cause.phase && (
-                      <div className="text-[11px] text-red-200/60">Phase: {statsData.root_cause.phase}</div>
-                    )}
-                 </div>
+                  </>
+                );
+              })()}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {statsData.root_cause.impact && (
+                <span className="text-[10px] font-mono text-red-400">{statsData.root_cause.impact}</span>
+              )}
+              {anomalyExpanded
+                ? <ChevronUp className="w-4 h-4 text-red-400" />
+                : <ChevronDown className="w-4 h-4 text-neutral-600 group-hover:text-red-400 transition-colors" />}
+            </div>
+          </button>
 
-                 {/* Error Breakdown by type */}
-                 {statsData.top_issues.length > 0 && (() => {
-                   const total = statsData.top_issues.reduce((sum, iss) => sum + iss.count, 0);
-                   const barColors = ['bg-red-500', 'bg-orange-500', 'bg-yellow-500/80', 'bg-neutral-500/60'];
-                   return (
-                     <div className="space-y-2">
-                       <span className="text-[10px] font-black uppercase tracking-[0.2em] text-red-300 block">Error Breakdown</span>
-                       <div className="space-y-2.5">
-                         {statsData.top_issues.slice(0, 4).map((iss, idx) => {
-                           const pct = total > 0 ? Math.round((iss.count / total) * 100) : 0;
-                           const issFrame = topUserFrame(iss.sample_stack);
-                           const issLoc = frameLabel(issFrame);
-                           return (
-                             <div key={idx} className="space-y-1">
-                               <div className="flex items-center justify-between gap-3">
-                                 <span className="font-mono text-[11px] text-neutral-300 truncate" title={issLoc ? `${iss.title} @ ${issLoc}` : iss.title}>
-                                   {iss.title}{issLoc ? <span className="text-red-400/60"> @ {issLoc}</span> : null}
-                                 </span>
-                                 <span className="text-[10px] font-bold text-neutral-500 shrink-0">{pct}% · {iss.count}×</span>
-                               </div>
-                               <div className="h-1.5 bg-neutral-800/60 rounded-full overflow-hidden">
-                                 <div className={`h-full rounded-full ${barColors[idx] ?? 'bg-neutral-500/60'}`} style={{ width: `${pct}%` }} />
+          {/* Expanded detail */}
+          {anomalyExpanded && (
+            <div className="px-6 pb-8 pt-2 relative overflow-hidden">
+               <div className="absolute top-0 left-0 w-1 h-full bg-red-500 shadow-[0_0_20px_theme(colors.red.500)]" />
+               <div className="relative z-10 flex flex-col xl:flex-row gap-8 items-start justify-between">
+                  <div className="space-y-5 flex-1">
+                     {filter && (
+                       <span className="bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
+                          Filtering Active
+                       </span>
+                     )}
+
+                     {/* Failure Clusters — independent chains, no cross-cluster arrows */}
+                     {(() => {
+                       const clusters = buildFailureClusters(statsData.top_issues ?? []);
+                       if (clusters.length === 0) return null;
+                       const multiCluster = clusters.length > 1;
+
+                       return (
+                         <div className="space-y-4">
+                           <div className="flex items-center gap-2">
+                             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500">
+                               {multiCluster ? 'Independent Failure Groups' : 'Cause Chain'}
+                             </span>
+                             {multiCluster && (
+                               <span className="text-[9px] font-bold text-neutral-600 border border-neutral-800 px-1.5 py-0.5 rounded">
+                                 {clusters.length} separate roots
+                               </span>
+                             )}
+                           </div>
+                           {clusters.map((cluster, ci) => (
+                             <div key={cluster.codeSha} className={multiCluster ? 'border border-neutral-800/60 rounded-xl p-3 bg-neutral-950/40' : ''}>
+                               {multiCluster && (
+                                 <div className="flex items-center gap-2 mb-3">
+                                   <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
+                                     Group {ci + 1}
+                                   </span>
+                                   <span className="text-[9px] font-mono text-neutral-700">{cluster.codeSha.slice(0, 7)}</span>
+                                   <span className="text-[9px] font-bold text-neutral-600 ml-auto">{cluster.totalHits} hits</span>
+                                 </div>
+                               )}
+                               {cluster.layers.map((layer, li) => {
+                                 const meta = ERROR_CLASS_META[layer.cls];
+                                 const isRoot = li === 0;
+                                 const isLast = li === cluster.layers.length - 1;
+                                 const hasMultipleLayers = cluster.layers.length > 1;
+                                 return (
+                                   <div key={layer.cls}>
+                                     <div className={`rounded-lg border px-4 py-3 ${meta.bg} ${meta.border}`}>
+                                       <div className="flex items-center gap-2 mb-2">
+                                         <span className={`text-[10px] font-black uppercase tracking-wider ${meta.color}`}>
+                                           {isRoot ? '🔴 Root Cause' : isLast ? '💥 User Impact' : '⚡ Propagated'}
+                                         </span>
+                                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${meta.bg} ${meta.border} ${meta.color}`}>
+                                           {meta.label}
+                                         </span>
+                                         {!isRoot && hasMultipleLayers && (
+                                           <span className="text-[9px] text-neutral-700 italic ml-auto">secondary effect</span>
+                                         )}
+                                       </div>
+                                       {layer.issues.map((iss, ii) => {
+                                         const issFrame = topUserFrame(iss.sample_stack);
+                                         const issLoc = frameLabel(issFrame);
+                                         const issLabel = compactIssueLabel(iss.title, iss.error_source);
+                                         const isPrimary = isRoot && ii === 0;
+                                         return (
+                                           <div
+                                             key={ii}
+                                             onClick={() => setFilter(filter === iss.title ? null : iss.title)}
+                                             className="flex items-center justify-between gap-3 cursor-pointer group/issue py-1"
+                                           >
+                                             <div className="flex items-center gap-2 min-w-0">
+                                               {isPrimary && hasMultipleLayers && (
+                                                 <span className="text-[8px] font-black uppercase text-red-500 shrink-0 border border-red-900/50 bg-red-950/30 px-1 py-0.5 rounded leading-none">
+                                                   PRIMARY
+                                                 </span>
+                                               )}
+                                               <span
+                                                 className={`font-mono text-[12px] truncate group-hover/issue:underline ${isPrimary ? 'text-neutral-100 font-semibold' : 'text-neutral-400'}`}
+                                                 title={issLoc ? `${iss.title} → ${issLoc}` : iss.title}
+                                               >
+                                                 {issLabel}
+                                                 {issLoc && <span className={`${meta.dimColor} font-normal`}> → {issLoc}</span>}
+                                               </span>
+                                             </div>
+                                             <span className="text-[10px] font-bold text-neutral-600 shrink-0">{iss.count}×</span>
+                                           </div>
+                                         );
+                                       })}
+                                     </div>
+                                     {/* Causal connector — only within the same cluster */}
+                                     {!isLast && (
+                                       <div className="flex items-center gap-2 py-1 pl-4">
+                                         <div className="w-px h-4 bg-neutral-700" />
+                                         <span className="text-[10px] text-neutral-600 font-mono italic">caused within same execution</span>
+                                       </div>
+                                     )}
+                                   </div>
+                                 );
+                               })}
+                             </div>
+                           ))}
+                         </div>
+                       );
+                     })()}
+
+                     {/* Flux Analysis — structured primary/secondary breakdown */}
+                     {(() => {
+                       const clusters = buildFailureClusters(statsData.top_issues ?? []);
+                       const primaryCluster = clusters[0];
+                       const rootLayer = primaryCluster?.layers[0];
+                       const userIssues = primaryCluster?.layers.filter(l => l.cls === 'user').flatMap(l => l.issues) ?? [];
+                       const externalIssues = primaryCluster?.layers.filter(l => l.cls === 'external').flatMap(l => l.issues) ?? [];
+                       return (
+                         <div className="border-l-2 border-red-500/20 pl-3 py-1 space-y-3">
+                           <span className="block font-bold text-red-400/80 text-xs">Flux Analysis</span>
+                           {rootLayer && (
+                             <div>
+                               <div className="text-[9px] text-neutral-600 uppercase font-bold tracking-wider mb-0.5">Primary Failure</div>
+                               <div className={`font-mono text-xs ${ERROR_CLASS_META[rootLayer.cls].color}`}>
+                                 {compactIssueLabel(rootLayer.issues[0].title, rootLayer.issues[0].error_source)}
                                </div>
                              </div>
-                           );
-                         })}
-                       </div>
+                           )}
+                           {(externalIssues.length > 0 || userIssues.length > 0) && (
+                             <div>
+                               <div className="text-[9px] text-neutral-600 uppercase font-bold tracking-wider mb-0.5">What your code did</div>
+                               {externalIssues.map((iss, i) => (
+                                 <div key={i} className="font-mono text-xs text-neutral-500">
+                                   did not handle → {compactIssueLabel(iss.title, iss.error_source)}
+                                 </div>
+                               ))}
+                               {userIssues.map((iss, i) => (
+                                 <div key={i} className="font-mono text-xs text-yellow-400/80">
+                                   threw → {compactIssueLabel(iss.title, iss.error_source)}
+                                 </div>
+                               ))}
+                             </div>
+                           )}
+                           <div>
+                             <div className="text-[9px] text-neutral-600 uppercase font-bold tracking-wider mb-0.5">Result</div>
+                             <div className="font-mono text-xs text-neutral-400">
+                               {statsData.root_cause?.impact || 'Execution aborted before response'}
+                             </div>
+                           </div>
+                           {clusters.length > 1 && (
+                             <div className="text-[10px] text-neutral-600 italic pt-1 border-t border-neutral-800">
+                               + {clusters.length - 1} additional independent failure group{clusters.length > 2 ? 's' : ''}
+                             </div>
+                           )}
+                           {statsData.root_cause.phase && (
+                             <div className="text-[10px] text-red-200/40">Phase: {statsData.root_cause.phase}</div>
+                           )}
+                         </div>
+                       );
+                     })()}
+
+                     {/* Latest Failure Snapshot */}
+                     {statsData.root_cause.latest_failure && (
+                        <div className="bg-black/60 border border-neutral-800 rounded-lg p-4 max-w-2xl">
+                           <div className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                              <Activity className="w-3 h-3" /> Latest Failure Snapshot
+                           </div>
+                           <div className="grid grid-cols-3 gap-4 mb-3">
+                              <div className="bg-neutral-900/40 p-2 rounded">
+                                 <div className="text-[9px] text-neutral-600 uppercase font-bold">Time</div>
+                                 <div className="text-xs font-mono text-neutral-300">
+                                    {statsData.root_cause.latest_failure.time ? new Date(statsData.root_cause.latest_failure.time).toLocaleTimeString() : "N/A"}
+                                 </div>
+                              </div>
+                              <div className="bg-neutral-900/40 p-2 rounded">
+                                 <div className="text-[9px] text-neutral-600 uppercase font-bold">Duration</div>
+                                 <div className="text-xs font-mono text-neutral-300">{statsData.root_cause.latest_failure.duration}</div>
+                              </div>
+                              <div className="bg-neutral-900/40 p-2 rounded">
+                                 <div className="text-[9px] text-neutral-600 uppercase font-bold">Result</div>
+                                 <div className="text-xs font-mono text-red-400 font-bold truncate">
+                                    {statsData.root_cause.latest_failure.error || "Unknown error"}
+                                 </div>
+                                 {(() => {
+                                   const frame = topUserFrame(statsData.root_cause.sample_stack);
+                                   const loc = frameLabel(frame);
+                                   return loc ? (
+                                     <div className="text-[10px] font-mono font-bold text-red-400/70 mt-0.5 truncate">↳ {loc}</div>
+                                   ) : null;
+                                 })()}
+                              </div>
+                           </div>
+                           <button 
+                              onClick={(e) => { e.stopPropagation(); setSelectedExecId(statsData.root_cause!.latest_failure!.id); setIsDrawerOpen(true); }}
+                              className="text-[10px] font-bold text-blue-500 hover:text-blue-400 flex items-center gap-1.5 uppercase transition-colors"
+                           >
+                              View Full Trace <ArrowUpRight className="w-3 h-3" />
+                           </button>
+                        </div>
+                     )}
+
+                     {anomalySuggestion && (
+                        <div className="bg-blue-500/10 border border-blue-500/20 rounded p-3 text-xs text-blue-300 flex items-start gap-2 max-w-lg shadow-inner">
+                           <Lightbulb className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                           <div>
+                              <span className="font-bold text-blue-400 block mb-0.5">Recommended Action</span>
+                              {anomalySuggestion}
+                           </div>
+                        </div>
+                     )}
+                  </div>
+                  
+                  <div className="flex flex-col gap-4 w-full xl:w-64 shrink-0 bg-black/40 p-5 rounded-lg border border-red-950/60 backdrop-blur-sm">
+                     <div className="flex justify-between items-center gap-8">
+                        <span className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Detection</span>
+                        <div className="flex flex-col items-end gap-0.5">
+                           <span className="text-[10px] font-bold text-emerald-500 uppercase">At runtime</span>
+                           {(() => { const f = topUserFrame(statsData.root_cause.sample_stack); return f ? <span className="text-[10px] font-mono text-red-400">{frameLabel(f)}</span> : null; })()}
+                        </div>
                      </div>
-                   );
-                 })()}
-
-                 {/* Latest Failure Snapshot */}
-                 {statsData.root_cause.latest_failure && (
-                    <div className="mt-6 bg-black/60 border border-neutral-800 rounded-lg p-4 max-w-2xl">
-                       <div className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-                          <Activity className="w-3 h-3" /> Latest Failure Snapshot
-                       </div>
-                       <div className="grid grid-cols-3 gap-4 mb-3">
-                          <div className="bg-neutral-900/40 p-2 rounded">
-                             <div className="text-[9px] text-neutral-600 uppercase font-bold">Time</div>
-                             <div className="text-xs font-mono text-neutral-300">
-                                {statsData.root_cause.latest_failure.time ? new Date(statsData.root_cause.latest_failure.time).toLocaleTimeString() : "N/A"}
-                             </div>
-                          </div>
-                          <div className="bg-neutral-900/40 p-2 rounded">
-                             <div className="text-[9px] text-neutral-600 uppercase font-bold">Duration</div>
-                             <div className="text-xs font-mono text-neutral-300">{statsData.root_cause.latest_failure.duration}</div>
-                          </div>
-                          <div className="bg-neutral-900/40 p-2 rounded">
-                             <div className="text-[9px] text-neutral-600 uppercase font-bold">Result</div>
-                             <div className="text-xs font-mono text-red-400 font-bold truncate">
-                                {statsData.root_cause.latest_failure.error || "Unknown error"}
-                             </div>
-                             {(() => {
-                               const frame = topUserFrame(statsData.root_cause.sample_stack);
-                               const loc = frameLabel(frame);
-                               return loc ? (
-                                 <div className="text-[10px] font-mono font-bold text-red-400/70 mt-0.5 truncate">↳ {loc}</div>
-                               ) : null;
-                             })()}
-                          </div>
-                       </div>
-                       <button 
-                          onClick={(e) => { e.stopPropagation(); setSelectedExecId(statsData.root_cause!.latest_failure!.id); setIsDrawerOpen(true); }}
-                          className="text-[10px] font-bold text-blue-500 hover:text-blue-400 flex items-center gap-1.5 uppercase transition-colors"
-                       >
-                          View Full Trace <ArrowUpRight className="w-3 h-3" />
-                       </button>
-                    </div>
-                 )}
-
-                 {anomalySuggestion && (
-                    <div className="bg-blue-500/10 border border-blue-500/20 rounded p-3 text-xs text-blue-300 flex items-start gap-2 max-w-lg mt-4 shadow-inner">
-                       <Lightbulb className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-                       <div>
-                          <span className="font-bold text-blue-400 block mb-0.5">Recommended Action</span>
-                          {anomalySuggestion}
-                       </div>
-                    </div>
-                 )}
-              </div>
-              
-              <div className="flex flex-col gap-4 w-full xl:w-72 shrink-0 bg-black/40 p-5 rounded-lg border border-red-950/60 backdrop-blur-sm">
-                 <div className="flex justify-between items-center gap-8">
-                    <span className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Detection</span>
-                    <div className="flex flex-col items-end gap-0.5">
-                       <span className="text-[10px] font-bold text-emerald-500 uppercase">At runtime</span>
-                       {(() => { const f = topUserFrame(statsData.root_cause.sample_stack); return f ? <span className="text-[10px] font-mono text-red-400">{frameLabel(f)}</span> : null; })()}
-                    </div>
-                 </div>
-                 {statsData.root_cause.confidence_reason && (
-                    <div className="text-[11px] text-neutral-500 leading-relaxed">
-                       {statsData.root_cause.confidence_reason}
-                    </div>
-                 )}
-                  <div className="flex justify-between items-center gap-8">
-                    <span className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Impact</span>
-                    <span className="font-mono text-red-400 font-bold">{statsData.root_cause.impact}</span>
-                 </div>
-                 {statsData.impact_stats && (
-                    <div className="flex justify-between items-center gap-8">
-                       <span className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Users Affected</span>
-                       <span className="font-mono text-neutral-300 font-bold">{statsData.impact_stats.unique_ips} IPs</span>
-                    </div>
-                 )}
-                 <div className="bg-red-500/5 rounded p-3 border border-red-500/10 mt-2">
-                    <div className="text-[10px] text-neutral-600 uppercase font-bold mb-1">Timeline correlation</div>
-                    <div className="text-[11px] text-neutral-400 font-mono">
-                       Anomaly started {new Date(statsData.root_cause.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.
-                    </div>
-                 </div>
-              </div>
-           </div>
+                     {statsData.root_cause.confidence_reason && (
+                        <div className="text-[11px] text-neutral-500 leading-relaxed">
+                           {statsData.root_cause.confidence_reason}
+                        </div>
+                     )}
+                     <div className="flex justify-between items-center gap-8">
+                        <span className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Impact</span>
+                        <span className="font-mono text-red-400 font-bold">{statsData.root_cause.impact}</span>
+                     </div>
+                     {statsData.impact_stats && (
+                        <div className="flex justify-between items-center gap-8">
+                           <span className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Users</span>
+                           <span className="font-mono text-neutral-300 font-bold">{statsData.impact_stats.unique_ips} IPs</span>
+                        </div>
+                     )}
+                     <div className="bg-red-500/5 rounded p-3 border border-red-500/10">
+                        <div className="text-[10px] text-neutral-600 uppercase font-bold mb-1">Timeline</div>
+                        <div className="text-[11px] text-neutral-400 font-mono">
+                           Started {new Date(statsData.root_cause.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.
+                        </div>
+                     </div>
+                  </div>
+               </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -618,49 +963,106 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                  Top Issues
                </h3>
             </div>
-            {statsData?.top_issues && statsData.top_issues.length > 0 ? (
-              <div className="flex flex-col gap-2">
-                 {statsData.top_issues.map((issue, i) => {
-                   const fixForIssue = errorTypeToFix(issue.title);
-                   const isPlatform = issue.error_source === 'platform_runtime' || issue.error_source === 'platform_executor';
-                   const badgeClass = isPlatform
-                     ? 'text-orange-500 bg-orange-950/30 border-orange-900/40'
-                     : i === 0 ? 'text-red-500 bg-red-950/30 border-red-900/40'
-                     : 'text-yellow-500 bg-yellow-950/30 border-yellow-900/40';
-                   const issueFrame = topUserFrame(issue.sample_stack);
-                   const issueLoc = frameLabel(issueFrame);
-                   return (
-                     <div
-                       key={i}
-                       onClick={() => setFilter(filter === issue.title ? null : issue.title)}
-                       className={`bg-[#111] border ${filter === issue.title ? 'border-red-500/50 ring-1 ring-red-500/20' : 'border-neutral-800'} px-4 py-3 rounded-lg flex items-center justify-between font-mono text-sm transition hover:border-neutral-700 cursor-pointer group`}
-                     >
-                       <div className="flex items-center gap-4 overflow-hidden">
-                         <div className={`flex flex-col items-center justify-center shrink-0 w-10 h-10 rounded border transition-colors ${badgeClass}`}>
-                           <span className="text-xs font-bold">{issue.count}</span>
-                           <span className="text-[8px] uppercase opacity-70">Hits</span>
-                         </div>
-                         <div className="flex flex-col overflow-hidden">
-                           <span className="text-neutral-200 truncate font-semibold" title={issueLoc ? `${issue.title} @ ${issueLoc}` : issue.title}>
-                             {issue.title}{issueLoc ? <span className="text-red-400/60 font-normal"> @ {issueLoc}</span> : null}
-                           </span>
-                           <div className="flex items-center gap-2 mt-0.5 overflow-hidden">
-                             <span className="text-[10px] text-neutral-600 uppercase tracking-wider shrink-0">{issue.fingerprint.slice(0, 8)}</span>
-                             {fixForIssue && (
-                               <span className="text-[10px] text-blue-400/70 truncate">→ {fixForIssue}</span>
-                             )}
-                           </div>
-                         </div>
-                       </div>
-                       <div className="shrink-0 text-right ml-4 hidden sm:block">
-                         <div className="text-xs text-neutral-400 font-medium">{new Date(issue.last_seen).toLocaleTimeString()}</div>
-                         <div className="text-[10px] text-neutral-600 mt-1">Last seen</div>
-                       </div>
-                     </div>
-                   );
-                 })}
-              </div>
-            ) : (
+            {statsData?.top_issues && statsData.top_issues.length > 0 ? (() => {
+              const clusters = buildFailureClusters(statsData.top_issues);
+              const multiCluster = clusters.length > 1;
+
+              return (
+                <div className="space-y-6">
+                  {clusters.map((cluster, ci) => (
+                    <div key={cluster.codeSha}>
+                      {multiCluster && (
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">
+                            Failure Group {ci + 1}
+                          </span>
+                          <span className="text-[9px] font-mono text-neutral-700">{cluster.codeSha.slice(0, 7)}</span>
+                          <span className="text-[9px] font-bold text-neutral-600 ml-auto">{cluster.totalHits} hits</span>
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        {cluster.layers.map((layer, li) => {
+                          const meta = ERROR_CLASS_META[layer.cls];
+                          const isRoot = li === 0;
+                          const isLast = li === cluster.layers.length - 1;
+                          const hasMultipleLayers = cluster.layers.length > 1;
+                          return (
+                            <div key={layer.cls}>
+                              {/* Layer header */}
+                              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-t-lg border-x border-t ${meta.bg} ${meta.border}`}>
+                                <span className={`text-[10px] font-black uppercase tracking-wider ${meta.color}`}>
+                                  {isRoot ? '🔴 Root Cause' : isLast ? '💥 User Impact' : '⚡ Propagated'}
+                                </span>
+                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${meta.bg} ${meta.border} ${meta.color}`}>
+                                  {meta.label}
+                                </span>
+                                {!isRoot && hasMultipleLayers && (
+                                  <span className="text-[9px] text-neutral-700 italic ml-1">(secondary effect)</span>
+                                )}
+                                <span className="text-[9px] text-neutral-600 ml-auto">
+                                  {layer.issues.length} issue{layer.issues.length > 1 ? 's' : ''}
+                                </span>
+                              </div>
+                              {/* Issues in this layer */}
+                              {layer.issues.map((issue, i) => {
+                                const fixForIssue = errorTypeToFix(issue.title);
+                                const issueFrame = topUserFrame(issue.sample_stack);
+                                const issueLoc = frameLabel(issueFrame);
+                                const isPrimary = isRoot && i === 0 && hasMultipleLayers;
+                                return (
+                                  <div
+                                    key={i}
+                                    onClick={() => setFilter(filter === issue.title ? null : issue.title)}
+                                    className={`bg-[#111] border-x border-b ${meta.border} ${filter === issue.title ? 'ring-1 ring-inset ' + meta.border : ''} px-4 py-3 flex items-center justify-between font-mono text-sm transition hover:bg-neutral-900/30 cursor-pointer group last:rounded-b-lg`}
+                                  >
+                                    <div className="flex items-center gap-4 overflow-hidden">
+                                      <div className={`flex flex-col items-center justify-center shrink-0 w-10 h-10 rounded border ${meta.bg} ${meta.border}`}>
+                                        <span className={`text-xs font-bold ${meta.color}`}>{issue.count}</span>
+                                        <span className="text-[8px] uppercase text-neutral-600">Hits</span>
+                                      </div>
+                                      <div className="flex flex-col overflow-hidden">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          {isPrimary && (
+                                            <span className="text-[8px] font-black uppercase text-red-500 shrink-0 border border-red-900/50 bg-red-950/30 px-1 py-0.5 rounded leading-none">
+                                              PRIMARY
+                                            </span>
+                                          )}
+                                          <span className="text-neutral-200 truncate font-semibold" title={issueLoc ? `${issue.title} → ${issueLoc}` : issue.title}>
+                                            {compactIssueLabel(issue.title, issue.error_source)}
+                                            {issueLoc && <span className={`${meta.dimColor} font-normal`}> → {issueLoc}</span>}
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center gap-2 mt-0.5 overflow-hidden">
+                                          <span className="text-[10px] text-neutral-600 uppercase tracking-wider shrink-0">{issue.fingerprint.slice(0, 8)}</span>
+                                          {fixForIssue && (
+                                            <span className="text-[10px] text-blue-400/70 truncate">→ {fixForIssue}</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="shrink-0 text-right ml-4 hidden sm:block">
+                                      <div className="text-xs text-neutral-400 font-medium">{new Date(issue.last_seen).toLocaleTimeString()}</div>
+                                      <div className="text-[10px] text-neutral-600 mt-1">Last seen</div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                              {/* Causal connector within cluster — only between adjacent layers */}
+                              {!isLast && (
+                                <div className="flex items-center gap-2 py-1.5 pl-5">
+                                  <div className="w-px h-5 bg-neutral-700" />
+                                  <span className="text-[10px] text-neutral-600 font-mono italic">caused within same execution ↓</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })() : (
               <div className="text-neutral-700 text-sm font-mono italic p-6 border border-dashed border-neutral-800 bg-[#0a0a0a] rounded-xl text-center">No recent issues detected.</div>
             )}
           </section>
