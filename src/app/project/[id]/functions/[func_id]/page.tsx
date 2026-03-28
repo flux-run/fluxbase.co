@@ -377,6 +377,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
     deployElapsedSec: number | null;
     expectedByNow: number | null;
     isSuspiciouslyLow: boolean;
+    lastFailedExecId: string | null;
   } => {
     const fp               = extractClusterFingerprint(cluster);
     const pathsTracked     = fp.paths.size > 0;
@@ -445,11 +446,15 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
         : observationState === 'partially_observed'
         ? Math.min(50, Math.round((matchedTotal / Math.max(VERIFIED_EXEC_MIN, 1)) * 50))
         : 0;
-    // Last matching execution timestamp
+    // Last matching execution timestamp + last failed exec ID (for replay)
     const allMatchedExecs = currentExecs.filter(e => execMatchesFingerprint(e, fp));
     const lastMatchedAt = allMatchedExecs.reduce<string | null>(
       (best, e) => e.started_at && (!best || e.started_at > best) ? e.started_at : best, null
     );
+    const lastFailedExec = allMatchedExecs
+      .filter(e => e.status !== 'ok')
+      .sort((a, b) => (b.started_at ?? '').localeCompare(a.started_at ?? ''))[0] ?? null;
+    const lastFailedExecId = lastFailedExec?.id ?? null;
     // Explicit matching criteria shown to the user
     const matchingCodeSha = currentExecs.find(e => e.code_sha)?.code_sha?.slice(0, 7) ?? null;
     const matchingCallSites = [...fp.paths].slice(0, 3);
@@ -495,7 +500,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
         : isDeterministic
         ? `Deterministic — fails ${failureRate}% across ${execCount} exec${execCount !== 1 ? 's' : ''}`
         : `Reproducible · ${execCount} exec${execCount !== 1 ? 's' : ''}, ${failureRate}% failure rate`;
-      return { state: isRegressed ? 'regressed' : 'active', confidence, execCount, errorCount: currentErrors, failureRate, matchedTotal, matchedSuccess, matchedFail, reason, isDeterministic, isRegressed, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode: effectiveVerifyMode, requiredToVerify: effectiveRequired, pathCoveredCount: pathCoveredExecs.length, deployElapsedSec, expectedByNow, isSuspiciouslyLow };
+      return { state: isRegressed ? 'regressed' : 'active', confidence, execCount, errorCount: currentErrors, failureRate, matchedTotal, matchedSuccess, matchedFail, reason, isDeterministic, isRegressed, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode: effectiveVerifyMode, requiredToVerify: effectiveRequired, pathCoveredCount: pathCoveredExecs.length, deployElapsedSec, expectedByNow, isSuspiciouslyLow, lastFailedExecId };
     }
 
     // No active failures — determine if the same scenario was exercised successfully
@@ -503,20 +508,20 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
     if (effectiveDeterministic ? matchedSuccess >= 1 : matchedTotal >= 3) {
       const confidence: 'high' | 'medium' | 'low' = effectiveDeterministic ? 'high' : matchedTotal >= 15 ? 'high' : matchedTotal >= 5 ? 'medium' : 'low';
       const reason = `Verified — ${matchedSuccess} exec${matchedSuccess !== 1 ? 's' : ''} on same path, no recurrence`;
-      return { state: 'verified_fixed', confidence, execCount, errorCount: 0, failureRate: 0, matchedTotal, matchedSuccess, matchedFail: 0, reason, isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode: effectiveVerifyMode, requiredToVerify: effectiveRequired, pathCoveredCount: pathCoveredExecs.length, deployElapsedSec, expectedByNow, isSuspiciouslyLow };
+      return { state: 'verified_fixed', confidence, execCount, errorCount: 0, failureRate: 0, matchedTotal, matchedSuccess, matchedFail: 0, reason, isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode: effectiveVerifyMode, requiredToVerify: effectiveRequired, pathCoveredCount: pathCoveredExecs.length, deployElapsedSec, expectedByNow, isSuspiciouslyLow, lastFailedExecId };
     }
     if (execCount >= VERIFIED_EXEC_HIGH)
       return { state: 'verified_fixed', confidence: 'medium', execCount, errorCount: 0, failureRate: 0, matchedTotal, matchedSuccess, matchedFail: 0,
-        reason: `Not reproduced across ${execCount} execs — path not yet exercised`, isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode: effectiveVerifyMode, requiredToVerify: effectiveRequired, pathCoveredCount: pathCoveredExecs.length, deployElapsedSec, expectedByNow, isSuspiciouslyLow };
+        reason: `Not reproduced across ${execCount} execs — path not yet exercised`, isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode: effectiveVerifyMode, requiredToVerify: effectiveRequired, pathCoveredCount: pathCoveredExecs.length, deployElapsedSec, expectedByNow, isSuspiciouslyLow, lastFailedExecId };
     if (execCount >= VERIFIED_EXEC_MIN)
       return { state: 'verified_fixed', confidence: 'low', execCount, errorCount: 0, failureRate: 0, matchedTotal, matchedSuccess, matchedFail: 0,
-        reason: `Not reproduced across ${execCount} execs — insufficient path coverage`, isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode: effectiveVerifyMode, requiredToVerify: effectiveRequired, pathCoveredCount: pathCoveredExecs.length, deployElapsedSec, expectedByNow, isSuspiciouslyLow };
+        reason: `Not reproduced across ${execCount} execs — insufficient path coverage`, isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode: effectiveVerifyMode, requiredToVerify: effectiveRequired, pathCoveredCount: pathCoveredExecs.length, deployElapsedSec, expectedByNow, isSuspiciouslyLow, lastFailedExecId };
 
     return { state: 'unverified', confidence: 'low', execCount, errorCount: 0, failureRate: 0, matchedTotal, matchedSuccess, matchedFail: 0,
       reason: pathsTracked
         ? `Failure path not yet exercised in current deploy (${execCount}/${VERIFIED_EXEC_MIN} execs)`
         : `Only ${execCount} of ${VERIFIED_EXEC_MIN} executions needed to verify`,
-      isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode: effectiveVerifyMode, requiredToVerify: effectiveRequired, pathCoveredCount: pathCoveredExecs.length, deployElapsedSec, expectedByNow, isSuspiciouslyLow };
+      isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode: effectiveVerifyMode, requiredToVerify: effectiveRequired, pathCoveredCount: pathCoveredExecs.length, deployElapsedSec, expectedByNow, isSuspiciouslyLow, lastFailedExecId };
   };
 
   const st = statsData?.stats;
@@ -1075,14 +1080,25 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                        )}
                                        {/* Nudge: prompt dev to trigger verification when path hasn't been hit */}
                                        {!isInfraCluster && verify.observationState === 'not_observed' && (
-                                         <div className="mt-1 pt-1.5 border-t border-white/[0.04] flex items-start gap-1.5">
-                                           <span className="text-blue-400/60 shrink-0">💡</span>
-                                           <span className="text-neutral-600 leading-tight">
-                                             {verify.isSuspiciouslyLow
-                                               ? 'Traffic expected but not seen — send a test request to trigger verification'
-                                               : 'No traffic yet — send a test request to verify fix'
-                                             }
-                                           </span>
+                                         <div className="mt-1 pt-1.5 border-t border-white/[0.04] space-y-1">
+                                           <div className="flex items-start gap-1.5">
+                                             <span className="text-blue-400/60 shrink-0">💡</span>
+                                             <span className="text-neutral-600 leading-tight">
+                                               {verify.isSuspiciouslyLow
+                                                 ? `Traffic expected but not seen${elapsedLabel} — send a test request to trigger verification`
+                                                 : `No traffic yet${elapsedLabel} — send a test request to verify fix`
+                                               }
+                                             </span>
+                                           </div>
+                                           {verify.lastFailedExecId && (
+                                             <a
+                                               href={`/project/${id}/executions/${verify.lastFailedExecId}`}
+                                               className="flex items-center gap-1 text-blue-400/70 hover:text-blue-300 transition-colors cursor-pointer"
+                                             >
+                                               <span className="text-[8px]">&#9654;</span>
+                                               <span>Replay failing request ({verify.lastFailedExecId.slice(0, 8)})</span>
+                                             </a>
+                                           )}
                                          </div>
                                        )}
                                      </div>
