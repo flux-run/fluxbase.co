@@ -1,9 +1,10 @@
 "use client";
 import { use, useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, CheckCircle2, AlertTriangle, Info, Zap, Terminal, MessageSquare, User, Clock, Bot } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, AlertTriangle, Info, Zap, Terminal, MessageSquare, User, Clock, Bot, ChevronDown } from "lucide-react";
 import { useFluxApi } from "@/lib/api";
 import { ProjectOverviewResult, Execution } from "@/types/api";
+import { useTeam, avatarColor } from "@/lib/teamStore";
 
 function timeAgo(d: string) {
   const m = Math.floor((Date.now() - new Date(d).getTime()) / 60000);
@@ -287,8 +288,8 @@ export default function IncidentDetailPage({
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [owner, setOwnerState] = useState<string>('');
   const [commentDraft, setCommentDraft] = useState('');
-  const [ownerDraft, setOwnerDraft] = useState('');
-  const [editingOwner, setEditingOwner] = useState(false);
+  const { users: teamUsers } = useTeam();
+  const [ownerDropdownOpen, setOwnerDropdownOpen] = useState(false);
 
   // Compute incident group early so callbacks can reference it
   const group = useMemo(() => {
@@ -358,7 +359,6 @@ export default function IncidentDetailPage({
     }
     const savedOwner = localStorage.getItem(`incident-owner:${title}`) ?? '';
     setOwnerState(savedOwner);
-    setOwnerDraft(savedOwner);
     const savedActivity = localStorage.getItem(`incident-activity:${title}`);
     if (savedActivity) {
       try { setActivity(JSON.parse(savedActivity)); } catch {}
@@ -421,7 +421,6 @@ export default function IncidentDetailPage({
     const trimmed = name.trim();
     setOwnerState(trimmed);
     localStorage.setItem(`incident-owner:${title}`, trimmed);
-    setEditingOwner(false);
     if (!trimmed) return;
     const who = owner || 'Someone';
     const ev: ActivityEvent = {
@@ -1164,38 +1163,55 @@ export default function IncidentDetailPage({
               <div className="space-y-2 pt-0.5">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[9px] text-neutral-600 font-mono shrink-0">Owner</span>
-                  {editingOwner ? (
-                    <form
-                      className="flex items-center gap-1 flex-1 justify-end"
-                      onSubmit={e => { e.preventDefault(); assignOwner(ownerDraft, activity); }}
-                    >
-                      <input
-                        autoFocus
-                        value={ownerDraft}
-                        onChange={e => setOwnerDraft(e.target.value)}
-                        placeholder="name or @handle"
-                        className="text-[9px] font-mono bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-300 placeholder-neutral-700 w-28 outline-none focus:border-neutral-500"
-                      />
-                      <button type="submit" className="text-[9px] font-black text-cyan-500 hover:text-cyan-400 px-1.5 transition-colors">Save</button>
-                      <button type="button" onClick={() => { setEditingOwner(false); setOwnerDraft(owner); }} className="text-[9px] text-neutral-600 hover:text-neutral-400 px-1 transition-colors">✕</button>
-                    </form>
-                  ) : (
+                  <div className="relative">
                     <button
-                      onClick={() => setEditingOwner(true)}
+                      onClick={() => setOwnerDropdownOpen(o => !o)}
                       className="flex items-center gap-1.5 group"
                     >
                       {owner ? (
                         <>
-                          <span className="w-4 h-4 rounded-full bg-neutral-700 flex items-center justify-center shrink-0">
-                            <User className="w-2.5 h-2.5 text-neutral-400" />
-                          </span>
+                          <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 text-[7px] font-black ${avatarColor(owner)}`}>
+                            {owner[0]?.toUpperCase()}
+                          </div>
                           <span className="text-[9px] font-bold text-neutral-300 font-mono">{owner}</span>
+                          <ChevronDown className="w-2.5 h-2.5 text-neutral-600" />
                         </>
                       ) : (
                         <span className="text-[9px] text-neutral-600 font-mono group-hover:text-neutral-400 transition-colors">Unassigned · assign →</span>
                       )}
                     </button>
-                  )}
+                    {ownerDropdownOpen && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setOwnerDropdownOpen(false)} />
+                        <div className="absolute right-0 top-full mt-1 z-20 w-48 rounded-xl border border-neutral-800 bg-neutral-950 shadow-xl overflow-hidden">
+                          {teamUsers.map(u => (
+                            <button
+                              key={u.id}
+                              onClick={() => { assignOwner(u.name, activity); setOwnerDropdownOpen(false); }}
+                              className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-neutral-900 transition-colors ${owner === u.name ? 'bg-neutral-900/60' : ''}`}
+                            >
+                              <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[8px] font-black ${avatarColor(u.name)}`}>
+                                {u.name[0]?.toUpperCase()}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[10px] font-black text-neutral-200 truncate">{u.name}</p>
+                                <p className="text-[8px] text-neutral-600 font-mono truncate">{u.role}</p>
+                              </div>
+                              {owner === u.name && <span className="text-[8px] text-blue-400 font-black">✓</span>}
+                            </button>
+                          ))}
+                          {owner && (
+                            <button
+                              onClick={() => { assignOwner('', activity); setOwnerDropdownOpen(false); }}
+                              className="w-full text-left px-3 py-2 text-[9px] text-neutral-600 hover:text-red-400 font-mono border-t border-neutral-800/60 transition-colors"
+                            >
+                              Remove owner
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-[9px] text-neutral-600 font-mono">Service</span>
@@ -1343,7 +1359,7 @@ export default function IncidentDetailPage({
               </div>
               <div className="flex items-center gap-2 flex-wrap justify-center">
                 <button
-                  onClick={() => setEditingOwner(true)}
+                  onClick={() => setOwnerDropdownOpen(true)}
                   className="text-[9px] font-black text-neutral-500 hover:text-white border border-neutral-800 hover:border-neutral-600 rounded-lg px-2.5 py-1 transition-all"
                 >
                   Assign owner
@@ -1368,9 +1384,7 @@ export default function IncidentDetailPage({
                 {/* avatar / dot */}
                 {(isHumanAction || isComment) ? (
                   <div className={`mt-0.5 shrink-0 w-[22px] h-[22px] rounded-full flex items-center justify-center z-10 text-[8px] font-black ${
-                    isComment
-                      ? 'bg-emerald-950/60 border border-emerald-800/60 text-emerald-300'
-                      : 'bg-emerald-950/40 border border-emerald-900/50 text-emerald-400'
+                    event.actor ? avatarColor(event.actor) : 'bg-emerald-950/60 border border-emerald-800/60 text-emerald-300'
                   }`}>
                     {actorInitial}
                   </div>
@@ -1443,7 +1457,7 @@ export default function IncidentDetailPage({
             )}
             {!owner && (
               <button
-                onClick={() => setEditingOwner(true)}
+                onClick={() => setOwnerDropdownOpen(true)}
                 className="text-[9px] font-black text-neutral-500 hover:text-white border border-neutral-800 hover:border-neutral-600 rounded-md px-2.5 py-1 transition-all"
               >
                 Assign owner
