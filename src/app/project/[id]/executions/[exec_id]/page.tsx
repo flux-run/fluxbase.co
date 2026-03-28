@@ -104,13 +104,19 @@ function parseStackFrames(stack?: string | null) {
     .filter(line => line.trim().startsWith('at '))
     .map(line => {
       const clean = line.trim().replace(/^at\s+/, '');
-      const full = clean.match(/^(.+?)\s+\((.+?):([\d]+):([\d]+)\)$/);
+      const full = clean.match(/^(.+?)\s+\((.+?):(\d+):(\d+)\)$/);
       if (full) return { fn: full[1], file: full[2], line: full[3], col: full[4] };
-      const bare = clean.match(/^(.+?):([\d]+):([\d]+)$/);
+      const bare = clean.match(/^(.+?):(\d+):(\d+)$/);
       if (bare) return { fn: '<anonymous>', file: bare[1], line: bare[2], col: bare[3] };
       return null;
     })
     .filter(Boolean) as { fn: string; file: string; line: string; col: string }[];
+}
+
+function frameLabel(frame?: { fn?: string; file: string; line: string | number; col?: string | number } | null, short = true): string | null {
+  if (!frame) return null;
+  const file = short ? (frame.file.split('/').pop() ?? frame.file) : frame.file;
+  return frame.col != null ? `${file}:${frame.line}:${frame.col}` : `${file}:${frame.line}`;
 }
 
 function errorTypeToFix(errorName?: string | null, errorMessage?: string | null, errorKey?: string | null): string | null {
@@ -228,9 +234,12 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
         : `Execution interrupted by unhandled exception: ${errorHeadline}`;
 
   const stackFrames = parseStackFrames(exec.error_stack);
-  const userFrame = stackFrames.find(f =>
-    !f.file.includes('ext:') && !f.file.includes('deno:') && !f.file.includes('node:') && !f.file.includes('internal/')
-  );
+  const userFrame: { fn?: string; file: string; line: string | number; col?: string | number } | null =
+    (exec.error_frames?.length ?? 0) > 0
+      ? exec.error_frames![0]
+      : (stackFrames.find(f =>
+          !f.file.includes('ext:') && !f.file.includes('deno:') && !f.file.includes('node:') && !f.file.includes('internal/')
+        ) ?? null);
   const fixHint = errorTypeToFix(exec.error_name, exec.error_message, exec.error);
 
   const reqHeaders = typeof reqObj?.headers === 'object' && reqObj.headers !== null
@@ -369,8 +378,8 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                             </h3>
                             {userFrame && (
                               <p className="text-neutral-600 text-[11px] font-mono">
-                                ↳ <span className="text-red-400/80">{userFrame.fn}</span>
-                                {' '}<span className="text-neutral-700">{userFrame.file}:{userFrame.line}</span>
+                                ↳ <span className="text-red-400/80">{userFrame.fn ?? '<anonymous>'}</span>
+                                {' '}<span className="text-neutral-700">{frameLabel(userFrame)}</span>
                               </p>
                             )}
                           </div>
@@ -433,33 +442,38 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                         </div>
                      )}
 
-                     {exec.status !== 'ok' && exec.error_stack && stackFrames.length > 0 && (
-                        <div className="space-y-2">
-                           <button
-                             onClick={() => setShowStack(v => !v)}
-                             className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-red-400 hover:text-red-300 transition-colors"
-                           >
-                             <ChevronRight className={`w-3 h-3 transition-transform duration-200 ${showStack ? 'rotate-90' : ''}`} />
-                             Stack trace — {stackFrames.length} frames
-                           </button>
-                           {showStack && (
-                             <div className="bg-black/80 border border-red-900/20 rounded-lg overflow-hidden">
-                               {stackFrames.slice(0, 14).map((frame, i) => (
-                                 <div key={i} className={`px-4 py-1.5 border-b border-neutral-900/40 last:border-0 font-mono text-[11px] flex gap-3 ${i === 0 ? 'bg-red-950/30' : ''}`}>
-                                   <span className="text-neutral-700 w-5 shrink-0 text-right">{i + 1}</span>
-                                   <div className="min-w-0">
-                                     <span className={i === 0 ? 'text-red-300' : 'text-neutral-400'}>{frame.fn}</span>
-                                     {frame.file && <span className="text-neutral-700 ml-2">{frame.file}:{frame.line}</span>}
+                     {exec.status !== 'ok' && (exec.error_frames?.length ?? stackFrames.length) > 0 && (() => {
+                        const displayFrames: { fn?: string; file: string; line: string | number; col?: string | number }[] =
+                          exec.error_frames?.length ? exec.error_frames : stackFrames;
+                        const limit = 5;
+                        return (
+                          <div className="space-y-2">
+                             <button
+                               onClick={() => setShowStack(v => !v)}
+                               className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-red-400 hover:text-red-300 transition-colors"
+                             >
+                               <ChevronRight className={`w-3 h-3 transition-transform duration-200 ${showStack ? 'rotate-90' : ''}`} />
+                               Stack trace — {displayFrames.length} frame{displayFrames.length !== 1 ? 's' : ''}
+                             </button>
+                             {showStack && (
+                               <div className="bg-black/80 border border-red-900/20 rounded-lg overflow-hidden">
+                                 {displayFrames.slice(0, limit).map((frame, i) => (
+                                   <div key={i} className={`px-4 py-1.5 border-b border-neutral-900/40 last:border-0 font-mono text-[11px] flex gap-3 ${i === 0 ? 'bg-red-950/30' : ''}`}>
+                                     <span className="text-neutral-700 w-5 shrink-0 text-right">{i + 1}</span>
+                                     <div className="min-w-0">
+                                       <span className={i === 0 ? 'text-red-300' : 'text-neutral-400'}>{frame.fn ?? '<anonymous>'}</span>
+                                       {frame.file && <span className="text-neutral-700 ml-2">{frameLabel(frame)}</span>}
+                                     </div>
                                    </div>
-                                 </div>
-                               ))}
-                               {stackFrames.length > 14 && (
-                                 <div className="px-4 py-2 text-[10px] text-neutral-600 font-mono italic">+{stackFrames.length - 14} more frames</div>
-                               )}
-                             </div>
-                           )}
-                        </div>
-                     )}
+                                 ))}
+                                 {displayFrames.length > limit && (
+                                   <div className="px-4 py-2 text-[10px] text-neutral-600 font-mono italic">+{displayFrames.length - limit} more frames</div>
+                                 )}
+                               </div>
+                             )}
+                          </div>
+                        );
+                     })()}
 
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-2 border-y border-neutral-900/50">
                         <div className="space-y-1">
@@ -602,9 +616,14 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                        <Terminal className="w-3.5 h-3.5 text-red-500" />
                        <span className="text-[10px] font-black uppercase text-red-500 tracking-widest">Halt Reason</span>
                     </div>
-                    <code className="text-[11px] text-red-400 font-mono italic">
-                       {haltReason}
-                    </code>
+                  <code className="text-[11px] text-red-400 font-mono italic whitespace-pre-wrap">
+                     {!isGenericErrorHeadline(errorHeadline) ? (
+                       <>
+                         {errorHeadline}
+                         {userFrame && <><br /><span className="text-neutral-600">at {frameLabel(userFrame, false)}</span></>}
+                       </>
+                     ) : haltReason}
+                  </code>
                   </div>
                )}
             </div>
@@ -659,7 +678,12 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                      <span className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest">Response Output</span>
                   </div>
                   <pre className="p-6 text-[12px] font-mono leading-relaxed text-neutral-400 max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-thumb-neutral-800">
-                     {JSON.stringify(resObj, null, 2)}
+                     {JSON.stringify(
+                       exec.status !== 'ok' && exec.error_frames?.[0]
+                         ? { ...resObj, frame: exec.error_frames[0] }
+                         : resObj,
+                       null, 2
+                     )}
                   </pre>
                </Card>
             </div>
@@ -702,7 +726,7 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                           {!isGenericErrorHeadline(errorHeadline) ? errorHeadline : (haltReason ?? 'Execution aborted')}
                         </code>
                         {userFrame && (
-                          <span className="text-[10px] text-neutral-600 font-mono mt-0.5">{userFrame.file}:{userFrame.line}</span>
+                          <span className="text-[10px] text-neutral-600 font-mono mt-0.5">at {frameLabel(userFrame)}</span>
                         )}
                       </div>
                       <span className="text-[10px] text-red-500 font-bold shrink-0">✕ ABORTED</span>

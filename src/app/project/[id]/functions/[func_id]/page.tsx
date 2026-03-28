@@ -100,6 +100,33 @@ function confidenceLabel(confidence?: number) {
   return "Low";
 }
 
+function parseStackFrames(stack?: string | null) {
+  if (!stack) return [];
+  return stack.split('\n')
+    .filter(line => line.trim().startsWith('at '))
+    .map(line => {
+      const clean = line.trim().replace(/^at\s+/, '');
+      const full = clean.match(/^(.+?)\s+\((.+?):(\d+):(\d+)\)$/);
+      if (full) return { fn: full[1], file: full[2], line: full[3], col: full[4] };
+      const bare = clean.match(/^(.+?):(\d+):(\d+)$/);
+      if (bare) return { fn: '<anonymous>', file: bare[1], line: bare[2], col: bare[3] };
+      return null;
+    })
+    .filter(Boolean) as { fn: string; file: string; line: string; col: string }[];
+}
+
+function frameLabel(frame?: { fn?: string; file: string; line: string | number; col?: string | number } | null, short = true): string | null {
+  if (!frame) return null;
+  const file = short ? (frame.file.split('/').pop() ?? frame.file) : frame.file;
+  return frame.col != null ? `${file}:${frame.line}:${frame.col}` : `${file}:${frame.line}`;
+}
+
+function topUserFrame(stack?: string | null) {
+  return parseStackFrames(stack).find(f =>
+    !f.file.includes('ext:') && !f.file.includes('deno:') && !f.file.includes('node:') && !f.file.includes('internal/')
+  ) ?? null;
+}
+
 export default function FunctionDetail({ params }: { params: Promise<{ id: string, func_id: string }> }) {
   const { id, func_id } = use(params);
   const api = useFluxApi(id);
@@ -243,6 +270,12 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                     )}
                  </div>
                  <h3 className="text-3xl font-bold text-red-50 leading-tight max-w-2xl">{activeIssue}</h3>
+                 {(() => {
+                   const frame = topUserFrame(statsData.root_cause.sample_stack);
+                   return frame ? (
+                     <p className="text-red-400/60 text-[12px] font-mono -mt-1">↳ {frameLabel(frame)}</p>
+                   ) : null;
+                 })()}
                  <div className="text-red-200/80 font-mono text-sm border-l-2 border-red-500/30 pl-4 py-1 space-y-1">
                     <span className="block font-bold text-red-400 mb-1">Detected Cause</span>
                     {statsData.root_cause.cause}
@@ -261,10 +294,14 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                        <div className="space-y-2.5">
                          {statsData.top_issues.slice(0, 4).map((iss, idx) => {
                            const pct = total > 0 ? Math.round((iss.count / total) * 100) : 0;
+                           const issFrame = topUserFrame(iss.sample_stack);
+                           const issLoc = frameLabel(issFrame);
                            return (
                              <div key={idx} className="space-y-1">
                                <div className="flex items-center justify-between gap-3">
-                                 <span className="font-mono text-[11px] text-neutral-300 truncate">{iss.title}</span>
+                                 <span className="font-mono text-[11px] text-neutral-300 truncate" title={issLoc ? `${iss.title} @ ${issLoc}` : iss.title}>
+                                   {iss.title}{issLoc ? <span className="text-neutral-600"> @ {issLoc}</span> : null}
+                                 </span>
                                  <span className="text-[10px] font-bold text-neutral-500 shrink-0">{pct}% · {iss.count}×</span>
                                </div>
                                <div className="h-1.5 bg-neutral-800/60 rounded-full overflow-hidden">
@@ -300,6 +337,13 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                              <div className="text-xs font-mono text-red-400 font-bold truncate">
                                 {statsData.root_cause.latest_failure.error || "Unknown error"}
                              </div>
+                             {(() => {
+                               const frame = topUserFrame(statsData.root_cause.sample_stack);
+                               const loc = frameLabel(frame);
+                               return loc ? (
+                                 <div className="text-[9px] font-mono text-neutral-600 mt-0.5 truncate">↳ {loc}</div>
+                               ) : null;
+                             })()}
                           </div>
                        </div>
                        <button 
@@ -483,14 +527,19 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                       </td>
                       <td className="px-4 py-3 align-top">
                         <span className={`font-bold ${exec.status === 'ok' ? 'text-green-500' : 'text-red-500'}`}>{exec.status.toUpperCase()}</span>
-                        {exec.status === 'error' && (
-                           <div
-                             className="text-[10px] text-red-400/80 mt-1 truncate max-w-[240px] font-mono"
-                             title={formatErrorHeadline(exec.error_name, exec.error_message, exec.error, exec.error_stack)}
-                           >
-                             {formatErrorHeadline(exec.error_name, exec.error_message, exec.error, exec.error_stack)}
-                           </div>
-                        )}
+                        {exec.status === 'error' && (() => {
+                           const headline = formatErrorHeadline(exec.error_name, exec.error_message, exec.error, exec.error_stack);
+                           const frame = topUserFrame(exec.error_stack);
+                           const loc = frameLabel(frame);
+                           return (
+                             <div
+                               className="text-[10px] text-red-400/80 mt-1 truncate max-w-[240px] font-mono"
+                               title={loc ? `${headline} (${loc})` : headline}
+                             >
+                               {headline}{loc ? <span className="text-neutral-600"> ({loc})</span> : null}
+                             </div>
+                           );
+                        })()}
                       </td>
                        <td className="px-4 py-3 text-neutral-500">{exec.duration_ms}ms</td>
                        <td className="px-4 py-3">
@@ -561,6 +610,8 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                      ? 'text-orange-500 bg-orange-950/30 border-orange-900/40'
                      : i === 0 ? 'text-red-500 bg-red-950/30 border-red-900/40'
                      : 'text-yellow-500 bg-yellow-950/30 border-yellow-900/40';
+                   const issueFrame = topUserFrame(issue.sample_stack);
+                   const issueLoc = frameLabel(issueFrame);
                    return (
                      <div
                        key={i}
@@ -573,7 +624,9 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                            <span className="text-[8px] uppercase opacity-70">Hits</span>
                          </div>
                          <div className="flex flex-col overflow-hidden">
-                           <span className="text-neutral-200 truncate font-semibold" title={issue.title}>{issue.title}</span>
+                           <span className="text-neutral-200 truncate font-semibold" title={issueLoc ? `${issue.title} @ ${issueLoc}` : issue.title}>
+                             {issue.title}{issueLoc ? <span className="text-neutral-600"> @ {issueLoc}</span> : null}
+                           </span>
                            <div className="flex items-center gap-2 mt-0.5 overflow-hidden">
                              <span className="text-[10px] text-neutral-600 uppercase tracking-wider shrink-0">{issue.fingerprint.slice(0, 8)}</span>
                              {fixForIssue && (

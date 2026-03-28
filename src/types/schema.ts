@@ -142,6 +142,7 @@ export interface Execution {
   is_user_code: boolean | null;
   error_source: string | null;
   error_type: string | null;
+  error_frames?: Array<{ fn?: string; file: string; line: number; col?: number }> | null;
 }
 
 export interface Issue {

@@ -55,6 +55,7 @@ export interface FunctionStatsResult {
     count: number;
     first_seen: string;
     last_seen: string;
+    sample_stack?: string | null;
   }[];
   timeseries: {
     hour: string;
