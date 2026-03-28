@@ -168,6 +168,18 @@ export function useFluxApi(projectId?: string) {
       getTeam: (orgId: string) =>
         request<{ members: { id: string; email: string; role: string }[]; pending: { id: string; email: string; role: string; created_at: string }[] }>(
           `/orgs/${orgId}/team`, token()),
+      getProjectAccess: (projectId: string) =>
+        request<{ members: { user_id: string; email: string; org_role: string; project_role: string | null }[] }>(
+          `/projects/${projectId}/access`, token()),
+      setProjectAccessRole: (projectId: string, userId: string, role: "engineer" | "viewer") =>
+        request<{ ok: boolean }>(`/projects/${projectId}/access/${userId}`, token(), {
+          method: "PUT",
+          body: JSON.stringify({ role }),
+        }),
+      removeProjectAccess: (projectId: string, userId: string) =>
+        request<{ ok: boolean }>(`/projects/${projectId}/access/${userId}`, token(), {
+          method: "DELETE",
+        }),
       updateMemberRole: (orgId: string, userId: string, role: string) =>
         request<{ ok: boolean }>(`/orgs/${orgId}/team/${userId}`, token(), {
           method: "PATCH",
