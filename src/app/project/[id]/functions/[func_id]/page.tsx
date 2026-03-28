@@ -1332,6 +1332,54 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
         </div>
 
         <div className="space-y-10">
+          {/* Deployments */}
+          <section>
+            <h3 className="text-sm font-bold uppercase tracking-widest text-neutral-500 mb-3 flex items-center gap-2">
+              <GitCommit className="w-4 h-4" />
+              Deployments
+            </h3>
+            <div className="flex flex-col gap-1.5 font-mono">
+              {deploymentList.length === 0 && (
+                <div className="text-neutral-700 text-xs italic">No deployments yet.</div>
+              )}
+              {deploymentList.map((dep, i) => {
+                const slice = deploySlice(dep.artifact_id);
+                const isCurrent = i === 0;
+                const sha7 = dep.artifact_id?.slice(0, 7) ?? '???????';
+                const errRate = slice && slice.total > 0 ? Math.round((slice.errors / slice.total) * 100) : null;
+                const relTime = dep.created_at ? (() => {
+                  const diff = Date.now() - new Date(dep.created_at).getTime();
+                  const mins = Math.floor(diff / 60000);
+                  if (mins < 60) return `${mins}m ago`;
+                  const hrs = Math.floor(mins / 60);
+                  if (hrs < 24) return `${hrs}h ago`;
+                  return `${Math.floor(hrs / 24)}d ago`;
+                })() : null;
+                return (
+                  <div key={dep.id ?? i} className={`flex items-center justify-between px-3 py-2 rounded-lg border text-[11px] ${
+                    isCurrent
+                      ? 'bg-emerald-950/20 border-emerald-900/50'
+                      : 'bg-neutral-950 border-neutral-800/60'
+                  }`}>
+                    <div className="flex items-center gap-2">
+                      <span className={`font-black ${isCurrent ? 'text-emerald-400' : 'text-neutral-500'}`}>{sha7}</span>
+                      {isCurrent && <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-600 border border-emerald-900/50 px-1 py-px rounded">current</span>}
+                      {dep.status === 'boot_failed' && <span className="text-[9px] font-bold uppercase tracking-wider text-red-500 border border-red-900/50 px-1 py-px rounded">boot failed</span>}
+                    </div>
+                    <div className="flex items-center gap-2 text-right">
+                      {errRate !== null && (
+                        <span className={`text-[10px] font-bold ${errRate > 0 ? 'text-red-400' : 'text-emerald-500'}`}>
+                          {errRate > 0 ? `${errRate}% err` : '0 err'}
+                        </span>
+                      )}
+                      {relTime && <span className="text-neutral-700 text-[10px]">{relTime}</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
           <section>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-bold uppercase tracking-widest text-neutral-500">Function Settings</h3>
