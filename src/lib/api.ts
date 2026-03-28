@@ -140,6 +140,8 @@ export function useFluxApi(projectId?: string) {
         }),
       getFunctionStats: (funcId: string) =>
         request<any>(`/function/${funcId}/overview`, token()),
+      getDeployments: (funcId: string) =>
+        request<any[]>(`/functions/${funcId}/deployments`, token()).catch(() => []),
 
       /* Routes */
       getRoutes: (id?: string) =>

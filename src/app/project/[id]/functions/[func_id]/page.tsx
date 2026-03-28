@@ -138,6 +138,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
   const [data, setData] = useState<Function | null>(null);
   const [executions, setExecutions] = useState<Execution[]>([]);
   const [statsData, setStatsData] = useState<FunctionStatsResult | null>(null);
+  const [deploymentList, setDeploymentList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedExecId, setSelectedExecId] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -147,14 +148,16 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
     if (!api.ready) return;
 
     try {
-      const [func, execs, st] = await Promise.all([
+      const [func, execs, st, deps] = await Promise.all([
         api.getFunction(func_id),
         api.getFunctionExecutions(func_id),
-        api.getFunctionStats(func_id)
+        api.getFunctionStats(func_id),
+        api.getDeployments(func_id),
       ]);
       setData(func);
       setExecutions(execs);
       setStatsData(st);
+      setDeploymentList(deps);
     } catch (err) {
       console.error("Failed to load function details:", err);
     } finally {
@@ -174,6 +177,9 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
   }, [func_id, api]);
 
   if (!data) return <div className="animate-pulse text-sm font-mono text-neutral-500">Loading function orchestration...</div>;
+
+  const latestDeployment = deploymentList[0] ?? null;
+  const bootFailed = latestDeployment?.status === 'boot_failed';
 
   const st = statsData?.stats;
   const stats = [
@@ -238,6 +244,19 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
           <button className="bg-neutral-100 text-black px-4 py-1.5 rounded-md font-semibold text-sm hover:bg-neutral-300 transition">Logs</button>
         </div>
       </header>
+
+      {bootFailed && (
+        <div className="bg-red-950/40 border border-red-900/60 rounded-xl p-5 flex items-start gap-3">
+          <AlertOctagon className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+          <div className="space-y-1 min-w-0">
+            <p className="text-sm font-bold text-red-300">Deployment failed — function cannot serve requests</p>
+            <p className="text-xs font-mono text-red-400/80 break-words">{latestDeployment.error_message || 'Boot error (no detail available)'}</p>
+            {latestDeployment.error_type && (
+              <p className="text-[10px] font-bold uppercase tracking-widest text-red-500/60">{latestDeployment.error_type.replace(/_/g, ' ')}</p>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
         {stats.map(s => (
