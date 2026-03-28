@@ -369,13 +369,13 @@ export default function ProjectPage({
                       <div className="text-3xl font-black tabular-nums text-red-400 leading-none">
                         {suggestedFocus.failureRatePct}%
                       </div>
-                      <div className="text-[8px] text-neutral-600 mt-0.5">failure rate</div>
+                      <div className="text-[8px] text-neutral-400 mt-0.5">failure rate</div>
                     </div>
                   </div>
 
                   {suggestedFocus.affectedFns.length > 1 && (
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[8px] text-neutral-700 uppercase font-black tracking-widest">Affected:</span>
+                      <span className="text-[8px] text-neutral-500 uppercase font-black tracking-widest">Affected:</span>
                       {suggestedFocus.affectedFns.map((fn) => (
                         <span key={fn} className="text-[9px] font-bold text-neutral-400 bg-neutral-900 border border-neutral-800 px-1.5 py-0.5 rounded font-mono">{fn}</span>
                       ))}
@@ -383,27 +383,27 @@ export default function ProjectPage({
                   )}
 
                   <div className="space-y-0.5 border-t border-red-900/30 pt-2">
-                    <p className="text-[8px] font-black uppercase tracking-widest text-neutral-700 mb-1">Why this first</p>
+                    <p className="text-[8px] font-black uppercase tracking-widest text-neutral-500 mb-1">Why this first</p>
                     {/* 1. failure rate — always consistent: actual rate + actual counts */}
-                    <p className="text-[9px] text-neutral-500 font-mono">
-                      <span className="text-red-500/50 mr-1.5 select-none">·</span>
+                    <p className="text-[9px] text-neutral-300 font-mono">
+                      <span className="text-red-500/60 mr-1.5 select-none">·</span>
                       {suggestedFocus.failureRatePct}% failure rate — {suggestedFocus.totalErrors.toLocaleString()}/{suggestedFocus.totalExecs.toLocaleString()} executions failing
                     </p>
                     {/* 2. user-impact first, traffic as secondary context */}
-                    <p className="text-[9px] text-neutral-500 font-mono">
-                      <span className="text-red-500/50 mr-1.5 select-none">·</span>
+                    <p className="text-[9px] text-neutral-300 font-mono">
+                      <span className="text-red-500/60 mr-1.5 select-none">·</span>
                       {suggestedFocus.usersPer10 > 0 ? (
                         <>
                           impacts ~{suggestedFocus.usersPer10} in 10 users
-                          <span className="text-neutral-700 ml-1">({suggestedFocus.trafficPct}% of traffic)</span>
+                          <span className="text-neutral-500 ml-1">({suggestedFocus.trafficPct}% of traffic)</span>
                         </>
                       ) : (
                         `${suggestedFocus.trafficPct}% of impacted traffic`
                       )}
                     </p>
                     {/* 3. relative comparison + dominance */}
-                    <p className="text-[9px] text-neutral-500 font-mono">
-                      <span className="text-red-500/50 mr-1.5 select-none">·</span>
+                    <p className="text-[9px] text-neutral-300 font-mono">
+                      <span className="text-red-500/60 mr-1.5 select-none">·</span>
                       {incidentGroups.length === 1
                         ? overview!.incidents.length > 1
                           ? "single incident — all failures share the same root cause"
@@ -412,46 +412,46 @@ export default function ProjectPage({
                         ? `${suggestedFocus.impactMultiple}× larger than next issue`
                         : `highest-impact of ${incidentGroups.length} active incidents`}
                       {incidentGroups.length > 1 && suggestedFocus.secondTrafficPct !== null && (
-                        <span className="text-neutral-600"> — next: {suggestedFocus.secondTrafficPct}% traffic</span>
+                        <span className="text-neutral-500"> — next: {suggestedFocus.secondTrafficPct}% traffic</span>
                       )}
                     </p>
                     {/* dominance: show when this group owns essentially all failing traffic */}
                     {suggestedFocus.trafficPct >= 80 && (
-                      <p className="text-[9px] text-neutral-500 font-mono">
-                        <span className="text-red-500/50 mr-1.5 select-none">·</span>
+                      <p className="text-[9px] text-neutral-300 font-mono">
+                        <span className="text-red-500/60 mr-1.5 select-none">·</span>
                         primary incident — accounts for {suggestedFocus.trafficPct === 100 ? "all" : "most"} failing traffic
                       </p>
                     )}
                     {/* 4. deploy causality — timing → evidence → conclusion */}
                     {suggestedFocus.deployId ? (
                       <>
-                        <p className="text-[9px] text-neutral-500 font-mono">
-                          <span className="text-red-500/50 mr-1.5 select-none">·</span>
+                        <p className="text-[9px] text-neutral-300 font-mono">
+                          <span className="text-red-500/60 mr-1.5 select-none">·</span>
                           {suggestedFocus.deployDeltaMin !== null && suggestedFocus.deployDeltaMin > 0
                             ? `started ${suggestedFocus.deployDeltaMin}m after deploy ${suggestedFocus.deployId}`
                             : `started after deploy ${suggestedFocus.deployId}`}
-                          <span className="text-neutral-700"> ({timeAgo(suggestedFocus.firstSeen)})</span>
+                          <span className="text-neutral-500"> ({timeAgo(suggestedFocus.firstSeen)})</span>
                         </p>
                         {suggestedFocus.errorsAfterDeploy > 0 && (
-                          <p className="text-[9px] text-neutral-600 font-mono">
-                            <span className="text-red-500/50 mr-1.5 select-none">·</span>
+                          <p className="text-[9px] text-neutral-400 font-mono">
+                            <span className="text-red-500/60 mr-1.5 select-none">·</span>
                             before deploy: {suggestedFocus.errorsBeforeDeploy} failures
                             {suggestedFocus.execsBeforeDeploy > 0 && (
-                              <span className="text-neutral-700"> / {suggestedFocus.execsBeforeDeploy} execs ({Math.round(suggestedFocus.errorsBeforeDeploy / suggestedFocus.execsBeforeDeploy * 100)}%)</span>
+                              <span className="text-neutral-500"> / {suggestedFocus.execsBeforeDeploy} execs ({Math.round(suggestedFocus.errorsBeforeDeploy / suggestedFocus.execsBeforeDeploy * 100)}%)</span>
                             )}
                           </p>
                         )}
                         {suggestedFocus.errorsAfterDeploy > 0 && (
-                          <p className="text-[9px] text-neutral-600 font-mono">
-                            <span className="text-red-500/50 mr-1.5 select-none">·</span>
+                          <p className="text-[9px] text-neutral-400 font-mono">
+                            <span className="text-red-500/60 mr-1.5 select-none">·</span>
                             after deploy: {suggestedFocus.errorsAfterDeploy} failures
                             {suggestedFocus.execsAfterDeploy > 0 && (
-                              <span className="text-neutral-700"> / {suggestedFocus.execsAfterDeploy} execs ({Math.round(suggestedFocus.errorsAfterDeploy / suggestedFocus.execsAfterDeploy * 100)}%)</span>
+                              <span className="text-neutral-500"> / {suggestedFocus.execsAfterDeploy} execs ({Math.round(suggestedFocus.errorsAfterDeploy / suggestedFocus.execsAfterDeploy * 100)}%)</span>
                             )}
                           </p>
                         )}
-                        <p className="text-[9px] text-neutral-600 font-mono">
-                          <span className="text-red-500/50 mr-1.5 select-none">·</span>
+                        <p className="text-[9px] text-neutral-400 font-mono">
+                          <span className="text-red-500/60 mr-1.5 select-none">·</span>
                           {suggestedFocus.deployMode === 'introduced'
                             ? 'no failures before this deploy'
                             : suggestedFocus.deployMode === 'regressed' && suggestedFocus.rateBeforePct !== null && suggestedFocus.rateAfterPct !== null
@@ -463,73 +463,107 @@ export default function ProjectPage({
                             : 'active around this deployment'}
                         </p>
                         {suggestedFocus.postDeploySampleLow && (
-                          <p className="text-[9px] text-neutral-600 font-mono">
-                            <span className="text-neutral-700/50 mr-1.5 select-none">·</span>
-                            <span className="text-neutral-600">low sample size after deploy ({suggestedFocus.execsAfterDeploy} executions)</span>
+                          <p className="text-[9px] text-neutral-400 font-mono">
+                            <span className="text-neutral-500/70 mr-1.5 select-none">·</span>
+                            <span className="text-neutral-400">low sample size after deploy ({suggestedFocus.execsAfterDeploy} executions)</span>
+                          </p>
+                        )}
+                        {suggestedFocus.deployMode === 'regressed' && suggestedFocus.postDeploySampleLow && (
+                          <p className="text-[9px] font-mono">
+                            <span className="text-red-500/60 mr-1.5 select-none">·</span>
+                            <span className="text-orange-400/80 font-black">→ possible regression (low impact confidence)</span>
                           </p>
                         )}
                         <p className="text-[9px] font-mono">
-                          <span className="text-red-500/50 mr-1.5 select-none">·</span>
+                          <span className="text-red-500/60 mr-1.5 select-none">·</span>
                           {suggestedFocus.deployMode === 'introduced' && (
-                            <span className="text-orange-500/70 font-black">→ caused by this deployment</span>
+                            <span className="text-orange-400 font-black">→ caused by this deployment</span>
                           )}
                           {suggestedFocus.deployMode === 'regressed' && (
-                            <span className="text-orange-400/70 font-black">→ worsened by this deployment</span>
+                            <span className="text-orange-300 font-black">
+                              {suggestedFocus.postDeploySampleLow
+                                ? '→ failure rate increased after deployment'
+                                : '→ worsened by this deployment'}
+                            </span>
                           )}
                           {suggestedFocus.deployMode === 'improved' && (
-                            <span className="text-emerald-500/70 font-black">→ improved by this deployment</span>
+                            <span className="text-emerald-400 font-black">→ improved by this deployment</span>
                           )}
                           {suggestedFocus.deployMode === 'unchanged' && (
-                            <span className="text-amber-500/70 font-black">
+                            <span className="text-amber-400 font-black">
                               → persistent failure — {suggestedFocus.postDeploySampleLow ? 'no evidence of improvement after deployment' : 'unchanged by deployment'}
                             </span>
                           )}
                           {!suggestedFocus.deployMode && (
-                            <span className="text-orange-500/70 font-black">→ likely caused by this deployment</span>
+                            <span className="text-orange-400 font-black">→ likely caused by this deployment</span>
                           )}
                         </p>
                       </>
                     ) : (
-                      <p className="text-[9px] text-neutral-500 font-mono">
-                        <span className="text-red-500/50 mr-1.5 select-none">·</span>
+                      <p className="text-[9px] text-neutral-300 font-mono">
+                        <span className="text-red-500/60 mr-1.5 select-none">·</span>
                         first seen {timeAgo(suggestedFocus.firstSeen)}
                       </p>
                     )}
                     {suggestedFocus.affectedFns.length > 1 && (
-                      <p className="text-[9px] text-neutral-500 font-mono">
-                        <span className="text-red-500/50 mr-1.5 select-none">·</span>
+                      <p className="text-[9px] text-neutral-300 font-mono">
+                        <span className="text-red-500/60 mr-1.5 select-none">·</span>
                         cross-function — {suggestedFocus.affectedFns.length} services affected
                       </p>
                     )}
                     {suggestedFocus.isRecurring && (
                       <p className="text-[9px] font-mono">
                         <span className="text-amber-500/50 mr-1.5 select-none">·</span>
-                        <span className="text-amber-400/80">⚠ recurring — also seen in previous deployment</span>
-                        <span className="text-neutral-700"> · fix may be incomplete</span>
+                        <span className="text-amber-300">⚠ recurring — also seen in previous deployment</span>
+                        <span className="text-neutral-500"> · fix may be incomplete</span>
                       </p>
                     )}
-                    {/* confidence footer — evidence-based reasoning, not just sample count */}
-                    <div className="pt-1.5 mt-0.5 border-t border-red-900/20 space-y-0.5">
+                    {/* confidence footer — two dimensions: signal (data quality) + impact (deploy causality) */}
+                    <div className="pt-1.5 mt-0.5 border-t border-red-900/30 space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[8px] font-black text-neutral-500 uppercase tracking-widest">Confidence</span>
+                      </div>
+                      {/* Signal confidence: how reliable is the underlying data */}
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[8px] font-black text-neutral-700 uppercase tracking-widest">Confidence:</span>
+                        <span className="text-[8px] text-neutral-400 font-mono pl-0.5">· signal:</span>
                         <span className={`text-[8px] font-black ${
                           suggestedFocus.confidenceLabel === "High" ? "text-emerald-500" :
                           suggestedFocus.confidenceLabel === "Medium" ? "text-amber-400" :
                           "text-neutral-500"
                         }`}>{suggestedFocus.confidenceLabel}</span>
+                        {suggestedFocus.affectedFns.length > 1 && (
+                          <span className="text-[8px] text-neutral-500 font-mono">({suggestedFocus.affectedFns.length} functions)</span>
+                        )}
                       </div>
-                      {suggestedFocus.affectedFns.length > 1 && (
-                        <p className="text-[8px] text-neutral-700 font-mono pl-0.5">
-                          · consistent across {suggestedFocus.affectedFns.length} functions
-                        </p>
+                      {/* Impact confidence: how certain are we the deploy caused/changed this */}
+                      {suggestedFocus.deployId && (
+                        <>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[8px] text-neutral-400 font-mono pl-0.5">· impact:</span>
+                            <span className={`text-[8px] font-black ${
+                              suggestedFocus.postDeploySampleLow ? 'text-neutral-500'
+                              : suggestedFocus.deployMode === 'introduced' ? 'text-emerald-500'
+                              : suggestedFocus.deployMode === 'regressed' || suggestedFocus.deployMode === 'improved' ? 'text-amber-400'
+                              : 'text-neutral-500'
+                            }`}>
+                              {suggestedFocus.postDeploySampleLow ? 'Low' : suggestedFocus.deployMode === 'introduced' ? 'High' : 'Medium'}
+                            </span>
+                          </div>
+                          {suggestedFocus.postDeploySampleLow && (
+                            <p className="text-[8px] text-neutral-500 font-mono pl-0.5">
+                              · reason: insufficient post-deploy data ({suggestedFocus.execsAfterDeploy} executions)
+                            </p>
+                          )}
+                        </>
                       )}
+                      {/* Evidence bullets */}
                       {suggestedFocus.deployMode === 'introduced' && (
-                        <p className="text-[8px] text-neutral-700 font-mono pl-0.5">
+                        <p className="text-[8px] text-neutral-500 font-mono pl-0.5">
                           · no prior occurrence
                         </p>
                       )}
                       {(suggestedFocus.deployMode === 'unchanged' || suggestedFocus.deployMode === 'regressed' || suggestedFocus.deployMode === 'improved') && (
-                        <p className="text-[8px] text-neutral-700 font-mono pl-0.5">
+                        <p className="text-[8px] text-neutral-500 font-mono pl-0.5">
                           · {suggestedFocus.deployMode === 'improved' ? 'failure rate improved after deploy' : suggestedFocus.deployMode === 'regressed' ? 'failure rate increased after deploy' : 'stable failure rate before and after deploy'}
                         </p>
                       )}
