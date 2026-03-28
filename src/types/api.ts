@@ -224,3 +224,62 @@ export interface ServiceToken {
   revoked: boolean;
   token?: string; // only present on create
 }
+
+export interface ProjectOverviewResult {
+  incidents: {
+    id: string;
+    title: string;
+    errorClass: 'infra' | 'external' | 'runtime' | 'user';
+    functionId: string;
+    functionName: string;
+    failureRatePct: number;
+    trafficImpactPct: number;
+    totalErrors: number;
+    totalExecs: number;
+    firstSeen: string;
+    lastSeen: string;
+    deployId: string | null;
+    deployedAt: string | null;
+  }[];
+  brokenAfterDeploy: {
+    functionId: string;
+    functionName: string;
+    deployId: string | null;
+    deployedAt: string;
+    deployedAgoSec: number | null;
+    prevFailurePct: number;
+    currentFailurePct: number;
+    prevExecs: number;
+    currentExecs: number;
+    topIssue: string | null;
+  }[];
+  verificationQueue: {
+    functionId: string;
+    functionName: string;
+    errorClass: string;
+    title: string;
+    deployId: string | null;
+    deployedAt: string;
+    progress: number;
+    required: number;
+    progressPct: number;
+    verifyStatus: 'waiting' | 'partial';
+    lastSeenAt: string;
+  }[];
+  recentFixes: {
+    functionId: string;
+    functionName: string;
+    errorClass: string;
+    title: string;
+    deployId: string | null;
+    deployedAt: string | null;
+    lastFailedAt: string;
+    execsSinceFix: number;
+    confidence: 'high' | 'medium' | 'low';
+  }[];
+  health: {
+    activeIncidents: number;
+    functionsFailing: number;
+    trafficImpactPct: number;
+  };
+}

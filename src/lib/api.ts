@@ -8,6 +8,7 @@ import type {
   OrgMember,
   Route,
   ServiceToken,
+  ProjectOverviewResult,
 } from "@/types/api";
 import { useAuth } from "@/components/auth/AuthProvider";
 
@@ -138,6 +139,8 @@ export function useFluxApi(projectId?: string) {
           method: "PATCH",
           body: JSON.stringify(updates),
         }),
+      getProjectOverview: (id?: string) =>
+        request<ProjectOverviewResult>(`/overview?project_id=${id ?? projectId}`, token()).catch(() => null),
       getFunctionStats: (funcId: string) =>
         request<any>(`/function/${funcId}/overview`, token()),
       getDeployments: (funcId: string) =>
