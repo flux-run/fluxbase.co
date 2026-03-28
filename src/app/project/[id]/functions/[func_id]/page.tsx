@@ -476,24 +476,43 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
         ))}
       </div>
 
-      {statsData?.root_cause && (
-        <div className="bg-gradient-to-br from-red-950/40 to-black border border-red-900/50 rounded-xl overflow-hidden shadow-2xl">
+      {statsData?.root_cause && (() => {
+        const _clusters = buildFailureClusters(statsData.top_issues ?? []);
+        const isFullyResolved = _clusters.length > 0 && latestDeployment?.artifact_id != null && _clusters.every(c => {
+          const domIssue = c.issues.slice().sort((a, b) => b.count - a.count)[0];
+          const ver = domIssue ? resolveIssueVersion(domIssue) : null;
+          return ver != null && !ver.isCurrent;
+        });
+        return (
+        <div className={`rounded-xl overflow-hidden shadow-2xl border ${
+          isFullyResolved
+            ? 'bg-gradient-to-br from-neutral-950 to-black border-neutral-800'
+            : 'bg-gradient-to-br from-red-950/40 to-black border-red-900/50'
+        }`}>
           {/* Collapsed headline — always visible */}
           <button
             onClick={() => setAnomalyExpanded(v => !v)}
-            className="w-full flex items-center justify-between gap-4 px-6 py-4 hover:bg-red-950/20 transition-colors text-left group"
+            className={`w-full flex items-center justify-between gap-4 px-6 py-4 transition-colors text-left group ${
+              isFullyResolved ? 'hover:bg-neutral-900/40' : 'hover:bg-red-950/20'
+            }`}
           >
             <div className="flex items-center gap-3 min-w-0">
-              <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1.5 uppercase tracking-wider shadow-[0_0_10px_theme(colors.red.500/50)] animate-pulse shrink-0">
-                <Zap className="w-3 h-3" />
-                Active Anomaly
-              </span>
+              {isFullyResolved ? (
+                <span className="bg-emerald-900/60 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1.5 uppercase tracking-wider border border-emerald-800/50 shrink-0">
+                  ✓ Past anomaly
+                </span>
+              ) : (
+                <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1.5 uppercase tracking-wider shadow-[0_0_10px_theme(colors.red.500/50)] animate-pulse shrink-0">
+                  <Zap className="w-3 h-3" />
+                  Active Anomaly
+                </span>
+              )}
               {/* Semantic headline derived from root cluster */}
               {(() => {
-                const clusters = buildFailureClusters(statsData.top_issues ?? []);
+                const clusters = _clusters;
                 const top = clusters[0];
                 if (!top) {
-                  return <span className="text-base font-bold text-red-100 font-mono truncate">{activeIssue}</span>;
+                  return <span className={`text-base font-bold font-mono truncate ${isFullyResolved ? 'text-neutral-400' : 'text-red-100'}`}>{activeIssue}</span>;
                 }
                 const topMeta = ERROR_CLASS_META[top.cls];
                 const topLabel = compactIssueLabel(top.issues[0].title, top.issues[0].error_source);
@@ -503,12 +522,17 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                   : null;
                 return (
                   <>
-                    <span className={`text-[10px] font-black uppercase tracking-wider ${topMeta.color} shrink-0`}>
+                    <span className={`text-[10px] font-black uppercase tracking-wider shrink-0 ${
+                      isFullyResolved ? 'text-neutral-600' : topMeta.color
+                    }`}>
                       {topMeta.label}
                     </span>
-                    <span className="text-sm font-bold text-red-100 font-mono truncate">
+                    <span className={`text-sm font-bold font-mono truncate ${
+                      isFullyResolved ? 'text-neutral-400 line-through decoration-neutral-700' : 'text-red-100'
+                    }`}>
                       {topLabel}
-                      {errorPct && <span className="text-red-400/70 font-normal"> · affecting {errorPct}</span>}
+                      {errorPct && !isFullyResolved && <span className="text-red-400/70 font-normal"> · affecting {errorPct}</span>}
+                      {errorPct && isFullyResolved && <span className="text-neutral-600 font-normal no-underline"> · previously affected {errorPct}</span>}
                     </span>
                     {clusters.length > 1 && (
                       <span className="text-[9px] font-bold text-neutral-600 shrink-0 border border-neutral-800 px-1.5 py-0.5 rounded">
@@ -520,19 +544,23 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
               })()}
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              {statsData.root_cause.impact && (
+              {statsData.root_cause.impact && !isFullyResolved && (
                 <span className="text-[10px] font-mono text-red-400">{statsData.root_cause.impact}</span>
               )}
               {anomalyExpanded
-                ? <ChevronUp className="w-4 h-4 text-red-400" />
-                : <ChevronDown className="w-4 h-4 text-neutral-600 group-hover:text-red-400 transition-colors" />}
+                ? <ChevronUp className={`w-4 h-4 ${isFullyResolved ? 'text-neutral-500' : 'text-red-400'}`} />
+                : <ChevronDown className={`w-4 h-4 text-neutral-600 group-hover:${isFullyResolved ? 'text-neutral-400' : 'text-red-400'} transition-colors`} />}
             </div>
           </button>
 
           {/* Expanded detail */}
           {anomalyExpanded && (
             <div className="px-6 pb-8 pt-2 relative overflow-hidden">
-               <div className="absolute top-0 left-0 w-1 h-full bg-red-500 shadow-[0_0_20px_theme(colors.red.500)]" />
+               <div className={`absolute top-0 left-0 w-1 h-full ${
+                 isFullyResolved
+                   ? 'bg-emerald-700 shadow-[0_0_12px_theme(colors.emerald.700)]'
+                   : 'bg-red-500 shadow-[0_0_20px_theme(colors.red.500)]'
+               }`} />
                <div className="relative z-10 flex flex-col xl:flex-row gap-8 items-start justify-between">
                   <div className="space-y-5 flex-1">
                      {filter && (
@@ -543,7 +571,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
 
                      {/* Failure Patterns — independent, one card per error class, no causal arrows */}
                      {(() => {
-                       const clusters = buildFailureClusters(statsData.top_issues ?? []);
+                       const clusters = _clusters;
                        if (clusters.length === 0) return null;
                        const totalFails = clusters.reduce((s, c) => s + c.totalHits, 0);
                        const hasUserErrors = clusters.some(c => c.cls === 'user');
@@ -928,7 +956,8 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
             </div>
           )}
         </div>
-      )}
+        );
+      })()}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         <div className="xl:col-span-2 space-y-10">
