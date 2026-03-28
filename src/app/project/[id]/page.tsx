@@ -42,6 +42,21 @@ function ErrorClassBadge({ cls }: { cls: string }) {
   );
 }
 
+function VerifyStatusBadge({ item }: { item: { progress: number; required: number; verifyStatus: string } }) {
+  const status = item.progress >= item.required ? "verified" : item.verifyStatus === "waiting" ? "pending" : "partial";
+  const style =
+    status === "verified"
+      ? "text-emerald-400 bg-emerald-950/50 border-emerald-800/40"
+      : status === "pending"
+      ? "text-neutral-500 bg-neutral-900 border-neutral-800"
+      : "text-amber-400 bg-amber-950/50 border-amber-800/40";
+  return (
+    <span className={`shrink-0 text-[7px] font-black uppercase px-1 py-0.5 rounded ml-auto border ${style}`}>
+      {status}
+    </span>
+  );
+}
+
 export default function ProjectPage({
   params,
 }: {
@@ -146,6 +161,12 @@ export default function ProjectPage({
     const totalExecs = top.incidents.reduce((s, i) => s + i.totalExecs, 0);
     // First seen = earliest firstSeen across incidents in the group
     const firstSeen = top.incidents.reduce((t, i) => i.firstSeen < t ? i.firstSeen : t, top.incidents[0].firstSeen);
+    const trafficPct = top.trafficContributionPct > 0 ? top.trafficContributionPct : top.maxTrafficPct;
+    const usersPer10 = Math.round(trafficPct / 10);
+    const deployDeltaMin =
+      topInc.deployedAt && firstSeen
+        ? Math.round((new Date(firstSeen).getTime() - new Date(topInc.deployedAt).getTime()) / 60000)
+        : null;
     return {
       title: topInc.title,
       cls: top.cls,
@@ -157,11 +178,15 @@ export default function ProjectPage({
       topFunctionId: topInc.functionId,
       topFunctionName: topInc.functionName,
       deployId: topInc.deployId,
+      deployedAt: topInc.deployedAt,
+      deployDeltaMin,
       impactMultiple,
       secondTrafficPct,
       totalErrors,
       totalExecs,
       firstSeen,
+      trafficPct,
+      usersPer10,
     };
   }, [incidentGroups, isBroken, overview]);
 
@@ -316,31 +341,44 @@ export default function ProjectPage({
 
                   <div className="space-y-0.5 border-t border-red-900/30 pt-2">
                     <p className="text-[8px] font-black uppercase tracking-widest text-neutral-700 mb-1">Why this first</p>
+                    {/* 1. failure rate — always consistent: actual rate + actual counts */}
                     <p className="text-[9px] text-neutral-500 font-mono">
                       <span className="text-red-500/50 mr-1.5 select-none">·</span>
-                      {suggestedFocus.failureRatePct === 100
-                        ? `100% failure rate — ${suggestedFocus.totalErrors.toLocaleString()}/${suggestedFocus.totalExecs.toLocaleString()} executions failing`
-                        : suggestedFocus.failureRatePct >= 80
-                        ? `${suggestedFocus.failureRatePct}% failure rate (${suggestedFocus.totalErrors.toLocaleString()}/${suggestedFocus.totalExecs.toLocaleString()} execs)`
-                        : `${suggestedFocus.failureRatePct}% failure rate · ${suggestedFocus.totalErrors.toLocaleString()} errors in 24h`}
+                      {suggestedFocus.failureRatePct}% failure rate — {suggestedFocus.totalErrors.toLocaleString()}/{suggestedFocus.totalExecs.toLocaleString()} executions failing
                     </p>
+                    {/* 2. traffic + visceral user-impact language */}
                     <p className="text-[9px] text-neutral-500 font-mono">
                       <span className="text-red-500/50 mr-1.5 select-none">·</span>
-                      {suggestedFocus.trafficContributionPct > 0
-                        ? `${suggestedFocus.trafficContributionPct}% of all impacted traffic`
-                        : `${suggestedFocus.trafficImpactPct}% of function traffic impacted`}
-                      {suggestedFocus.impactMultiple !== null && suggestedFocus.impactMultiple > 1.5 && (
-                        <span className="text-neutral-700 ml-1">
-                          ({suggestedFocus.impactMultiple}x more than next{suggestedFocus.secondTrafficPct ? ` · next: ${suggestedFocus.secondTrafficPct}%` : ""})
-                        </span>
+                      {suggestedFocus.trafficPct}% of impacted traffic
+                      {suggestedFocus.usersPer10 > 0 && (
+                        <span className="text-neutral-600"> — ~{suggestedFocus.usersPer10} in 10 users affected</span>
                       )}
                     </p>
+                    {/* 3. relative comparison — why this over others */}
+                    {incidentGroups.length > 1 && suggestedFocus.impactMultiple !== null ? (
+                      <p className="text-[9px] text-neutral-500 font-mono">
+                        <span className="text-red-500/50 mr-1.5 select-none">·</span>
+                        {suggestedFocus.impactMultiple}× more impactful than next issue
+                        {suggestedFocus.secondTrafficPct !== null && (
+                          <span className="text-neutral-600"> — next affects only {suggestedFocus.secondTrafficPct}% traffic</span>
+                        )}
+                      </p>
+                    ) : incidentGroups.length === 1 ? (
+                      <p className="text-[9px] text-neutral-500 font-mono">
+                        <span className="text-red-500/50 mr-1.5 select-none">·</span>
+                        only active incident
+                      </p>
+                    ) : null}
+                    {/* 4. timing + deploy causality with +Xm offset */}
                     <p className="text-[9px] text-neutral-500 font-mono">
                       <span className="text-red-500/50 mr-1.5 select-none">·</span>
-                      first seen {timeAgo(suggestedFocus.firstSeen)}
-                      {suggestedFocus.isRegression && suggestedFocus.deployId && (
-                        <span className="text-neutral-600"> — after deploy {suggestedFocus.deployId}</span>
-                      )}
+                      {suggestedFocus.isRegression && suggestedFocus.deployId
+                        ? `started ${timeAgo(suggestedFocus.firstSeen)} · after deploy ${suggestedFocus.deployId}${
+                            suggestedFocus.deployDeltaMin !== null && suggestedFocus.deployDeltaMin > 0
+                              ? ` (+${suggestedFocus.deployDeltaMin}m)`
+                              : ""
+                          }`
+                        : `first seen ${timeAgo(suggestedFocus.firstSeen)}`}
                     </p>
                     {suggestedFocus.affectedFns.length > 1 && (
                       <p className="text-[9px] text-neutral-500 font-mono">
@@ -504,11 +542,7 @@ export default function ProjectPage({
                       <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
                         <ErrorClassBadge cls={item.errorClass} />
                         <span className="text-[8px] font-bold text-neutral-500 truncate">{item.functionName}</span>
-                        <span className={`shrink-0 text-[7px] font-black uppercase px-1 py-0.5 rounded ml-auto border ${
-                          item.verifyStatus === "waiting" ? "text-neutral-500 bg-neutral-900 border-neutral-800" : "text-amber-400 bg-amber-950/50 border-amber-800/40"
-                        }`}>
-                          {item.verifyStatus}
-                        </span>
+                        <VerifyStatusBadge item={item} />
                       </div>
                       <p className="text-[10px] text-neutral-400 leading-tight truncate mb-1.5">{item.title}</p>
                       <div className="flex items-center gap-2">
