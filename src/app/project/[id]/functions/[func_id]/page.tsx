@@ -979,9 +979,9 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                      : verify.verifyMode === 'deterministic' ? 'text-red-400/80'
                                      : 'text-amber-500/70';
                                    return (
-                                     <div className="mt-2 pt-2 border-t border-white/5 font-mono text-[9px] space-y-0.5">
-                                       {/* Label + confidence score */}
-                                       <div className="flex items-center justify-between gap-2">
+                                     <div className="mt-2 pt-2 border-t border-white/5 font-mono text-[9px]">
+                                       {/* ── Header: full-width label + state ── */}
+                                       <div className="flex items-center justify-between gap-2 mb-1.5">
                                          <span className="text-neutral-600 uppercase tracking-wider">Verification</span>
                                          <div className="flex items-center gap-1.5">
                                            <span className={`font-black uppercase tracking-wider ${obsLabel.color}`}>{obsLabel.text}</span>
@@ -990,97 +990,102 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                            )}
                                          </div>
                                        </div>
-                                       {/* Strategy: label → behavior → expectation */}
-                                       <div className="flex items-start justify-between gap-2">
-                                         <span className="text-neutral-700 shrink-0">Strategy</span>
-                                         <div className="flex flex-col items-end gap-px">
-                                           <span className={`font-bold ${strategyColor}`}>{strategyLabel}</span>
-                                           <span className="text-neutral-700">{strategyDetail}</span>
+                                       {/* ── Two-column body ── */}
+                                       <div className="grid grid-cols-2 gap-x-3 items-start">
+                                         {/* ── Left: status / measurements ── */}
+                                         <div className="space-y-0.5">
+                                           {/* Strategy */}
+                                           <div className="flex items-start justify-between gap-1">
+                                             <span className="text-neutral-700 shrink-0">Strategy</span>
+                                             <div className="flex flex-col items-end gap-px">
+                                               <span className={`font-bold ${strategyColor}`}>{strategyLabel}</span>
+                                               <span className="text-neutral-700">{strategyDetail}</span>
+                                             </div>
+                                           </div>
+                                           {/* Coverage bar */}
+                                           {!isInfraCluster && verify.observationState !== 'verified' && verify.requiredToVerify > 0 && (
+                                             <div className="flex items-center justify-between gap-1">
+                                               <span className="text-neutral-700 shrink-0">Coverage</span>
+                                               <div className="flex items-center gap-1">
+                                                 <div className="w-12 h-1 rounded-full bg-neutral-800 overflow-hidden">
+                                                   <div
+                                                     className={`h-full rounded-full transition-all ${coveragePct >= 100 ? 'bg-emerald-500' : coveragePct > 40 ? 'bg-amber-500' : 'bg-neutral-700'}`}
+                                                     style={{ width: `${Math.min(coveragePct, 100)}%` }}
+                                                   />
+                                                 </div>
+                                                 <span className="text-neutral-600">{verify.matchedTotal}/{verify.requiredToVerify}</span>
+                                               </div>
+                                             </div>
+                                           )}
+                                           {/* Observed */}
+                                           {!isInfraCluster && (
+                                             <div className="flex items-center justify-between gap-1">
+                                               <span className="text-neutral-700 shrink-0">Observed</span>
+                                               {verify.matchedTotal === 0
+                                                 ? <span className="text-neutral-700">none yet</span>
+                                                 : <span className="text-neutral-500">{verify.matchedFail}f · {verify.matchedSuccess}ok</span>
+                                               }
+                                             </div>
+                                           )}
+                                           {/* Expected traffic baseline */}
+                                           {!isInfraCluster && verify.observationState === 'not_observed' && verify.expectedByNow !== null && (
+                                             <div className="flex items-start justify-between gap-1">
+                                               <span className="text-neutral-700 shrink-0">Expected</span>
+                                               <div className="flex flex-col items-end gap-px">
+                                                 <span className="text-neutral-600">~{verify.expectedByNow} by now</span>
+                                                 {verify.isSuspiciouslyLow && (
+                                                   <span className="text-amber-500/80 font-bold">⚠ overdue</span>
+                                                 )}
+                                               </div>
+                                             </div>
+                                           )}
+                                           {/* Fix path hit */}
+                                           {!isInfraCluster && fixCoveragePct !== null && verify.observationState !== 'verified' && (
+                                             <div className="flex items-start justify-between gap-1">
+                                               <span className="text-neutral-700 shrink-0">Fix path</span>
+                                               <div className="flex flex-col items-end gap-px">
+                                                 <span className={`font-bold ${
+                                                   fixCoveragePct === 0 ? 'text-neutral-600'
+                                                   : fixCoveragePct < 10 ? 'text-amber-600/80'
+                                                   : 'text-amber-400'
+                                                 }`}>{fixCoveragePct}%</span>
+                                                 {fixCoveragePct === 0 && (
+                                                   <span className="text-red-400/50">not exercised</span>
+                                                 )}
+                                               </div>
+                                             </div>
+                                           )}
+                                           {/* Transition signal */}
+                                           {(verify.observationState === 'verified' || verify.observationState === 'likely_fixed') && verify.matchedSuccess > 0 && (
+                                             <div className="flex items-center justify-between gap-1">
+                                               <span className="text-neutral-700">Transition</span>
+                                               <span className={`font-bold ${verify.observationState === 'verified' ? 'text-emerald-400' : 'text-emerald-500/70'}`}>fail → ok ✓</span>
+                                             </div>
+                                           )}
+                                           {/* Last matching exec */}
+                                           {verify.lastMatchedAt && (
+                                             <div className="flex items-center justify-between gap-1">
+                                               <span className="text-neutral-700 shrink-0">Last match</span>
+                                               <span className="text-neutral-500">{timeAgo(verify.lastMatchedAt)}</span>
+                                             </div>
+                                           )}
+                                         </div>
+                                         {/* ── Right: match criteria ── */}
+                                         <div className="space-y-px border-l border-white/[0.04] pl-3">
+                                           <span className="text-neutral-700">Match criteria</span>
+                                           <div className="flex flex-col gap-px mt-0.5">
+                                             {criteriaRows.map(({ label, value }) => (
+                                               <div key={label} className="flex items-baseline gap-1 min-w-0">
+                                                 <span className="text-neutral-800 shrink-0">{label}:</span>
+                                                 <span className="text-neutral-500 truncate" title={value}>{value}</span>
+                                               </div>
+                                             ))}
+                                           </div>
                                          </div>
                                        </div>
-                                       {/* Coverage bar — only for traffic-verifiable failures, pre-verified */}
-                                       {!isInfraCluster && verify.observationState !== 'verified' && verify.requiredToVerify > 0 && (
-                                         <div className="flex items-center justify-between gap-2">
-                                           <span className="text-neutral-700 shrink-0">Coverage</span>
-                                           <div className="flex items-center gap-1.5">
-                                             <div className="w-16 h-1 rounded-full bg-neutral-800 overflow-hidden">
-                                               <div
-                                                 className={`h-full rounded-full transition-all ${coveragePct >= 100 ? 'bg-emerald-500' : coveragePct > 40 ? 'bg-amber-500' : 'bg-neutral-700'}`}
-                                                 style={{ width: `${Math.min(coveragePct, 100)}%` }}
-                                               />
-                                             </div>
-                                             <span className="text-neutral-600">{verify.matchedTotal}&thinsp;/&thinsp;{verify.requiredToVerify} ({coveragePct}%)</span>
-                                           </div>
-                                         </div>
-                                       )}
-                                       {/* Observed counts (honest zero) */}
-                                       {/* Expected traffic baseline — warn when path should have been hit by now */}
-                                       {!isInfraCluster && verify.observationState === 'not_observed' && verify.expectedByNow !== null && (
-                                         <div className="flex items-start justify-between gap-2">
-                                           <span className="text-neutral-700 shrink-0">Expected</span>
-                                           <div className="flex flex-col items-end gap-px">
-                                             <span className="text-neutral-600">~{verify.expectedByNow} matching exec{verify.expectedByNow !== 1 ? 's' : ''} by now</span>
-                                             {verify.isSuspiciouslyLow && (
-                                               <span className="text-amber-500/80 font-bold">⚠ path should have been hit by now</span>
-                                             )}
-                                           </div>
-                                         </div>
-                                       )}
-                                       {/* Observed counts (honest zero) */}
-                                       {!isInfraCluster && (
-                                         <div className="flex items-center justify-between gap-2">
-                                           <span className="text-neutral-700">Observed</span>
-                                           {verify.matchedTotal === 0
-                                             ? <span className="text-neutral-700">no matching executions yet</span>
-                                             : <span className="text-neutral-500">{verify.matchedFail} failure{verify.matchedFail !== 1 ? 's' : ''} · {verify.matchedSuccess} success{verify.matchedSuccess !== 1 ? 'es' : ''}</span>
-                                           }
-                                         </div>
-                                       )}
-                                       {/* Fix path coverage: did the fix even get exercised? */}
-                                       {!isInfraCluster && fixCoveragePct !== null && verify.observationState !== 'verified' && (
-                                         <div className="flex items-start justify-between gap-2">
-                                           <span className="text-neutral-700 shrink-0">Fix path hit</span>
-                                           <div className="flex flex-col items-end gap-px">
-                                             <span className={`font-bold ${
-                                               fixCoveragePct === 0 ? 'text-neutral-600'
-                                               : fixCoveragePct < 10 ? 'text-amber-600/80'
-                                               : 'text-amber-400'
-                                             }`}>{fixCoveragePct}% of traffic</span>
-                                             {fixCoveragePct === 0 && (
-                                               <span className="text-red-400/50">fix not yet exercised in production</span>
-                                             )}
-                                           </div>
-                                         </div>
-                                       )}
-                                       {/* Explicit matching criteria — every dimension named */}
-                                       <div className="pt-0.5 mt-0.5 border-t border-white/[0.04] space-y-px">
-                                         <span className="text-neutral-700">Match criteria</span>
-                                         <div className="flex flex-col gap-px mt-0.5 pl-2">
-                                           {criteriaRows.map(({ label, value }) => (
-                                             <div key={label} className="flex items-baseline gap-1">
-                                               <span className="text-neutral-800 shrink-0">{label}:</span>
-                                               <span className="text-neutral-500 truncate" title={value}>{value}</span>
-                                             </div>
-                                           ))}
-                                         </div>
-                                       </div>
-                                       {/* Last matching execution */}
-                                       {verify.lastMatchedAt && (
-                                         <div className="flex items-center justify-between gap-2">
-                                           <span className="text-neutral-700">Last matching exec</span>
-                                           <span className="text-neutral-500">{timeAgo(verify.lastMatchedAt)}</span>
-                                         </div>
-                                       )}
-                                       {/* Verified: transition signal */}
-                                       {(verify.observationState === 'verified' || verify.observationState === 'likely_fixed') && verify.matchedSuccess > 0 && (
-                                         <div className="flex items-center justify-between gap-2">
-                                           <span className="text-neutral-700">Transition</span>
-                                           <span className={`font-bold ${verify.observationState === 'verified' ? 'text-emerald-400' : 'text-emerald-500/70'}`}>failure → success ✓</span>
-                                         </div>
-                                       )}
-                                       {/* Nudge: prompt dev to trigger verification when path hasn't been hit */}
+                                       {/* ── Full-width nudge + replay CTA ── */}
                                        {!isInfraCluster && verify.observationState === 'not_observed' && (
-                                         <div className="mt-1 pt-1.5 border-t border-white/[0.04] space-y-1">
+                                         <div className="mt-1.5 pt-1.5 border-t border-white/[0.04] space-y-1">
                                            <div className="flex items-start gap-1.5">
                                              <span className="text-blue-400/60 shrink-0">💡</span>
                                              <span className="text-neutral-600 leading-tight">
