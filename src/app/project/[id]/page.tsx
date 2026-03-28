@@ -350,15 +350,14 @@ export default function ProjectPage({
                       <span className="text-red-500/50 mr-1.5 select-none">·</span>
                       {suggestedFocus.failureRatePct}% failure rate — {suggestedFocus.totalErrors.toLocaleString()}/{suggestedFocus.totalExecs.toLocaleString()} executions failing
                     </p>
-                    {/* 2. traffic + visceral user-impact language */}
+                    {/* 2. user-impact first, traffic as supporting context */}
                     <p className="text-[9px] text-neutral-500 font-mono">
                       <span className="text-red-500/50 mr-1.5 select-none">·</span>
-                      {suggestedFocus.trafficPct}% of impacted traffic
-                      {suggestedFocus.usersPer10 > 0 && (
-                        <span className="text-neutral-600"> — ~{suggestedFocus.usersPer10} in 10 users affected</span>
-                      )}
+                      {suggestedFocus.usersPer10 > 0
+                        ? `impacts ~${suggestedFocus.usersPer10} in 10 users (${suggestedFocus.trafficPct}% of traffic)`
+                        : `${suggestedFocus.trafficPct}% of impacted traffic`}
                     </p>
-                    {/* 3. relative comparison */}
+                    {/* 3. relative comparison + dominance */}
                     <p className="text-[9px] text-neutral-500 font-mono">
                       <span className="text-red-500/50 mr-1.5 select-none">·</span>
                       {incidentGroups.length === 1
@@ -372,7 +371,14 @@ export default function ProjectPage({
                         <span className="text-neutral-600"> — next: {suggestedFocus.secondTrafficPct}% traffic</span>
                       )}
                     </p>
-                    {/* 4. deploy causality — lead with delta, then conclusion */}
+                    {/* dominance: show when this group accounts for essentially all traffic */}
+                    {incidentGroups.length > 1 && suggestedFocus.trafficPct >= 80 && (
+                      <p className="text-[9px] text-neutral-500 font-mono">
+                        <span className="text-red-500/50 mr-1.5 select-none">·</span>
+                        primary incident — accounts for {suggestedFocus.trafficPct === 100 ? "all" : "most"} failing traffic
+                      </p>
+                    )}
+                    {/* 4. deploy causality — timing → evidence → conclusion */}
                     {suggestedFocus.deployId ? (
                       <>
                         <p className="text-[9px] text-neutral-500 font-mono">
@@ -382,13 +388,13 @@ export default function ProjectPage({
                             : `started after deploy ${suggestedFocus.deployId}`}
                           <span className="text-neutral-700"> ({timeAgo(suggestedFocus.firstSeen)})</span>
                         </p>
+                        <p className="text-[9px] text-neutral-600 font-mono">
+                          <span className="text-red-500/50 mr-1.5 select-none">·</span>
+                          all failures began after this deploy
+                        </p>
                         <p className="text-[9px] font-mono">
                           <span className="text-red-500/50 mr-1.5 select-none">·</span>
                           <span className="text-orange-500/70 font-black">→ likely caused by this deployment</span>
-                        </p>
-                        <p className="text-[9px] text-neutral-600 font-mono">
-                          <span className="text-red-500/50 mr-1.5 select-none">·</span>
-                          all failures started after this deploy
                         </p>
                       </>
                     ) : (
