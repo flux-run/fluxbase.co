@@ -326,41 +326,100 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
     return oldest ? { label: oldest.artifact_id?.slice(0, 7) ?? oldest.artifact_id, isCurrent: false, isPrev: deploymentList.length === 2, createdAt: oldest.created_at } : null;
   };
 
-  // Verification thresholds: how many executions in the current deploy before we trust "not seen"
+  // ── Verification Engine ────────────────────────────────────────────────────
+  // Thresholds for "enough traffic to trust no-failure signal"
   const VERIFIED_EXEC_MIN = 20;
   const VERIFIED_EXEC_HIGH = 50;
-  type VerifyState = 'active' | 'unverified' | 'verified_resolved';
+
+  type VerifyState = 'active' | 'unverified' | 'verified_fixed' | 'regressed';
+
+  // Build a deterministic fingerprint for a cluster from its issue metadata +
+  // the paths those errors were seen on across all known deploy slices.
+  const extractClusterFingerprint = (cluster: ReturnType<typeof buildFailureClusters>[number]) => {
+    const errorFingerprints = new Set<string>();
+    const errorTypeSources  = new Set<string>();
+    const paths             = new Set<string>();
+    for (const issue of cluster.issues) {
+      if (issue.fingerprint) errorFingerprints.add(issue.fingerprint);
+      const ts = [issue.error_type, issue.error_source].filter(Boolean).join('|');
+      if (ts) errorTypeSources.add(ts);
+    }
+    // Harvest paths from historical failing execs across latest + prev deploy
+    const historicalExecs = [...(latestSlice?.execs ?? []), ...(prevSlice?.execs ?? [])];
+    for (const exec of historicalExecs) {
+      if (exec.status === 'ok') continue;
+      const fp = exec.error_fingerprint;
+      if (fp && errorFingerprints.has(fp)) { if (exec.path) paths.add(exec.path); continue; }
+      const ts = [exec.error_type, exec.error_source].filter(Boolean).join('|');
+      if (ts && errorTypeSources.has(ts) && exec.path) paths.add(exec.path);
+    }
+    return { errorFingerprints, errorTypeSources, paths };
+  };
+
+  const execMatchesFingerprint = (exec: Execution, fp: ReturnType<typeof extractClusterFingerprint>): boolean => {
+    if (exec.error_fingerprint && fp.errorFingerprints.has(exec.error_fingerprint)) return true;
+    const ts = [exec.error_type, exec.error_source].filter(Boolean).join('|');
+    return !!(ts && fp.errorTypeSources.has(ts));
+  };
+
   const verifyClusterState = (cluster: ReturnType<typeof buildFailureClusters>[number]): {
     state: VerifyState; confidence: 'high' | 'medium' | 'low';
     execCount: number; errorCount: number; failureRate: number;
-    reason: string; isDeterministic: boolean;
+    matchedTotal: number; matchedSuccess: number; matchedFail: number;
+    reason: string; isDeterministic: boolean; isRegressed: boolean; pathsTracked: boolean;
   } => {
+    const fp               = extractClusterFingerprint(cluster);
+    const pathsTracked     = fp.paths.size > 0;
     const activeInCurrentDeploy = cluster.issues.some(i => (i as any).active_in_current_deploy === true);
-    const execCount = latestSlice?.total ?? 0;
-    const currentErrors = latestSlice?.errors ?? 0;
-    const failureRate = execCount > 0 ? Math.round((currentErrors / execCount) * 100) : 0;
-    // Deterministic: consistent high failure rate (≥80%) with enough executions to trust
-    const isDeterministic = execCount >= 5 && failureRate >= 80;
-    if (activeInCurrentDeploy) {
-      const reason = isDeterministic
-        ? `Deterministic — fails ${failureRate}% of the time across ${execCount} exec${execCount !== 1 ? 's' : ''}`
-        : `Reproducible in current deploy · ${execCount} exec${execCount !== 1 ? 's' : ''}, ${failureRate}% failure rate`;
-      return { state: 'active', confidence: 'high', execCount, errorCount: currentErrors, failureRate, reason, isDeterministic };
+    const execCount        = latestSlice?.total ?? 0;
+    const currentErrors    = latestSlice?.errors ?? 0;
+    const failureRate      = execCount > 0 ? Math.round((currentErrors / execCount) * 100) : 0;
+    const isDeterministic  = execCount >= 5 && failureRate >= 80;
+
+    const currentExecs     = latestSlice?.execs ?? [];
+    // Execs that hit paths known to have caused this error (path coverage)
+    const pathCoveredExecs = pathsTracked ? currentExecs.filter(e => fp.paths.has(e.path)) : [];
+    // Execs whose error fingerprint / type+source directly matches this cluster
+    const matchedFail      = currentExecs.filter(e => e.status !== 'ok' && execMatchesFingerprint(e, fp)).length;
+    const matchedSuccess   = pathCoveredExecs.filter(e => e.status === 'ok').length;
+    const matchedTotal     = matchedFail + matchedSuccess;
+
+    // Regression: was the same path clean in the previous deploy, but is now failing?
+    const prevExecs          = prevSlice?.execs ?? [];
+    const prevMatchedFail    = prevExecs.filter(e => e.status !== 'ok' && execMatchesFingerprint(e, fp)).length;
+    const prevPathCovered    = pathsTracked ? prevExecs.filter(e => fp.paths.has(e.path)).length : 0;
+    const wasCleanInPrev     = prevMatchedFail === 0 && prevPathCovered >= 3;
+    const isActiveNow        = activeInCurrentDeploy || matchedFail > 0 || (!pathsTracked && currentErrors > 0);
+    const isRegressed        = wasCleanInPrev && isActiveNow;
+
+    if (isActiveNow) {
+      const confidence: 'high' | 'medium' | 'low' = matchedFail > 0 || activeInCurrentDeploy ? 'high' : 'medium';
+      const reason = isRegressed
+        ? `Re-emerged after ${prevPathCovered} clean exec${prevPathCovered !== 1 ? 's' : ''} in prev deploy`
+        : isDeterministic
+        ? `Deterministic — fails ${failureRate}% across ${execCount} exec${execCount !== 1 ? 's' : ''}`
+        : `Reproducible · ${execCount} exec${execCount !== 1 ? 's' : ''}, ${failureRate}% failure rate`;
+      return { state: isRegressed ? 'regressed' : 'active', confidence, execCount, errorCount: currentErrors, failureRate, matchedTotal, matchedSuccess, matchedFail, reason, isDeterministic, isRegressed, pathsTracked };
     }
-    if (currentErrors > 0) {
-      const reason = isDeterministic
-        ? `Deterministic — fails ${failureRate}% of the time across ${execCount} exec${execCount !== 1 ? 's' : ''}`
-        : `Reproducible in current deploy · ${execCount} exec${execCount !== 1 ? 's' : ''}, ${failureRate}% failure rate`;
-      return { state: 'active', confidence: 'medium', execCount, errorCount: currentErrors, failureRate, reason, isDeterministic };
+
+    // No active failures — determine if the same scenario was exercised successfully
+    if (matchedTotal >= 3) {
+      const confidence: 'high' | 'medium' | 'low' = matchedTotal >= 15 ? 'high' : matchedTotal >= 5 ? 'medium' : 'low';
+      const reason = `Verified — ${matchedSuccess} exec${matchedSuccess !== 1 ? 's' : ''} on same path, no recurrence`;
+      return { state: 'verified_fixed', confidence, execCount, errorCount: 0, failureRate: 0, matchedTotal, matchedSuccess, matchedFail: 0, reason, isDeterministic: false, isRegressed: false, pathsTracked };
     }
     if (execCount >= VERIFIED_EXEC_HIGH)
-      return { state: 'verified_resolved', confidence: 'high', execCount, errorCount: 0, failureRate: 0,
-        reason: `Not reproduced across ${execCount} executions in current deploy`, isDeterministic: false };
+      return { state: 'verified_fixed', confidence: 'medium', execCount, errorCount: 0, failureRate: 0, matchedTotal, matchedSuccess, matchedFail: 0,
+        reason: `Not reproduced across ${execCount} execs — path not yet exercised`, isDeterministic: false, isRegressed: false, pathsTracked };
     if (execCount >= VERIFIED_EXEC_MIN)
-      return { state: 'verified_resolved', confidence: 'medium', execCount, errorCount: 0, failureRate: 0,
-        reason: `Not reproduced across ${execCount} executions — approaching confidence threshold`, isDeterministic: false };
-    return { state: 'unverified', confidence: 'low', execCount, errorCount: 0, failureRate: 0,
-      reason: `Only ${execCount} of ${VERIFIED_EXEC_MIN} executions needed to verify`, isDeterministic: false };
+      return { state: 'verified_fixed', confidence: 'low', execCount, errorCount: 0, failureRate: 0, matchedTotal, matchedSuccess, matchedFail: 0,
+        reason: `Not reproduced across ${execCount} execs — insufficient path coverage`, isDeterministic: false, isRegressed: false, pathsTracked };
+
+    return { state: 'unverified', confidence: 'low', execCount, errorCount: 0, failureRate: 0, matchedTotal, matchedSuccess, matchedFail: 0,
+      reason: pathsTracked
+        ? `Failure path not yet exercised in current deploy (${execCount}/${VERIFIED_EXEC_MIN} execs)`
+        : `Only ${execCount} of ${VERIFIED_EXEC_MIN} executions needed to verify`,
+      isDeterministic: false, isRegressed: false, pathsTracked };
   };
 
   const st = statsData?.stats;
@@ -522,22 +581,26 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
         const _clusters = buildFailureClusters(statsData.top_issues ?? []);
         // Compute verification state per cluster
         const _clusterVerify = _clusters.map(c => verifyClusterState(c));
-        const allHistorical = _clusters.length > 0 && latestDeployment?.artifact_id != null && _clusterVerify.every(v => v.state !== 'active');
-        const allVerified = allHistorical && _clusterVerify.every(v => v.state === 'verified_resolved');
-        // Panel colour: red = active, amber = unverified, neutral = verified resolved
-        const panelTheme = !allHistorical ? 'red' : allVerified ? 'green' : 'amber';
+        const hasActive    = _clusterVerify.some(v => v.state === 'active');
+        const hasRegressed  = _clusterVerify.some(v => v.state === 'regressed');
+        const allHistorical = _clusters.length > 0 && latestDeployment?.artifact_id != null && !hasActive && !hasRegressed;
+        const allVerified   = allHistorical && _clusterVerify.every(v => v.state === 'verified_fixed');
+        // Panel colour: red = active, orange = regressed, amber = unverified, green = verified fixed
+        const panelTheme = hasActive ? 'red' : hasRegressed ? 'orange' : allVerified ? 'green' : 'amber';
         return (
         <div className={`rounded-xl overflow-hidden shadow-2xl border ${
-          panelTheme === 'green' ? 'bg-gradient-to-br from-neutral-950 to-black border-neutral-800'
-          : panelTheme === 'amber' ? 'bg-gradient-to-br from-amber-950/20 to-black border-amber-900/40'
+          panelTheme === 'green'  ? 'bg-gradient-to-br from-neutral-950 to-black border-neutral-800'
+          : panelTheme === 'amber'  ? 'bg-gradient-to-br from-amber-950/20 to-black border-amber-900/40'
+          : panelTheme === 'orange' ? 'bg-gradient-to-br from-orange-950/30 to-black border-orange-900/50'
           : 'bg-gradient-to-br from-red-950/40 to-black border-red-900/50'
         }`}>
           {/* Collapsed headline — always visible */}
           <button
             onClick={() => setAnomalyExpanded(v => !v)}
             className={`w-full flex items-center justify-between gap-4 px-6 py-4 transition-colors text-left group ${
-              panelTheme === 'green' ? 'hover:bg-neutral-900/40'
-              : panelTheme === 'amber' ? 'hover:bg-amber-950/20'
+              panelTheme === 'green'  ? 'hover:bg-neutral-900/40'
+              : panelTheme === 'amber'  ? 'hover:bg-amber-950/20'
+              : panelTheme === 'orange' ? 'hover:bg-orange-950/20'
               : 'hover:bg-red-950/20'
             }`}
           >
@@ -549,6 +612,10 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
               ) : panelTheme === 'amber' ? (
                 <span className="bg-amber-900/40 text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1.5 uppercase tracking-wider border border-amber-800/50 shrink-0">
                   ○ Unverified
+                </span>
+              ) : panelTheme === 'orange' ? (
+                <span className="bg-orange-900/40 text-orange-300 text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1.5 uppercase tracking-wider border border-orange-800/50 animate-pulse shrink-0">
+                  ↻ Regressed
                 </span>
               ) : (
                 <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1.5 uppercase tracking-wider shadow-[0_0_10px_theme(colors.red.500/50)] animate-pulse shrink-0">
@@ -577,11 +644,15 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                       {topMeta.label}
                     </span>
                     <span className={`text-sm font-bold font-mono truncate ${
-                      panelTheme !== 'red' ? 'text-neutral-400 line-through decoration-neutral-700' : 'text-red-100'
+                      panelTheme === 'red' ? 'text-red-100'
+                      : panelTheme === 'orange' ? 'text-orange-200'
+                      : 'text-neutral-400 line-through decoration-neutral-700'
                     }`}>
                       {topLabel}
-                      {errorPct && panelTheme === 'red' && <span className="text-red-400/70 font-normal"> · affecting {errorPct}</span>}
-                      {errorPct && panelTheme !== 'red' && <span className="text-neutral-600 font-normal no-underline"> · previously affected {errorPct}</span>}
+                      {errorPct && (panelTheme === 'red' || panelTheme === 'orange') && (
+                        <span className={`font-normal ${panelTheme === 'orange' ? 'text-orange-400/70' : 'text-red-400/70'}`}> · affecting {errorPct}</span>
+                      )}
+                      {errorPct && panelTheme !== 'red' && panelTheme !== 'orange' && <span className="text-neutral-600 font-normal no-underline"> · previously affected {errorPct}</span>}
                     </span>
                     {clusters.length > 1 && (
                       <span className="text-[9px] font-bold text-neutral-600 shrink-0 border border-neutral-800 px-1.5 py-0.5 rounded">
@@ -597,8 +668,8 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                 <span className="text-[10px] font-mono text-red-400">{statsData.root_cause.impact}</span>
               )}
               {anomalyExpanded
-                ? <ChevronUp className={`w-4 h-4 ${panelTheme === 'red' ? 'text-red-400' : panelTheme === 'amber' ? 'text-amber-500' : 'text-neutral-500'}`} />
-                : <ChevronDown className={`w-4 h-4 text-neutral-600 transition-colors ${panelTheme === 'red' ? 'group-hover:text-red-400' : panelTheme === 'amber' ? 'group-hover:text-amber-400' : 'group-hover:text-neutral-400'}`} />}
+                ? <ChevronUp className={`w-4 h-4 ${panelTheme === 'red' ? 'text-red-400' : panelTheme === 'amber' ? 'text-amber-500' : panelTheme === 'orange' ? 'text-orange-400' : 'text-neutral-500'}`} />
+                : <ChevronDown className={`w-4 h-4 text-neutral-600 transition-colors ${panelTheme === 'red' ? 'group-hover:text-red-400' : panelTheme === 'amber' ? 'group-hover:text-amber-400' : panelTheme === 'orange' ? 'group-hover:text-orange-400' : 'group-hover:text-neutral-400'}`} />}
             </div>
           </button>
 
@@ -610,6 +681,8 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                    ? 'bg-emerald-700 shadow-[0_0_12px_theme(colors.emerald.700)]'
                    : panelTheme === 'amber'
                    ? 'bg-amber-600 shadow-[0_0_12px_theme(colors.amber.600)]'
+                   : panelTheme === 'orange'
+                   ? 'bg-orange-500 shadow-[0_0_16px_theme(colors.orange.500)]'
                    : 'bg-red-500 shadow-[0_0_20px_theme(colors.red.500)]'
                }`} />
                <div className="relative z-10 flex flex-col xl:flex-row gap-8 items-start justify-between">
@@ -638,25 +711,39 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                            {(() => {
                              const currentLabel = deployVersionMap[latestDeployment?.artifact_id ?? '']?.label ?? latestDeployment?.artifact_id?.slice(0, 7) ?? null;
                              if (!currentLabel) return null;
-                             const currentCluster = clusters.find((c, ci) => _clusterVerify[ci]?.state === 'active');
+                             const currentCluster  = clusters.find((c, ci) => _clusterVerify[ci]?.state === 'active' || _clusterVerify[ci]?.state === 'regressed');
                              const unverifiedCount = _clusterVerify.filter(v => v.state === 'unverified').length;
+                             const regressedCount  = _clusterVerify.filter(v => v.state === 'regressed').length;
+                             const isRegressedStrip = currentCluster ? _clusterVerify[clusters.indexOf(currentCluster)]?.isRegressed : false;
                              return (
                                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-[10px] font-mono ${
                                  currentCluster
-                                   ? 'bg-red-950/20 border-red-900/40 text-red-400/80'
+                                   ? isRegressedStrip
+                                     ? 'bg-orange-950/20 border-orange-900/40 text-orange-400/80'
+                                     : 'bg-red-950/20 border-red-900/40 text-red-400/80'
                                    : 'bg-emerald-950/20 border-emerald-900/40 text-emerald-500/70'
                                }`}>
                                  <span className="font-black uppercase tracking-wider">{currentLabel}</span>
                                  <span className="text-neutral-700">· current deploy</span>
                                  {currentCluster ? (
                                    <span className="ml-auto flex items-center gap-2 font-mono">
-                                     <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse shrink-0" />
                                      {(() => {
                                        const ci = clusters.indexOf(currentCluster);
-                                       const v = _clusterVerify[ci];
-                                       return v?.isDeterministic
-                                         ? <span className="text-red-400 font-bold">Deterministic failure · {v.failureRate}%</span>
-                                         : <span>Reproducible · {v?.failureRate ?? 0}% · {v?.execCount ?? 0} exec{(v?.execCount ?? 0) !== 1 ? 's' : ''}</span>;
+                                       const v  = _clusterVerify[ci];
+                                       if (v?.isRegressed) return (
+                                         <>
+                                           <span className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse shrink-0" />
+                                           <span className="text-orange-400 font-bold">↻ Regression · {v.matchedFail} failure{v.matchedFail !== 1 ? 's' : ''} re-emerged</span>
+                                         </>
+                                       );
+                                       return (
+                                         <>
+                                           <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse shrink-0" />
+                                           {v?.isDeterministic
+                                             ? <span className="text-red-400 font-bold">Deterministic · {v.failureRate}%</span>
+                                             : <span>Reproducible · {v?.failureRate ?? 0}% · {v?.execCount ?? 0} exec{(v?.execCount ?? 0) !== 1 ? 's' : ''}</span>}
+                                         </>
+                                       );
                                      })()}
                                    </span>
                                  ) : unverifiedCount > 0 ? (
@@ -745,12 +832,15 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                    const te = Number(st?.total_execs ?? 0);
                                    const verifyNode = (() => {
                                      if (te <= 0) return null;
-                                     if (verify.state === 'verified_resolved') {
+                                     if (verify.state === 'verified_fixed') {
+                                       const signal = verify.matchedSuccess > 0
+                                         ? `${verify.matchedSuccess} path-matched exec${verify.matchedSuccess !== 1 ? 's' : ''}`
+                                         : `${verify.execCount} exec${verify.execCount !== 1 ? 's' : ''}`;
                                        return (
                                          <span className="flex items-center gap-1 shrink-0">
-                                           <span className={`font-bold ${verify.confidence === 'high' ? 'text-emerald-500' : 'text-emerald-600/70'}`}>✓ fixed</span>
+                                           <span className={`font-bold ${verify.confidence === 'high' ? 'text-emerald-500' : 'text-emerald-600/70'}`}>✓ verified fixed</span>
                                            <span className={`px-1 rounded border ${verify.confidence === 'high' ? 'text-emerald-700 border-emerald-900/60 bg-emerald-950/20' : 'text-neutral-600 border-neutral-800'}`}>{verify.confidence}</span>
-                                           <span className="text-neutral-700">· {verify.execCount} exec{verify.execCount !== 1 ? 's' : ''}</span>
+                                           <span className="text-neutral-700">· {signal}</span>
                                          </span>
                                        );
                                      }
@@ -758,13 +848,28 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                        return (
                                          <span className="flex items-center gap-1 shrink-0">
                                            <span className="text-amber-500/80 font-bold">○ unverified</span>
-                                           <span className="text-neutral-700">· {verify.execCount}/{20} exec{verify.execCount !== 1 ? 's' : ''}</span>
+                                           <span className="text-neutral-700">
+                                             {verify.matchedTotal > 0
+                                               ? `· ${verify.matchedTotal} matched exec${verify.matchedTotal !== 1 ? 's' : ''}`
+                                               : verify.pathsTracked
+                                               ? `· ${verify.execCount}/${VERIFIED_EXEC_MIN} execs · path not hit`
+                                               : `· ${verify.execCount}/${VERIFIED_EXEC_MIN} execs`}
+                                           </span>
+                                         </span>
+                                       );
+                                     }
+                                     if (verify.state === 'regressed') {
+                                       return (
+                                         <span className="flex items-center gap-1 shrink-0">
+                                           <span className="font-bold text-orange-400">↻ regressed</span>
+                                           <span className="px-1 rounded border text-orange-600 border-orange-900/50 bg-orange-950/10">{verify.confidence}</span>
+                                           <span className="text-neutral-700">· {verify.matchedFail} failure{verify.matchedFail !== 1 ? 's' : ''} re-emerged</span>
                                          </span>
                                        );
                                      }
                                      // active
                                      const currentRate = Math.round((totalFails / te) * 100);
-                                     const afterRate = Math.round(Math.max(0, (totalFails - cluster.totalHits) / te) * 100);
+                                     const afterRate   = Math.round(Math.max(0, (totalFails - cluster.totalHits) / te) * 100);
                                      return (
                                        <span className="flex items-center gap-1 shrink-0">
                                          <span className={`font-bold ${verify.isDeterministic ? 'text-red-400' : 'text-red-400/70'}`}>
