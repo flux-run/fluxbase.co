@@ -362,6 +362,7 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                 : 'text-neutral-500'
             }`}>
               Overhead: {data.narrative.breakdown.overhead_ms}ms{exec.duration_ms ? ` (${Math.round(data.narrative.breakdown.overhead_ms / exec.duration_ms * 100)}%)` : ''}
+              <span className="text-neutral-700"> · runtime + infra cost</span>
             </span>
           </>
         ) : exec.client_ip ? (
@@ -372,6 +373,19 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
             ⚠ {data.narrative.pattern_history.count}× in last {data.narrative.pattern_history.window_min}m
           </span>
         )}
+        {data.narrative?.breakdown && (() => {
+          const b = data.narrative!.breakdown;
+          const topLabel = b.io_ms >= b.js_ms && b.io_ms >= b.overhead_ms
+            ? `IO (${b.io_ms}ms)`
+            : b.overhead_ms >= b.js_ms
+              ? `Overhead (${b.overhead_ms}ms)`
+              : `JS (${b.js_ms}ms)`;
+          return (
+            <span className="text-[10px] font-mono text-neutral-600 ml-auto">
+              Top cost: <span className="text-neutral-400">{topLabel}</span>
+            </span>
+          );
+        })()}
       </div>
 
       {/* 3. ANALYSIS */}

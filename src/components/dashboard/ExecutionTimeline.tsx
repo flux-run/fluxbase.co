@@ -316,7 +316,7 @@ function EventRow({ event, seq, isLast, isSlow }: { event: TimelineEvent; seq: n
               <span className="text-[10px] font-mono text-neutral-600 shrink-0">{event.sublabel}</span>
             )}
             {isSlow && (
-              <span className="text-[9px] font-black uppercase tracking-widest text-orange-500/80 shrink-0">slow</span>
+              <span className="text-[9px] font-black uppercase tracking-widest text-orange-500/80 shrink-0">slow · highest step</span>
             )}
           </div>
         </div>
