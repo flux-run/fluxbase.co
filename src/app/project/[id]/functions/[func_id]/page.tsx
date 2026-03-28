@@ -1334,6 +1334,90 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
         </div>
 
         <div className="space-y-10">
+          <section>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold uppercase tracking-widest text-neutral-500">Function Settings</h3>
+              <button 
+                onClick={async () => {
+                  try {
+                    await api.updateFunction(func_id, {
+                      access_policy: data.access_policy ?? undefined,
+                      rate_limit_rpm: data.rate_limit_rpm ?? undefined,
+                      max_duration_ms: data.max_duration_ms ?? undefined,
+                    });
+                    toast.success("Settings updated");
+                    loadData();
+                  } catch (err) {
+                    toast.error("Failed to update settings: " + err);
+                  }
+                }}
+                className="text-blue-500 hover:text-blue-400 transition flex items-center gap-1.5 text-xs font-bold"
+              >
+                <Save className="w-3 h-3" />
+                Update
+              </button>
+            </div>
+            <div className="bg-neutral-950 border border-neutral-900 rounded-xl p-6 space-y-6 shadow-inner">
+               <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest">Access Policy</label>
+                  <select 
+                    value={data.access_policy ?? ""} 
+                    onChange={(e) => setData({ ...data, access_policy: e.target.value })}
+                    className="w-full bg-black border border-neutral-800 rounded p-2 text-xs font-mono text-neutral-100 focus:border-blue-500 outline-none"
+                  >
+                    <option value="private">Private (Token Required)</option>
+                    <option value="public">Public (Any access)</option>
+                    <option value="webhook">Webhook (HMAC Secret)</option>
+                  </select>
+               </div>
+
+               <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest">Rate Limit (RPM)</label>
+                    <input 
+                      type="number" 
+                      value={data.rate_limit_rpm ?? ""} 
+                      onChange={(e) => setData({ ...data, rate_limit_rpm: parseInt(e.target.value) })}
+                      className="w-full bg-black border border-neutral-800 rounded p-2 text-xs font-mono text-neutral-100 focus:border-blue-500 outline-none" 
+                    />
+                 </div>
+                 <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest">Timeout (ms)</label>
+                    <input 
+                      type="number" 
+                      value={data.max_duration_ms ?? ""} 
+                      onChange={(e) => setData({ ...data, max_duration_ms: parseInt(e.target.value) })}
+                      className="w-full bg-black border border-neutral-800 rounded p-2 text-xs font-mono text-neutral-100 focus:border-blue-500 outline-none" 
+                    />
+                 </div>
+               </div>
+
+               {data.access_policy === "webhook" && (
+                 <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest">Webhook Secret</label>
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        value={data.webhook_secret || ""} 
+                        readOnly
+                        className="flex-1 bg-black border border-neutral-800 rounded p-2 text-xs font-mono text-neutral-500" 
+                      />
+                      <button 
+                        onClick={async () => {
+                          const secret = Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
+                          await api.updateFunction(func_id, { webhook_secret: secret });
+                          loadData();
+                        }}
+                        className="bg-neutral-900 border border-neutral-800 px-3 py-1 rounded text-[10px] font-bold text-neutral-400 hover:text-white"
+                      >
+                        Rotate
+                      </button>
+                    </div>
+                 </div>
+               )}
+            </div>
+          </section>
+
           {/* Deployments */}
           <section>
             <h3 className="text-sm font-bold uppercase tracking-widest text-neutral-500 mb-3 flex items-center gap-2">
@@ -1428,107 +1512,6 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                   </div>
                 );
               })}
-            </div>
-          </section>
-
-          <section>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-bold uppercase tracking-widest text-neutral-500">Function Settings</h3>
-              <button 
-                onClick={async () => {
-                  try {
-                    await api.updateFunction(func_id, {
-                      access_policy: data.access_policy ?? undefined,
-                      rate_limit_rpm: data.rate_limit_rpm ?? undefined,
-                      max_duration_ms: data.max_duration_ms ?? undefined,
-                    });
-                    toast.success("Settings updated");
-                    loadData();
-                  } catch (err) {
-                    toast.error("Failed to update settings: " + err);
-                  }
-                }}
-                className="text-blue-500 hover:text-blue-400 transition flex items-center gap-1.5 text-xs font-bold"
-              >
-                <Save className="w-3 h-3" />
-                Update
-              </button>
-            </div>
-            <div className="bg-neutral-950 border border-neutral-900 rounded-xl p-6 space-y-6 shadow-inner">
-               <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest">Access Policy</label>
-                  <select 
-                    value={data.access_policy ?? ""} 
-                    onChange={(e) => setData({ ...data, access_policy: e.target.value })}
-                    className="w-full bg-black border border-neutral-800 rounded p-2 text-xs font-mono text-neutral-100 focus:border-blue-500 outline-none"
-                  >
-                    <option value="private">Private (Token Required)</option>
-                    <option value="public">Public (Any access)</option>
-                    <option value="webhook">Webhook (HMAC Secret)</option>
-                  </select>
-               </div>
-
-               <div className="grid grid-cols-2 gap-4">
-                 <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest">Rate Limit (RPM)</label>
-                    <input 
-                      type="number" 
-                      value={data.rate_limit_rpm ?? ""} 
-                      onChange={(e) => setData({ ...data, rate_limit_rpm: parseInt(e.target.value) })}
-                      className="w-full bg-black border border-neutral-800 rounded p-2 text-xs font-mono text-neutral-100 focus:border-blue-500 outline-none" 
-                    />
-                 </div>
-                 <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest">Timeout (ms)</label>
-                    <input 
-                      type="number" 
-                      value={data.max_duration_ms ?? ""} 
-                      onChange={(e) => setData({ ...data, max_duration_ms: parseInt(e.target.value) })}
-                      className="w-full bg-black border border-neutral-800 rounded p-2 text-xs font-mono text-neutral-100 focus:border-blue-500 outline-none" 
-                    />
-                 </div>
-               </div>
-
-               {data.access_policy === "webhook" && (
-                 <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest">Webhook Secret</label>
-                    <div className="flex gap-2">
-                      <input 
-                        type="text" 
-                        value={data.webhook_secret || ""} 
-                        readOnly
-                        className="flex-1 bg-black border border-neutral-800 rounded p-2 text-xs font-mono text-neutral-500" 
-                      />
-                      <button 
-                        onClick={async () => {
-                          const secret = Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
-                          await api.updateFunction(func_id, { webhook_secret: secret });
-                          loadData();
-                        }}
-                        className="bg-neutral-900 border border-neutral-800 px-3 py-1 rounded text-[10px] font-bold text-neutral-400 hover:text-white"
-                      >
-                        Rotate
-                      </button>
-                    </div>
-                 </div>
-               )}
-            </div>
-          </section>
-
-          <section>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-bold uppercase tracking-widest text-neutral-500">Environment</h3>
-              <button className="text-neutral-700 cursor-not-allowed flex items-center gap-1.5 text-xs font-bold">
-                <Save className="w-3 h-3" />
-                Save
-              </button>
-            </div>
-            <div className="bg-neutral-950 border border-neutral-900 rounded-xl p-4 space-y-4 shadow-inner">
-               <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest">DATABASE_URL</label>
-                  <input type="password" value="********" readOnly className="w-full bg-black border border-neutral-800 rounded p-2 text-xs font-mono text-neutral-400 cursor-not-allowed" />
-               </div>
-               <button className="w-full bg-neutral-900 border border-neutral-800 py-1.5 rounded text-[11px] font-bold text-neutral-400 hover:bg-neutral-800 transition">Manage Secrets</button>
             </div>
           </section>
         </div>
