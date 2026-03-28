@@ -369,11 +369,12 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
     reason: string; isDeterministic: boolean; isRegressed: boolean; pathsTracked: boolean;
     observationState: 'not_observed' | 'partially_observed' | 'verified';
     lastMatchedAt: string | null;
-    matchingCriteria: { codeSha: string | null; callSites: string[]; externalDep: string | null; errorType: string | null; errorSource: string | null };
+    matchingCriteria: { codeSha: string | null; callSites: string[]; externalDep: string | null; errorType: string | null; errorSource: string | null; errorSignature: string | null };
     confidenceScore: number;
-    verifyMode: 'deterministic' | 'probabilistic';
+    verifyMode: 'deterministic' | 'probabilistic' | 'deployment';
     requiredToVerify: number;
     pathCoveredCount: number;
+    deployElapsedSec: number | null;
   } => {
     const fp               = extractClusterFingerprint(cluster);
     const pathsTracked     = fp.paths.size > 0;
@@ -440,7 +441,17 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
     }
     const clusterErrorType   = cluster.issues[0]?.error_type ?? null;
     const clusterErrorSource = cluster.issues[0]?.error_source ?? null;
-    const matchingCriteria = { codeSha: matchingCodeSha, callSites: matchingCallSites, externalDep: matchingExternalDep, errorType: clusterErrorType, errorSource: clusterErrorSource };
+    // Error signature: human-readable description of what went wrong (for criteria display)
+    const clusterErrorSignature = cluster.issues[0]?.title
+      ? cluster.issues[0].title.slice(0, 50)
+      : clusterErrorType ?? null;
+    const matchingCriteria = { codeSha: matchingCodeSha, callSites: matchingCallSites, externalDep: matchingExternalDep, errorType: clusterErrorType, errorSource: clusterErrorSource, errorSignature: clusterErrorSignature };
+    // Infra failures (boot issues, no artifact) cannot be traffic-verified
+    const isInfra = cluster.cls === 'infra';
+    const effectiveVerifyMode: 'deterministic' | 'probabilistic' | 'deployment' = isInfra ? 'deployment' : effectiveDeterministic ? 'deterministic' : 'probabilistic';
+    const effectiveRequired = isInfra ? 0 : requiredToVerify;
+    // Time since latest deploy (for "waiting since Xm" context)
+    const deployElapsedSec = deployedAt ? Math.floor((Date.now() - deployedAt) / 1000) : null;
 
     if (isActiveNow) {
       const confidence: 'high' | 'medium' | 'low' = matchedFail > 0 || activeInCurrentDeploy ? 'high' : 'medium';
@@ -449,7 +460,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
         : isDeterministic
         ? `Deterministic — fails ${failureRate}% across ${execCount} exec${execCount !== 1 ? 's' : ''}`
         : `Reproducible · ${execCount} exec${execCount !== 1 ? 's' : ''}, ${failureRate}% failure rate`;
-      return { state: isRegressed ? 'regressed' : 'active', confidence, execCount, errorCount: currentErrors, failureRate, matchedTotal, matchedSuccess, matchedFail, reason, isDeterministic, isRegressed, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode, requiredToVerify, pathCoveredCount: pathCoveredExecs.length };
+      return { state: isRegressed ? 'regressed' : 'active', confidence, execCount, errorCount: currentErrors, failureRate, matchedTotal, matchedSuccess, matchedFail, reason, isDeterministic, isRegressed, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode: effectiveVerifyMode, requiredToVerify: effectiveRequired, pathCoveredCount: pathCoveredExecs.length, deployElapsedSec };
     }
 
     // No active failures — determine if the same scenario was exercised successfully
@@ -457,20 +468,20 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
     if (effectiveDeterministic ? matchedSuccess >= 1 : matchedTotal >= 3) {
       const confidence: 'high' | 'medium' | 'low' = effectiveDeterministic ? 'high' : matchedTotal >= 15 ? 'high' : matchedTotal >= 5 ? 'medium' : 'low';
       const reason = `Verified — ${matchedSuccess} exec${matchedSuccess !== 1 ? 's' : ''} on same path, no recurrence`;
-      return { state: 'verified_fixed', confidence, execCount, errorCount: 0, failureRate: 0, matchedTotal, matchedSuccess, matchedFail: 0, reason, isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode, requiredToVerify, pathCoveredCount: pathCoveredExecs.length };
+      return { state: 'verified_fixed', confidence, execCount, errorCount: 0, failureRate: 0, matchedTotal, matchedSuccess, matchedFail: 0, reason, isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode: effectiveVerifyMode, requiredToVerify: effectiveRequired, pathCoveredCount: pathCoveredExecs.length, deployElapsedSec };
     }
     if (execCount >= VERIFIED_EXEC_HIGH)
       return { state: 'verified_fixed', confidence: 'medium', execCount, errorCount: 0, failureRate: 0, matchedTotal, matchedSuccess, matchedFail: 0,
-        reason: `Not reproduced across ${execCount} execs — path not yet exercised`, isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode, requiredToVerify, pathCoveredCount: pathCoveredExecs.length };
+        reason: `Not reproduced across ${execCount} execs — path not yet exercised`, isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode: effectiveVerifyMode, requiredToVerify: effectiveRequired, pathCoveredCount: pathCoveredExecs.length, deployElapsedSec };
     if (execCount >= VERIFIED_EXEC_MIN)
       return { state: 'verified_fixed', confidence: 'low', execCount, errorCount: 0, failureRate: 0, matchedTotal, matchedSuccess, matchedFail: 0,
-        reason: `Not reproduced across ${execCount} execs — insufficient path coverage`, isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode, requiredToVerify, pathCoveredCount: pathCoveredExecs.length };
+        reason: `Not reproduced across ${execCount} execs — insufficient path coverage`, isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode: effectiveVerifyMode, requiredToVerify: effectiveRequired, pathCoveredCount: pathCoveredExecs.length, deployElapsedSec };
 
     return { state: 'unverified', confidence: 'low', execCount, errorCount: 0, failureRate: 0, matchedTotal, matchedSuccess, matchedFail: 0,
       reason: pathsTracked
         ? `Failure path not yet exercised in current deploy (${execCount}/${VERIFIED_EXEC_MIN} execs)`
         : `Only ${execCount} of ${VERIFIED_EXEC_MIN} executions needed to verify`,
-      isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode, requiredToVerify, pathCoveredCount: pathCoveredExecs.length };
+      isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode: effectiveVerifyMode, requiredToVerify: effectiveRequired, pathCoveredCount: pathCoveredExecs.length, deployElapsedSec };
   };
 
   const st = statsData?.stats;
@@ -874,16 +885,27 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                  })}
                                  {/* ── Verification block: 3-state truth tracking ── */}
                                  {(() => {
+                                   // ── Status label ──
+                                   const isInfraCluster = cluster.cls === 'infra';
+                                   const elapsedLabel = (() => {
+                                     const s = verify.deployElapsedSec;
+                                     if (!s) return '';
+                                     if (s < 60) return ` (${s}s since deploy)`;
+                                     if (s < 3600) return ` (${Math.floor(s / 60)}m since deploy)`;
+                                     return ` (${Math.floor(s / 3600)}h since deploy)`;
+                                   })();
                                    const obsLabel = (() => {
+                                     if (isInfraCluster)
+                                       return { text: 'DEPLOYMENT ISSUE', color: 'text-orange-400' };
                                      if (verify.observationState === 'not_observed')
-                                       return { text: 'WAITING FOR TRAFFIC', color: 'text-neutral-500' };
+                                       return { text: `WAITING FOR TRAFFIC${verify.observationState === 'not_observed' ? elapsedLabel : ''}`, color: 'text-neutral-500' };
                                      if (verify.observationState === 'verified')
                                        return { text: 'VERIFIED', color: verify.confidence === 'high' ? 'text-emerald-400' : 'text-emerald-600/70' };
                                      if (verify.state === 'regressed') return { text: 'REGRESSION', color: 'text-orange-400' };
                                      if (verify.state === 'active')    return { text: 'STILL FAILING', color: 'text-red-500' };
                                      return { text: 'PARTIALLY OBSERVED', color: 'text-amber-500' };
                                    })();
-                                   const { codeSha, callSites, externalDep, errorType, errorSource } = verify.matchingCriteria;
+                                   const { codeSha, callSites, externalDep, errorType, errorSource, errorSignature } = verify.matchingCriteria;
                                    const coveragePct = verify.requiredToVerify > 0
                                      ? Math.round((Math.min(verify.matchedTotal, verify.requiredToVerify) / verify.requiredToVerify) * 100)
                                      : 0;
@@ -891,14 +913,29 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                    const fixCoveragePct = verify.execCount > 0 && verify.pathsTracked
                                      ? Math.round((verify.pathCoveredCount / verify.execCount) * 100)
                                      : null;
-                                   // Criteria rows: ordered, labeled, explicit
+                                   // Criteria rows: explicit labeled dimensions of what "matching" means
                                    const criteriaRows: { label: string; value: string }[] = [];
-                                   if (callSites[0]) criteriaRows.push({ label: 'call site', value: callSites[0] });
+                                   if (data?.name)   criteriaRows.push({ label: 'function', value: data.name });
+                                   if (data?.path)   criteriaRows.push({ label: 'route', value: `${data.method ?? 'GET'} ${data.path}` });
+                                   if (callSites[0]) criteriaRows.push({ label: 'code location', value: callSites[0] });
                                    if (externalDep)  criteriaRows.push({ label: 'operation', value: `fetch(${externalDep})` });
-                                   if (errorType)    criteriaRows.push({ label: 'error type', value: errorType });
-                                   if (errorSource)  criteriaRows.push({ label: 'source', value: errorSource.replace(/_/g, ' ') });
+                                   if (errorSignature) criteriaRows.push({ label: 'error signature', value: errorSignature });
+                                   if (errorType && errorType !== errorSignature) criteriaRows.push({ label: 'error type', value: errorType });
                                    if (codeSha)      criteriaRows.push({ label: 'version', value: codeSha });
                                    if (criteriaRows.length === 0) criteriaRows.push({ label: 'match', value: 'fingerprint' });
+                                   // ── Strategy description ──
+                                   const strategyLabel =
+                                     verify.verifyMode === 'deployment' ? 'Deployment validation'
+                                     : verify.verifyMode === 'deterministic' ? 'Deterministic'
+                                     : 'Probabilistic';
+                                   const strategyDetail =
+                                     verify.verifyMode === 'deployment' ? '→ requires successful function boot'
+                                     : verify.verifyMode === 'deterministic' ? '→ 1 matching success proves fix'
+                                     : `→ ${verify.requiredToVerify} matching execs for confidence`;
+                                   const strategyColor =
+                                     verify.verifyMode === 'deployment' ? 'text-orange-400/80'
+                                     : verify.verifyMode === 'deterministic' ? 'text-red-400/80'
+                                     : 'text-amber-500/70';
                                    return (
                                      <div className="mt-2 pt-2 border-t border-white/5 font-mono text-[9px] space-y-0.5">
                                        {/* Label + confidence score */}
@@ -911,22 +948,16 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                            )}
                                          </div>
                                        </div>
-                                       {/* Verification strategy + what it drives */}
+                                       {/* Strategy: label → behavior → expectation */}
                                        <div className="flex items-start justify-between gap-2">
                                          <span className="text-neutral-700 shrink-0">Strategy</span>
                                          <div className="flex flex-col items-end gap-px">
-                                           <span className={`font-bold ${verify.verifyMode === 'deterministic' ? 'text-red-400/80' : 'text-amber-500/70'}`}>
-                                             {verify.verifyMode === 'deterministic' ? 'Deterministic' : 'Probabilistic'}
-                                           </span>
-                                           <span className="text-neutral-700">
-                                             {verify.verifyMode === 'deterministic'
-                                               ? '→ 1 matching success proves fix'
-                                               : `→ ${verify.requiredToVerify} matching execs for confidence`}
-                                           </span>
+                                           <span className={`font-bold ${strategyColor}`}>{strategyLabel}</span>
+                                           <span className="text-neutral-700">{strategyDetail}</span>
                                          </div>
                                        </div>
-                                       {/* Adaptive threshold — coverage bar */}
-                                       {verify.observationState !== 'verified' && (
+                                       {/* Coverage bar — only for traffic-verifiable failures, pre-verified */}
+                                       {!isInfraCluster && verify.observationState !== 'verified' && verify.requiredToVerify > 0 && (
                                          <div className="flex items-center justify-between gap-2">
                                            <span className="text-neutral-700 shrink-0">Coverage</span>
                                            <div className="flex items-center gap-1.5">
@@ -941,15 +972,17 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                          </div>
                                        )}
                                        {/* Observed counts (honest zero) */}
-                                       <div className="flex items-center justify-between gap-2">
-                                         <span className="text-neutral-700">Observed</span>
-                                         {verify.matchedTotal === 0
-                                           ? <span className="text-neutral-700">no matching executions yet</span>
-                                           : <span className="text-neutral-500">{verify.matchedFail} failure{verify.matchedFail !== 1 ? 's' : ''} · {verify.matchedSuccess} success{verify.matchedSuccess !== 1 ? 'es' : ''}</span>
-                                         }
-                                       </div>
-                                       {/* Fix path coverage insight */}
-                                       {fixCoveragePct !== null && verify.observationState !== 'verified' && (
+                                       {!isInfraCluster && (
+                                         <div className="flex items-center justify-between gap-2">
+                                           <span className="text-neutral-700">Observed</span>
+                                           {verify.matchedTotal === 0
+                                             ? <span className="text-neutral-700">no matching executions yet</span>
+                                             : <span className="text-neutral-500">{verify.matchedFail} failure{verify.matchedFail !== 1 ? 's' : ''} · {verify.matchedSuccess} success{verify.matchedSuccess !== 1 ? 'es' : ''}</span>
+                                           }
+                                         </div>
+                                       )}
+                                       {/* Fix path coverage: did the fix even get exercised? */}
+                                       {!isInfraCluster && fixCoveragePct !== null && verify.observationState !== 'verified' && (
                                          <div className="flex items-start justify-between gap-2">
                                            <span className="text-neutral-700 shrink-0">Fix path hit</span>
                                            <div className="flex flex-col items-end gap-px">
@@ -957,21 +990,21 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                                fixCoveragePct === 0 ? 'text-neutral-600'
                                                : fixCoveragePct < 10 ? 'text-amber-600/80'
                                                : 'text-amber-400'
-                                             }`}>{fixCoveragePct}% of executions</span>
+                                             }`}>{fixCoveragePct}% of traffic</span>
                                              {fixCoveragePct === 0 && (
-                                               <span className="text-neutral-700">fix not yet exercised in production</span>
+                                               <span className="text-red-400/50">fix not yet exercised in production</span>
                                              )}
                                            </div>
                                          </div>
                                        )}
-                                       {/* Explicit matching criteria — labeled rows */}
-                                       <div className="flex items-start justify-between gap-2 pt-0.5 mt-0.5 border-t border-white/[0.04]">
-                                         <span className="text-neutral-700 shrink-0">Match criteria</span>
-                                         <div className="flex flex-col items-end gap-px">
+                                       {/* Explicit matching criteria — every dimension named */}
+                                       <div className="pt-0.5 mt-0.5 border-t border-white/[0.04] space-y-px">
+                                         <span className="text-neutral-700">Match criteria</span>
+                                         <div className="flex flex-col gap-px mt-0.5 pl-2">
                                            {criteriaRows.map(({ label, value }) => (
-                                             <div key={label} className="flex items-center gap-1">
-                                               <span className="text-neutral-800">{label}:</span>
-                                               <span className="text-neutral-600 truncate max-w-[100px]" title={value}>{value}</span>
+                                             <div key={label} className="flex items-baseline gap-1">
+                                               <span className="text-neutral-800 shrink-0">{label}:</span>
+                                               <span className="text-neutral-500 truncate" title={value}>{value}</span>
                                              </div>
                                            ))}
                                          </div>
