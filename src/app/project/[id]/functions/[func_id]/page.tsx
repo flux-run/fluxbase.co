@@ -100,6 +100,11 @@ function confidenceLabel(confidence?: number) {
   return "Low";
 }
 
+function isInternalFrame(file: string): boolean {
+  return file.includes('ext:') || file.includes('deno:') || file.includes('node:') ||
+    file.includes('internal/') || file.startsWith('flux:');
+}
+
 function parseStackFrames(stack?: string | null) {
   if (!stack) return [];
   return stack.split('\n')
@@ -122,9 +127,7 @@ function frameLabel(frame?: { fn?: string; file: string; line: string | number; 
 }
 
 function topUserFrame(stack?: string | null) {
-  return parseStackFrames(stack).find(f =>
-    !f.file.includes('ext:') && !f.file.includes('deno:') && !f.file.includes('node:') && !f.file.includes('internal/')
-  ) ?? null;
+  return parseStackFrames(stack).find(f => !isInternalFrame(f.file)) ?? null;
 }
 
 export default function FunctionDetail({ params }: { params: Promise<{ id: string, func_id: string }> }) {

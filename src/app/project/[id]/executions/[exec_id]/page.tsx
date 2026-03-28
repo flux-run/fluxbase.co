@@ -98,6 +98,11 @@ function formatThrownExpression(
   return formatErrorHeadline(errorName, errorMessage, fallback, errorStack);
 }
 
+function isInternalFrame(file: string): boolean {
+  return file.includes('ext:') || file.includes('deno:') || file.includes('node:') ||
+    file.includes('internal/') || file.startsWith('flux:');
+}
+
 function parseStackFrames(stack?: string | null) {
   if (!stack) return [];
   return stack.split('\n')
@@ -111,6 +116,10 @@ function parseStackFrames(stack?: string | null) {
       return null;
     })
     .filter(Boolean) as { fn: string; file: string; line: string; col: string }[];
+}
+
+function parseUserStackFrames(stack?: string | null) {
+  return parseStackFrames(stack).filter(f => !isInternalFrame(f.file));
 }
 
 function frameLabel(frame?: { fn?: string; file: string; line: string | number; col?: string | number } | null, short = true): string | null {
@@ -233,13 +242,11 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
         ? "Execution was halted by an unhandled exception"
         : `Execution interrupted by unhandled exception: ${errorHeadline}`;
 
-  const stackFrames = parseStackFrames(exec.error_stack);
+  const stackFrames = parseUserStackFrames(exec.error_stack);
   const userFrame: { fn?: string; file: string; line: string | number; col?: string | number } | null =
     (exec.error_frames?.length ?? 0) > 0
       ? exec.error_frames![0]
-      : (stackFrames.find(f =>
-          !f.file.includes('ext:') && !f.file.includes('deno:') && !f.file.includes('node:') && !f.file.includes('internal/')
-        ) ?? null);
+      : stackFrames[0] ?? null;
   const fixHint = errorTypeToFix(exec.error_name, exec.error_message, exec.error);
 
   const reqHeaders = typeof reqObj?.headers === 'object' && reqObj.headers !== null
