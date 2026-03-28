@@ -1,11 +1,12 @@
 "use client";
 import { useEffect, useState, use } from "react";
 import { useFluxApi } from "@/lib/api";
-import { Activity, Terminal, ExternalLink, Copy, Check, ChevronRight, Zap, Globe, Database, Server } from "lucide-react";
+import { Activity, Terminal, ExternalLink, Copy, Check, ChevronRight, Zap, Globe, Database, Server, GitMerge } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ExecutionDetail as ExecutionDetailType, Checkpoint, LogEntry } from "@/types/api";
+import { ExecutionTimeline } from "@/components/dashboard/ExecutionTimeline";
 
 function formatErrorHeadline(
   errorName?: string | null,
@@ -739,69 +740,17 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
          </section>
       </div>
 
-      {(data.spans?.length ?? 0) > 0 && (
-        <section className="space-y-6">
-           <h3 className="text-[11px] font-black uppercase tracking-widest text-neutral-600 flex items-center gap-2">
-              <Activity className="w-3.5 h-3.5 text-indigo-500/60" />
-              Determinism Trace (Step-by-Step)
-           </h3>
-           <div className="space-y-3 relative before:absolute before:left-[19px] before:top-2 before:bottom-2 before:w-[2px] before:bg-neutral-900">
-              {data.spans?.map((span, i: number) => (
-                <div key={i} className="flex gap-6 items-center group relative">
-                   <div className="w-10 h-10 rounded-full bg-black border-2 border-neutral-900 flex items-center justify-center z-10 group-hover:border-blue-500 transition-colors shadow-xl">
-                      {span.type === 'js' ? <Terminal className="w-4 h-4 text-emerald-500" /> : <Globe className="w-4 h-4 text-blue-500" />}
-                   </div>
-                   <Card className="flex-1 bg-[#111] border-neutral-900 p-4 flex items-center justify-between hover:border-neutral-700 transition">
-                      <div className="flex flex-col">
-                        <span className="text-xs font-bold text-neutral-200 uppercase tracking-tighter">{span.type} Layer</span>
-                        <code className="text-[12px] text-neutral-500 mt-1 max-w-[300px] truncate">{span.label || 'Execution'}</code>
-                      </div>
-                      <div className="flex flex-col items-end">
-                        <span className="text-[11px] font-mono text-neutral-600">{span.duration_ms}ms</span>
-                        <span className="text-[10px] text-green-500 font-bold mt-1">✓ RECORDED</span>
-                      </div>
-                   </Card>
-                </div>
-              ))}
-              {exec.status !== 'ok' && (
-                <div className="flex gap-6 items-center relative">
-                   <div className="w-10 h-10 rounded-full bg-red-950 border-2 border-red-800 flex items-center justify-center z-10 shadow-xl">
-                      <span className="text-red-400 text-base leading-none font-bold">✕</span>
-                   </div>
-                   <Card className="flex-1 bg-red-950/10 border-red-900/30 p-4 flex items-center justify-between">
-                      <div className="flex flex-col">
-                        <span className="text-xs font-bold text-red-300 uppercase tracking-tighter">Failure Point</span>
-                        {userFrame && (
-                          <span className="text-[12px] text-red-400 font-mono font-bold mt-0.5">↳ {frameLabel(userFrame)}</span>
-                        )}
-                        <code className="text-[11px] text-red-500/60 mt-0.5 font-mono truncate max-w-[300px]">
-                          {!isGenericErrorHeadline(errorHeadline) ? errorHeadline : (haltReason ?? 'Execution aborted')}
-                        </code>
-                      </div>
-                      <span className="text-[10px] text-red-500 font-bold shrink-0">✕ ABORTED</span>
-                   </Card>
-                </div>
-              )}
-           </div>
-        </section>
-      )}
-
-      {(data.logs?.length ?? 0) > 0 && (
-        <section className="space-y-4">
-           <h3 className="text-[11px] font-black uppercase tracking-widest text-neutral-600 flex items-center gap-2">
-              <Terminal className="w-3.5 h-3.5 text-zinc-500" />
-              Isolate Console Output
-           </h3>
-           <Card className="bg-black border-neutral-900 p-6 font-mono text-[13px] space-y-2 shadow-2xl">
-              {(data.logs ?? []).map((log: LogEntry) => (
-                <div key={log.seq} className="flex gap-6 border-l-2 border-neutral-900 pl-4 py-1 hover:bg-neutral-900/30 transition-colors rounded-r">
-                   <span className="text-neutral-700 w-20 flex-shrink-0">+{log.seq}s</span>
-                   <span className={log.level === 'error' ? 'text-red-400' : 'text-neutral-400'}>{log.message ?? log.args_json}</span>
-                </div>
-              ))}
-           </Card>
-        </section>
-      )}
+      <section className="space-y-6">
+        <h3 className="text-[11px] font-black uppercase tracking-widest text-neutral-600 flex items-center gap-2">
+           <GitMerge className="w-3.5 h-3.5 text-indigo-500/60" />
+           Execution Trace
+        </h3>
+        <ExecutionTimeline
+          execution={exec}
+          checkpoints={data.checkpoints ?? []}
+          logs={data.logs ?? []}
+        />
+      </section>
     </div>
   );
 }
