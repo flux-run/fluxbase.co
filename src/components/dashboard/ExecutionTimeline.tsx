@@ -226,17 +226,17 @@ function checkpointToEvent(cp: Checkpoint): TimelineEvent {
 // ── Kind metadata ─────────────────────────────────────────────────────────────
 
 const KIND_META: Record<TimelineEvent["kind"], { icon: string; color: string; bg: string; label: string }> = {
-  request:         { icon: "→",  color: "text-neutral-400", bg: "bg-neutral-800",  label: "REQ" },
-  log:             { icon: "›",  color: "text-neutral-500", bg: "bg-neutral-900",  label: "LOG" },
-  http:            { icon: "🌐", color: "text-orange-400",  bg: "bg-orange-950/40", label: "HTTP" },
-  postgres:        { icon: "🗄", color: "text-purple-400",  bg: "bg-purple-950/40", label: "DB" },
-  redis:           { icon: "⚡", color: "text-red-400",     bg: "bg-red-950/40",   label: "KV" },
-  tcp:             { icon: "⟷",  color: "text-cyan-400",    bg: "bg-cyan-950/40",  label: "TCP" },
-  timer:           { icon: "⏱",  color: "text-neutral-400", bg: "bg-neutral-900",  label: "TIMER" },
+  request:         { icon: "→",  color: "text-sky-400",     bg: "bg-sky-950/50",    label: "REQ" },
+  log:             { icon: "›",  color: "text-neutral-400", bg: "bg-neutral-800",   label: "LOG" },
+  http:            { icon: "🌐", color: "text-orange-300",  bg: "bg-orange-950/50", label: "HTTP" },
+  postgres:        { icon: "🗄", color: "text-purple-300",  bg: "bg-purple-950/50", label: "DB" },
+  redis:           { icon: "⚡", color: "text-red-300",     bg: "bg-red-950/50",    label: "KV" },
+  tcp:             { icon: "⟷",  color: "text-cyan-300",    bg: "bg-cyan-950/50",   label: "TCP" },
+  timer:           { icon: "⏱",  color: "text-neutral-400", bg: "bg-neutral-800",   label: "TIMER" },
   "performance.now": { icon: "⏱", color: "text-neutral-600", bg: "bg-neutral-900", label: "PERF" },
-  other:           { icon: "·",  color: "text-neutral-500", bg: "bg-neutral-900",  label: "IO" },
-  response:        { icon: "←",  color: "text-neutral-400", bg: "bg-neutral-800",  label: "RES" },
-  error:           { icon: "✗",  color: "text-red-400",     bg: "bg-red-950/40",   label: "ERR" },
+  other:           { icon: "·",  color: "text-neutral-400", bg: "bg-neutral-800",   label: "IO" },
+  response:        { icon: "←",  color: "text-sky-400",     bg: "bg-sky-950/50",    label: "RES" },
+  error:           { icon: "✗",  color: "text-red-300",     bg: "bg-red-950/50",    label: "ERR" },
 };
 
 // ── EventRow ──────────────────────────────────────────────────────────────────
@@ -245,33 +245,36 @@ function EventRow({ event, seq }: { event: TimelineEvent; seq: number }) {
   const [open, setOpen] = useState(false);
   const meta = KIND_META[event.kind];
   const hasDetail = !!event.detail;
+  const durLabel = event.durationMs != null
+    ? event.durationMs > 0 ? `${event.durationMs}ms` : "0ms"
+    : null;
 
   return (
     <div className="group">
       <div
-        className={`flex items-start gap-3 px-4 py-2.5 rounded-lg transition-colors ${
-          hasDetail ? "cursor-pointer hover:bg-neutral-900/60" : ""
+        className={`flex items-center gap-3 px-4 py-3 transition-colors ${
+          hasDetail ? "cursor-pointer hover:bg-neutral-900/70" : ""
         } ${event.isError ? "bg-red-950/20 hover:bg-red-950/30" : ""}`}
         onClick={() => hasDetail && setOpen((o) => !o)}
       >
         {/* seq number */}
-        <span className="shrink-0 w-5 text-right text-[10px] font-mono text-neutral-700 mt-0.5 select-none">
+        <span className="shrink-0 w-5 text-right text-[11px] font-mono text-neutral-700 select-none">
           {seq}
         </span>
 
         {/* kind badge */}
-        <span className={`shrink-0 text-[9px] font-bold font-mono px-1.5 py-0.5 rounded ${meta.bg} ${meta.color} uppercase tracking-widest mt-0.5`}>
+        <span className={`shrink-0 text-[9px] font-bold font-mono px-1.5 py-0.5 rounded ${meta.bg} ${meta.color} uppercase tracking-widest`}>
           {meta.label}
         </span>
 
-        {/* icon + label */}
+        {/* label */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <span className={`text-[11px] font-mono ${event.isError ? "text-red-300" : "text-neutral-200"} break-all`}>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`text-[12px] font-mono ${event.isError ? "text-red-300" : "text-neutral-100"} truncate`}>
               {event.label}
             </span>
             {event.badge && (
-              <span className={`text-[10px] font-mono ${event.badgeColor || "text-neutral-500"} shrink-0`}>
+              <span className={`text-[11px] font-mono ${event.badgeColor || "text-neutral-500"} shrink-0`}>
                 {event.badge}
               </span>
             )}
@@ -281,14 +284,16 @@ function EventRow({ event, seq }: { event: TimelineEvent; seq: number }) {
           </div>
         </div>
 
-        {/* duration + expand */}
+        {/* duration — always shown, 0ms in muted style */}
         <div className="shrink-0 flex items-center gap-2 ml-auto">
-          {event.durationMs != null && event.durationMs > 0 && (
-            <span className="text-[10px] font-mono text-neutral-600">{event.durationMs}ms</span>
+          {durLabel !== null && (
+            <span className={`text-[11px] font-mono tabular-nums ${
+              event.durationMs && event.durationMs > 0 ? "text-neutral-400" : "text-neutral-700"
+            }`}>{durLabel}</span>
           )}
           {hasDetail && (
-            <span className="text-neutral-700 group-hover:text-neutral-500 transition-colors">
-              {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+            <span className="text-neutral-700 group-hover:text-neutral-400 transition-colors">
+              {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
             </span>
           )}
         </div>
@@ -318,19 +323,18 @@ function buildLogLabel(log: LogEntry): { label: string; extraDetail?: React.Reac
       const args = JSON.parse(log.args_json) as unknown[];
       if (Array.isArray(args) && args.length > 0) {
         const firstStr = typeof args[0] === "string" ? args[0] : JSON.stringify(args[0]);
-        const label = `console.${log.level}(${truncate(firstStr, 90)})`;
+        const label = `console.${log.level}("${truncate(firstStr, 80)}")`;
         const extraDetail =
           args.length > 1 ? <JsonBlock data={args} /> : undefined;
         return { label, extraDetail };
       }
     } catch { /* ignore malformed args_json */ }
   }
-  // Fall back: if message looks like just a level name, wrap it too
-  const looksLikeLevelOnly = ["log", "info", "warn", "error", "debug"].includes(log.message.trim().toLowerCase());
-  if (looksLikeLevelOnly) {
-    return { label: `console.${log.level}()` };
+  const msg = log.message.trim();
+  if (msg) {
+    return { label: `console.${log.level}("${truncate(msg, 80)}")` };
   }
-  return { label: log.message };
+  return { label: `console.${log.level}()` };
 }
 
 export function ExecutionTimeline({ execution, checkpoints = [], logs = [] }: ExecutionTimelineProps) {
@@ -429,7 +433,7 @@ export function ExecutionTimeline({ execution, checkpoints = [], logs = [] }: Ex
   }
 
   return (
-    <div className="space-y-0.5">
+    <div className="divide-y divide-neutral-900/60">
       {events.map((event, i) => (
         <EventRow key={event.key} event={event} seq={i + 1} />
       ))}

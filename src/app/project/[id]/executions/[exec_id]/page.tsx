@@ -1,11 +1,8 @@
 "use client";
 import { useEffect, useState, use } from "react";
 import { useFluxApi } from "@/lib/api";
-import { Activity, Terminal, Copy, Check, ChevronRight, ChevronDown, Zap, GitMerge } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ExecutionDetail as ExecutionDetailType, Checkpoint, LogEntry } from "@/types/api";
+import { Activity, Terminal, Copy, Check, ChevronRight, ChevronDown, GitMerge } from "lucide-react";
+import { ExecutionDetail as ExecutionDetailType, LogEntry } from "@/types/api";
 import { ExecutionTimeline } from "@/components/dashboard/ExecutionTimeline";
 
 function formatErrorHeadline(
@@ -287,13 +284,13 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
       <header className="flex justify-between items-start border-b border-neutral-900 pb-8">
         <div>
           <div className="flex items-center gap-4 mb-3">
-             <Badge variant={exec.status === 'ok' ? 'success' : 'destructive'} className="font-bold text-[10px] uppercase tracking-widest">
+             <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded ${exec.status === 'ok' ? 'bg-emerald-950 text-emerald-400 border border-emerald-900/50' : 'bg-red-950 text-red-400 border border-red-900/50'}`}>
                {exec.status === 'ok' ? 'Success' : 'Failure'}
-             </Badge>
+             </span>
              {exec.error_source && (
-               <Badge variant="outline" className="border-neutral-800 text-neutral-500 font-bold text-[10px] uppercase tracking-widest">
+               <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded border border-neutral-800 text-neutral-500">
                  Source: {sourceLabel}
-               </Badge>
+               </span>
              )}
              <h2 className="text-2xl font-bold text-white font-mono flex items-center">
                <span className="text-neutral-600 mr-2 text-xl">{exec.method}</span>
@@ -325,10 +322,10 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
             {copiedCurl ? <Check className="w-3 h-3 text-green-500" /> : <Terminal className="w-3 h-3" />}
             <span>Copy cURL</span>
           </button>
-          <Button onClick={copyReplay} variant="outline" size="sm" className="bg-neutral-900 border-neutral-800 text-xs font-bold hover:bg-neutral-800 hover:text-white h-9 group/cta">
-             <Zap className="w-4 h-4 mr-2 text-blue-500 group-hover/cta:animate-pulse" />
+          <button onClick={copyReplay} className="flex items-center gap-1.5 bg-neutral-900 border border-neutral-800 px-3 py-2 rounded-lg text-xs font-bold text-neutral-400 hover:bg-neutral-800 hover:text-white hover:border-neutral-700 transition-all h-9">
+             <svg className="w-4 h-4 mr-1 text-blue-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
              Replay
-          </Button>
+          </button>
         </div>
       </header>
 
@@ -372,261 +369,147 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
       </div>
 
       {/* 3. ANALYSIS */}
-      <section className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-        <Card className={`overflow-hidden border ${exec.status === 'ok' ? 'border-emerald-900/30 bg-emerald-950/10' : 'border-red-900/30 bg-red-950/10'}`}>
-           <CardContent className="p-6">
-              <div className="space-y-5">
-                     <div className="space-y-2">
-                        <div className="flex items-center gap-2 mb-1">
-                           <Badge className={`${
-                              data.narrative?.severity === 'critical' ? 'bg-red-500' :
-                              data.narrative?.severity === 'high' ? 'bg-orange-500' :
-                              data.narrative?.severity === 'medium' ? 'bg-yellow-500' : 'bg-emerald-500'
-                           } text-black font-black text-[9px] uppercase px-1.5 py-0 rounded-sm`}>
-                              {data.narrative?.severity || 'Healthy'}
-                           </Badge>
-                           <Badge variant="outline" className="border-neutral-800 text-neutral-400 text-[9px] uppercase font-black px-1.5 py-0">
-                              Source: {data.narrative?.source === 'user_code' ? 'User Code' : sourceLabel}
-                           </Badge>
-                           {userFrame ? (
-                             <div className="flex items-center gap-1.5 bg-emerald-950/20 px-2 py-0.5 rounded border border-emerald-900/30">
-                               <span className="text-[9px] font-bold text-emerald-500/80 uppercase">Exact location identified</span>
-                             </div>
-                           ) : (
-                             <div className="flex items-center gap-1.5 bg-white/5 px-2 py-0.5 rounded border border-white/10">
-                               <span className="text-[9px] font-bold text-neutral-500 uppercase">Detected at runtime</span>
-                             </div>
-                           )}
-                        </div>
-                        {exec.status !== 'ok' ? (
-                          <div className="space-y-1.5">
-                            <p className="text-red-400/60 text-[10px] font-black uppercase tracking-[0.2em]">
-                              {data.narrative?.issue && !isGenericErrorHeadline(data.narrative.issue)
-                                ? data.narrative.issue
-                                : 'Unhandled exception'}
-                            </p>
-                            <h3 className={`font-black text-white tracking-tight leading-tight ${!isGenericErrorHeadline(errorHeadline) ? 'text-2xl font-mono' : 'text-3xl'}`}>
-                              {!isGenericErrorHeadline(errorHeadline) ? errorHeadline : displayIssue}
-                            </h3>
-                            {userFrame && (
-                              <p className="text-[13px] font-mono mt-0.5 flex items-center gap-1.5">
-                                <span className="text-red-400/50">↳</span>
-                                <span className="text-red-400/90 font-bold">{frameLabel(userFrame)}</span>
-                              </p>
-                            )}
-                          </div>
-                        ) : (
-                          <h3 className="text-3xl font-black text-white tracking-tight leading-tight">
-                            {displayIssue}
-                          </h3>
-                        )}
-                        <div className="flex flex-wrap items-center gap-3">
-                           <Badge variant="outline" className={`${exec.status === 'ok' ? 'border-emerald-500/30 text-emerald-500' : 'border-red-500/30 text-red-500'} text-[10px] uppercase font-black px-2 py-0.5`}>
-                              {exec.status === 'ok' ? 'Success' : 'Aborted'}
-                           </Badge>
-                           {data.narrative?.pattern_history && (
-                              <Badge variant="outline" className="border-red-500/50 bg-red-500/10 text-red-400 text-[10px] uppercase font-black px-2 py-0.5 animate-pulse">
-                                 Happened {data.narrative.pattern_history.count} times in last {data.narrative.pattern_history.window_min}m
-                              </Badge>
-                           )}
-                           <span className="text-neutral-600 text-[10px] font-mono uppercase tracking-widest">
-                              {exec.duration_ms === 0 ? 'No runtime entry' : `${exec.duration_ms}ms total duration`}
-                           </span>
-                        </div>
+      <section className="space-y-4">
+        {exec.status === 'ok' ? (
+          /* Success: thin insight strip */
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] font-mono border-b border-neutral-900/60 pb-4">
+            <span className="text-neutral-500 uppercase tracking-widest text-[9px] font-black">Analysis</span>
+            <span className="text-neutral-400">{data.narrative?.root_cause || data.narrative?.cause || 'No issues detected.'}</span>
+            {data.narrative?.anomaly && data.narrative.anomaly.is_abnormal && (
+              <span className="text-orange-400">⚠ Abnormal — avg {data.narrative.anomaly.avg_duration}ms, this {exec.duration_ms}ms</span>
+            )}
+            {data.narrative?.pattern_history && (
+              <span className="text-red-400">{data.narrative.pattern_history.count}× in last {data.narrative.pattern_history.window_min}m</span>
+            )}
+          </div>
+        ) : (
+          /* Error: keep detail, no card chrome */
+          <div className="space-y-4 border-l-2 border-red-900/50 pl-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded ${
+                  data.narrative?.severity === 'critical' ? 'bg-red-500 text-black' :
+                  data.narrative?.severity === 'high' ? 'bg-orange-500 text-black' :
+                  'bg-yellow-500 text-black'
+                }`}>{data.narrative?.severity || 'error'}</span>
+                <span className="text-[10px] text-red-400/60 font-mono uppercase tracking-widest">
+                  {data.narrative?.issue && !isGenericErrorHeadline(data.narrative.issue) ? data.narrative.issue : 'Unhandled exception'}
+                </span>
+              </div>
+              <p className="text-base font-mono font-bold text-white leading-snug">
+                {!isGenericErrorHeadline(errorHeadline) ? errorHeadline : displayIssue}
+              </p>
+              {userFrame && (
+                <p className="text-xs font-mono text-red-400/70">↳ {frameLabel(userFrame)}</p>
+              )}
+            </div>
+
+            {(data.narrative?.root_cause || data.narrative?.synthetic_root_cause) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-[9px] font-black uppercase tracking-widest text-neutral-600">Root Cause</span>
+                  <p className="text-neutral-200 text-[12px] mt-1 leading-relaxed">
+                    {data.narrative?.root_cause && !data.narrative.root_cause.toLowerCase().includes('unhandled exception thrown in user code')
+                      ? data.narrative.root_cause
+                      : userFrame ? `Unhandled throw at ${frameLabel(userFrame)}` : 'Unhandled exception in user code'}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-[9px] font-black uppercase tracking-widest text-neutral-600">Phase</span>
+                  <p className="text-neutral-300 text-[12px] mt-1">{data.narrative?.phase || phaseLabel(exec.error_phase)}</p>
+                </div>
+              </div>
+            )}
+
+            {exec.status !== 'ok' && userFrame && (() => {
+               const artifactSource: string | null = (() => {
+                 try {
+                   const mods = (reqObj as any)?.artifact?.modules;
+                   return Array.isArray(mods) ? (mods[0]?.source ?? null) : null;
+                 } catch { return null; }
+               })();
+               const preview = artifactSource && typeof userFrame.line === 'number'
+                 ? codePreview(artifactSource, userFrame.line)
+                 : artifactSource && typeof userFrame.line === 'string'
+                   ? codePreview(artifactSource, parseInt(userFrame.line, 10))
+                   : null;
+               const displayFrames: { fn?: string; file: string; line: string | number; col?: string | number }[] =
+                 exec.error_frames?.length ? exec.error_frames : stackFrames;
+               return (
+                 <div className="space-y-2">
+                   {preview && (
+                     <div className="rounded-lg overflow-hidden border border-red-900/30 bg-black/90">
+                       <div className="px-4 py-1.5 bg-red-950/20 border-b border-red-900/20 flex items-center justify-between">
+                         <span className="text-[10px] font-mono font-bold text-red-300">{frameLabel(userFrame)}</span>
+                         <span className="text-[9px] text-red-400/50 uppercase font-black tracking-widest">Failure line</span>
+                       </div>
+                       <div className="font-mono text-[12px] leading-relaxed">
+                         {preview.map(({ n, text, failing }) => (
+                           <div key={n} className={`flex gap-0 ${failing ? 'bg-red-950/40' : ''}`}>
+                             <span className="select-none w-10 shrink-0 text-right pr-4 py-0.5 text-neutral-700 border-r border-neutral-900">{n}</span>
+                             <span className={`pl-4 py-0.5 whitespace-pre ${failing ? 'text-red-300' : 'text-neutral-500'}`}>{text || ' '}</span>
+                           </div>
+                         ))}
+                       </div>
                      </div>
-
-                     {(data.narrative?.root_cause || data.narrative?.synthetic_root_cause) && (
-                        <div className={`p-4 rounded-xl space-y-4 ${exec.status === 'ok' ? 'bg-emerald-500/5 border border-emerald-500/10' : 'bg-red-500/10 border border-red-500/20'}`}>
-                           <span className={`text-[9px] font-black uppercase tracking-[0.2em] flex items-center gap-2 ${exec.status === 'ok' ? 'text-emerald-400' : 'text-red-400'}`}>
-                              <Zap className="w-3 h-3" /> {exec.status === 'ok' ? 'Execution Insight' : 'Root Cause'}
-                           </span>
-                           {exec.status === 'ok' ? (
-                              <div className="space-y-1">
-                                 <p className="text-white text-lg font-bold tracking-tight">
-                                    {data.narrative?.root_cause}
-                                 </p>
-                                 {data.narrative?.synthetic_root_cause && (
-                                    <p className="text-neutral-400 text-xs leading-relaxed font-medium">
-                                       {data.narrative.synthetic_root_cause}
-                                    </p>
-                                 )}
-                              </div>
-                           ) : (
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                 <div className="space-y-1">
-                                    <span className="text-[10px] uppercase font-black tracking-[0.2em] text-red-300">Root Cause</span>
-                                    <p className="text-white text-sm font-semibold">
-                                      {data.narrative?.root_cause && !data.narrative.root_cause.toLowerCase().includes('unhandled exception thrown in user code')
-                                        ? data.narrative.root_cause
-                                        : userFrame
-                                          ? `Unhandled throw at ${frameLabel(userFrame)}`
-                                          : 'Unhandled exception in user code'
-                                      }
-                                    </p>
-                                 </div>
-                                 <div className="space-y-1">
-                                    <span className="text-[10px] uppercase font-black tracking-[0.2em] text-red-300">Details</span>
-                                    <p className="text-red-100 text-sm font-mono">{displayDetails}</p>
-                                 </div>
-                                 <div className="space-y-1">
-                                    <span className="text-[10px] uppercase font-black tracking-[0.2em] text-red-300">Phase</span>
-                                    <p className="text-neutral-200 text-sm">{data.narrative?.phase || phaseLabel(exec.error_phase)}</p>
-                                 </div>
-                                 <div className="space-y-1">
-                                    <span className="text-[10px] uppercase font-black tracking-[0.2em] text-red-300">Impact</span>
-                                    <p className="text-neutral-200 text-sm">{data.narrative?.impact}</p>
-                                 </div>
-                              </div>
-                           )}
-                        </div>
-                     )}
-
-                     {exec.status !== 'ok' && userFrame && (() => {
-                        // Try to get source from artifact for inline preview
-                        const artifactSource: string | null = (() => {
-                          try {
-                            const mods = (reqObj as any)?.artifact?.modules;
-                            return Array.isArray(mods) ? (mods[0]?.source ?? null) : null;
-                          } catch { return null; }
-                        })();
-                        const preview = artifactSource && typeof userFrame.line === 'number'
-                          ? codePreview(artifactSource, userFrame.line)
-                          : artifactSource && typeof userFrame.line === 'string'
-                            ? codePreview(artifactSource, parseInt(userFrame.line, 10))
-                            : null;
-                        const displayFrames: { fn?: string; file: string; line: string | number; col?: string | number }[] =
-                          exec.error_frames?.length ? exec.error_frames : stackFrames;
-                        return (
-                          <div className="space-y-2">
-                             {/* Inline code preview */}
-                             {preview && (
-                               <div className="rounded-lg overflow-hidden border border-red-900/30 bg-black/90">
-                                 <div className="px-4 py-1.5 bg-red-950/20 border-b border-red-900/20 flex items-center justify-between">
-                                   <span className="text-[10px] font-mono font-bold text-red-300">{frameLabel(userFrame)}</span>
-                                   <span className="text-[9px] text-red-400/50 uppercase font-black tracking-widest">Failure</span>
-                                 </div>
-                                 <div className="font-mono text-[12px] leading-relaxed">
-                                   {preview.map(({ n, text, failing }) => (
-                                     <div key={n} className={`flex gap-0 ${failing ? 'bg-red-950/40' : ''}`}>
-                                       <span className="select-none w-10 shrink-0 text-right pr-4 py-0.5 text-neutral-700 border-r border-neutral-900">{n}</span>
-                                       <span className={`pl-4 py-0.5 whitespace-pre ${failing ? 'text-red-300' : 'text-neutral-500'}`}>{text || ' '}</span>
-                                     </div>
-                                   ))}
-                                 </div>
-                               </div>
-                             )}
-                             {/* Collapsible full stack */}
-                             {displayFrames.length > 1 && (
-                               <button
-                                 onClick={() => setShowStack(v => !v)}
-                                 className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-neutral-600 hover:text-neutral-400 transition-colors"
-                               >
-                                 <ChevronRight className={`w-3 h-3 transition-transform duration-200 ${showStack ? 'rotate-90' : ''}`} />
-                                 Full stack — {displayFrames.length} frame{displayFrames.length !== 1 ? 's' : ''}
-                               </button>
-                             )}
-                             {showStack && displayFrames.length > 1 && (
-                               <div className="bg-black/80 border border-neutral-900/60 rounded-lg overflow-hidden">
-                                 {displayFrames.map((frame, i) => (
-                                   <div key={i} className={`px-4 py-1.5 border-b border-neutral-900/40 last:border-0 font-mono text-[11px] flex gap-3 ${i === 0 ? 'bg-red-950/20' : ''}`}>
-                                     <span className="text-neutral-700 w-5 shrink-0 text-right">{i + 1}</span>
-                                     <span className={i === 0 ? 'text-red-400' : 'text-neutral-600'}>{frameLabel(frame)}</span>
-                                   </div>
-                                 ))}
-                               </div>
-                             )}
-                          </div>
-                        );
-                     })()}
-
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-2 border-y border-neutral-900/50">
-                        <div className="space-y-1">
-                           <span className="text-[10px] font-black uppercase text-neutral-500 tracking-[0.2em]">Cause Analysis</span>
-                           <p className="text-neutral-200 text-sm font-medium leading-relaxed">
-                              {data.narrative?.cause && !data.narrative.cause.toLowerCase().includes('unhandled exception')
-                              ? data.narrative.cause
-                              : exec.status === 'ok'
-                                ? `Execution completed successfully in ${exec.duration_ms}ms.`
-                                : userFrame
-                                  ? `Exception thrown at ${frameLabel(userFrame)}.`
-                                  : `Unhandled exception in ${sourceLabel.toLowerCase()}.`}
-                           </p>
-                        </div>
-                        <div className="space-y-1">
-                           <span className="text-[10px] font-black uppercase text-neutral-500 tracking-[0.2em]">Impact Assessment</span>
-                           <p className="text-neutral-300 text-sm leading-relaxed">
-                              {data.narrative?.impact || (exec.status === 'ok' 
-                                ? `All ${(data.spans?.length ?? 0)} recorded external steps were committed deterministically.`
-                                : `Order was NOT created. Database insert skipped to maintain consistency.`)}
-                           </p>
-                        </div>
+                   )}
+                   {displayFrames.length > 1 && (
+                     <button
+                       onClick={() => setShowStack(v => !v)}
+                       className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-neutral-600 hover:text-neutral-400 transition-colors"
+                     >
+                       <ChevronRight className={`w-3 h-3 transition-transform duration-200 ${showStack ? 'rotate-90' : ''}`} />
+                       Full stack — {displayFrames.length} frame{displayFrames.length !== 1 ? 's' : ''}
+                     </button>
+                   )}
+                   {showStack && displayFrames.length > 1 && (
+                     <div className="bg-black/80 border border-neutral-900/60 rounded-lg overflow-hidden">
+                       {displayFrames.map((frame, i) => (
+                         <div key={i} className={`px-4 py-1.5 border-b border-neutral-900/40 last:border-0 font-mono text-[11px] flex gap-3 ${i === 0 ? 'bg-red-950/20' : ''}`}>
+                           <span className="text-neutral-700 w-5 shrink-0 text-right">{i + 1}</span>
+                           <span className={i === 0 ? 'text-red-400' : 'text-neutral-600'}>{frameLabel(frame)}</span>
+                         </div>
+                       ))}
                      </div>
-
-                     <div className="p-3 bg-white/5 rounded-xl border border-white/10 flex items-center justify-between gap-4 group hover:border-white/20 transition-all">
-                        <div className="flex items-center gap-3">
-                           <div className="p-1.5 bg-blue-500/20 text-blue-400 rounded">
-                              <Terminal className="w-4 h-4" />
-                           </div>
-                           <div className="space-y-0.5">
-                              <p className="text-white font-bold text-xs uppercase tracking-tight">Recommendation</p>
-                              <p className="text-neutral-400 text-xs italic">
-                              {fixHint
-                                ? (userFrame ? `${fixHint.replace(/\.$/, '')} (${frameLabel(userFrame)}).` : fixHint)
-                                : userFrame
-                                  ? `This exception originates from ${frameLabel(userFrame)}. ${displaySuggestion.replace(/^.*?\. /, '')}`
-                                  : displaySuggestion}
-                              </p>
-                           </div>
-                        </div>
-                     </div>
-
-                     {data.narrative?.confidence_reason && (
-                        <p className="text-[11px] text-neutral-500 italic border-t border-neutral-900/50 pt-3">
-                           {data.narrative.confidence_reason}
-                        </p>
-                     )}
-
-                     {data.narrative?.anomaly && (
-                        <div className="pt-4 border-t border-neutral-900/50 space-y-3">
-                           <span className="text-[10px] font-black uppercase text-neutral-500 tracking-[0.2em]">Behavior compared to recent executions</span>
-                           <div className="flex items-center gap-6">
-                              <div className="space-y-0.5">
-                                 <p className="text-[10px] text-neutral-500 uppercase font-bold">24h Avg Duration</p>
-                                 <p className="text-white font-mono text-sm">{data.narrative.anomaly.avg_duration}ms</p>
-                              </div>
-                              <div className="h-8 w-px bg-neutral-900" />
-                              <div className="space-y-0.5">
-                                 <p className="text-[10px] text-neutral-500 uppercase font-bold">Current</p>
-                                 <p className={`${data.narrative.anomaly.is_abnormal ? 'text-orange-400' : 'text-emerald-400'} font-mono text-sm`}>{exec.duration_ms}ms</p>
-                              </div>
-                              <div className="h-8 w-px bg-neutral-900" />
-                              <div className="space-y-0.5">
-                                 <p className="text-[10px] text-neutral-500 uppercase font-bold">Status</p>
-                                 <p className="text-white text-xs uppercase font-black">{data.narrative.anomaly.is_abnormal ? 'Abnormal' : 'Normal'}</p>
-                              </div>
-                           </div>
-                           <p className="text-[10px] text-neutral-500 italic">
-                             {data.narrative.anomaly.message}
-                           </p>
-                        </div>
-                     )}
-
-                     {data.narrative?.next_steps && data.narrative.next_steps.length > 0 && (
-                        <div className="space-y-3 pt-2">
-                           <span className="text-[10px] font-black uppercase text-neutral-500 tracking-[0.2em]">Next Diagnostic Steps</span>
-                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                              {data.narrative.next_steps.map((step, i) => (
-                                 <div key={i} className="flex items-start gap-3 bg-neutral-900/30 p-2.5 rounded-lg border border-neutral-800/50">
-                                    <span className="flex-shrink-0 w-5 h-5 rounded-full bg-neutral-800 flex items-center justify-center text-[10px] font-black text-neutral-400">{i + 1}</span>
-                                    <p className="text-neutral-400 text-[11px] leading-tight mt-0.5">{step}</p>
-                                 </div>
-                              ))}
-                           </div>
-                        </div>
-                     )}
+                   )}
                  </div>
-           </CardContent>
-        </Card>
+               );
+            })()}
+
+            <div className="flex flex-col gap-1">
+              <span className="text-[9px] font-black uppercase tracking-widest text-neutral-600">Recommendation</span>
+              <p className="text-[12px] text-neutral-400 leading-relaxed">
+                {fixHint
+                  ? (userFrame ? `${fixHint.replace(/\.$/, '')} (${frameLabel(userFrame)}).` : fixHint)
+                  : userFrame
+                    ? `This exception originates from ${frameLabel(userFrame)}. ${displaySuggestion.replace(/^.*?\. /, '')}`
+                    : displaySuggestion}
+              </p>
+            </div>
+
+            {data.narrative?.anomaly && (
+              <div className="flex items-center gap-5 text-[11px] font-mono text-neutral-500 pt-1 border-t border-neutral-900/40">
+                <span>24h avg: {data.narrative.anomaly.avg_duration}ms</span>
+                <span className={data.narrative.anomaly.is_abnormal ? 'text-orange-400' : 'text-neutral-500'}>this: {exec.duration_ms}ms</span>
+                {data.narrative.anomaly.is_abnormal && <span className="text-orange-400">⚠ Abnormal</span>}
+              </div>
+            )}
+
+            {data.narrative?.next_steps && data.narrative.next_steps.length > 0 && (
+              <div className="space-y-2">
+                <span className="text-[9px] font-black uppercase tracking-widest text-neutral-600">Next Steps</span>
+                <ol className="space-y-1">
+                  {data.narrative.next_steps.map((step, i) => (
+                    <li key={i} className="flex items-start gap-2 text-[11px] text-neutral-400 leading-snug">
+                      <span className="shrink-0 text-neutral-700 font-mono">{i + 1}.</span>
+                      <span>{step}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       {/* 4. REPLAY COMMAND */}
