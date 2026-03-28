@@ -406,13 +406,15 @@ export default function ProjectPage({
                             : `started after deploy ${suggestedFocus.deployId}`}
                           <span className="text-neutral-700"> ({timeAgo(suggestedFocus.firstSeen)})</span>
                         </p>
+                        {suggestedFocus.errorsAfterDeploy > 0 && (
+                          <p className="text-[9px] text-neutral-600 font-mono">
+                            <span className="text-red-500/50 mr-1.5 select-none">·</span>
+                            {suggestedFocus.errorsBeforeDeploy === 0 ? "0" : suggestedFocus.errorsBeforeDeploy} failures before deploy · {suggestedFocus.errorsAfterDeploy}/{suggestedFocus.totalExecs} after
+                          </p>
+                        )}
                         <p className="text-[9px] text-neutral-600 font-mono">
                           <span className="text-red-500/50 mr-1.5 select-none">·</span>
-                          {suggestedFocus.errorsBeforeDeploy === 0 && suggestedFocus.errorsAfterDeploy > 0
-                            ? `0 failures before deploy · ${suggestedFocus.errorsAfterDeploy} after`
-                            : suggestedFocus.errorsAfterDeploy > 0
-                              ? `${suggestedFocus.errorsBeforeDeploy} before deploy · ${suggestedFocus.errorsAfterDeploy} after`
-                              : "all failures began after this deploy"}
+                          all failures began after this deploy
                         </p>
                         <p className="text-[9px] font-mono">
                           <span className="text-red-500/50 mr-1.5 select-none">·</span>
