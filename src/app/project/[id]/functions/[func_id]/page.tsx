@@ -228,6 +228,8 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
   const [filter, setFilter] = useState<string | null>(null);
   const [anomalyExpanded, setAnomalyExpanded] = useState(false);
   const [execPage, setExecPage] = useState(0);
+  const [activatingDeploy, setActivatingDeploy] = useState<string | null>(null);
+  const [confirmDeploy, setConfirmDeploy] = useState<string | null>(null);
 
   useEffect(() => { setExecPage(0); }, [filter]);
 
@@ -1344,7 +1346,9 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
               )}
               {deploymentList.map((dep, i) => {
                 const slice = deploySlice(dep.artifact_id);
-                const isCurrent = i === 0;
+                // Only the first (most recent) row whose artifact_id matches latest_artifact_id is "active"
+                const isActive = dep.artifact_id === data.latest_artifact_id &&
+                  deploymentList.findIndex(d => d.artifact_id === data.latest_artifact_id) === i;
                 const sha7 = dep.artifact_id?.slice(0, 7) ?? '???????';
                 const errRate = slice && slice.total > 0 ? Math.round((slice.errors / slice.total) * 100) : null;
                 const relTime = dep.created_at ? (() => {
@@ -1355,25 +1359,72 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                   if (hrs < 24) return `${hrs}h ago`;
                   return `${Math.floor(hrs / 24)}d ago`;
                 })() : null;
+                const isConfirming = confirmDeploy === dep.artifact_id;
+                const isActivating = activatingDeploy === dep.artifact_id;
                 return (
-                  <div key={dep.id ?? i} className={`flex items-center justify-between px-3 py-2 rounded-lg border text-[11px] ${
-                    isCurrent
+                  <div key={dep.id ?? i} className={`flex flex-col gap-1.5 px-3 py-2 rounded-lg border text-[11px] transition-colors ${
+                    isActive
                       ? 'bg-emerald-950/20 border-emerald-900/50'
+                      : isConfirming
+                      ? 'bg-amber-950/20 border-amber-900/50'
                       : 'bg-neutral-950 border-neutral-800/60'
                   }`}>
-                    <div className="flex items-center gap-2">
-                      <span className={`font-black ${isCurrent ? 'text-emerald-400' : 'text-neutral-500'}`}>{sha7}</span>
-                      {isCurrent && <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-600 border border-emerald-900/50 px-1 py-px rounded">current</span>}
-                      {dep.status === 'boot_failed' && <span className="text-[9px] font-bold uppercase tracking-wider text-red-500 border border-red-900/50 px-1 py-px rounded">boot failed</span>}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className={`font-black ${isActive ? 'text-emerald-400' : 'text-neutral-500'}`}>{sha7}</span>
+                        {isActive && <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-600 border border-emerald-900/50 px-1 py-px rounded">active</span>}
+                        {dep.status === 'boot_failed' && <span className="text-[9px] font-bold uppercase tracking-wider text-red-500 border border-red-900/50 px-1 py-px rounded">boot failed</span>}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {errRate !== null && (
+                          <span className={`text-[10px] font-bold ${errRate > 0 ? 'text-red-400' : 'text-emerald-500'}`}>
+                            {errRate > 0 ? `${errRate}% err` : '0 err'}
+                          </span>
+                        )}
+                        {relTime && <span className="text-neutral-700 text-[10px]">{relTime}</span>}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 text-right">
-                      {errRate !== null && (
-                        <span className={`text-[10px] font-bold ${errRate > 0 ? 'text-red-400' : 'text-emerald-500'}`}>
-                          {errRate > 0 ? `${errRate}% err` : '0 err'}
-                        </span>
-                      )}
-                      {relTime && <span className="text-neutral-700 text-[10px]">{relTime}</span>}
-                    </div>
+                    {!isActive && (
+                      <div className="flex items-center gap-1.5">
+                        {isConfirming ? (
+                          <>
+                            <button
+                              disabled={isActivating}
+                              onClick={async () => {
+                                setActivatingDeploy(dep.artifact_id);
+                                try {
+                                  await api.updateFunction(func_id, { latest_artifact_id: dep.artifact_id });
+                                  toast.success(`Activated ${sha7}`);
+                                  setConfirmDeploy(null);
+                                  loadData();
+                                } catch (err) {
+                                  toast.error('Activation failed: ' + err);
+                                } finally {
+                                  setActivatingDeploy(null);
+                                }
+                              }}
+                              className="flex-1 text-center text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded border border-amber-700 bg-amber-900/30 text-amber-400 hover:bg-amber-900/60 disabled:opacity-40 transition-colors"
+                            >
+                              {isActivating ? 'Activating…' : 'Confirm activate'}
+                            </button>
+                            <button
+                              disabled={isActivating}
+                              onClick={() => setConfirmDeploy(null)}
+                              className="text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded border border-neutral-800 text-neutral-600 hover:text-neutral-400 disabled:opacity-40 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmDeploy(dep.artifact_id)}
+                            className="text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded border border-neutral-800 text-neutral-600 hover:border-neutral-600 hover:text-neutral-300 transition-colors w-full"
+                          >
+                            ↑ Set active
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}

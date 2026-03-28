@@ -107,7 +107,7 @@ export interface Function extends BaseFunction {
   severity?: "critical" | "warning" | "healthy";
   status_message?: string;
   status?: string;
-  latest_artifact_id?: string | null;
+  latest_artifact_id: string | null;
   latest_deploy_at?: string | null;
   latest_deploy_status?: string | null;
   stats?: {
