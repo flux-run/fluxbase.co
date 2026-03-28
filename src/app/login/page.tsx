@@ -176,6 +176,14 @@ export default function LoginPage() {
                 className="w-full h-11 px-4 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[13px] text-neutral-200 placeholder-neutral-600 outline-none focus:border-white/20 transition-colors font-mono"
               />
 
+              {mode === "login" && (
+                <div className="text-right">
+                  <Link href="/forgot-password" className="text-[10px] text-neutral-500 hover:text-neutral-300 underline underline-offset-2">
+                    Forgot password?
+                  </Link>
+                </div>
+              )}
+
               {error && (
                 <p className="text-[10px] text-red-400 font-mono bg-red-950/30 border border-red-900/40 rounded-lg px-3 py-2">{error}</p>
               )}
