@@ -678,69 +678,36 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                              const pct = totalFails > 0 ? Math.round((cluster.totalHits / totalFails) * 100) : 0;
                              const isMostImpactful = ci === 0 && clusters.length > 1;
                              const verify = clusterVerify[ci];
+                             const domIssue = cluster.issues.slice().sort((a, b) => b.count - a.count)[0];
+                             const ver = domIssue ? resolveIssueVersion(domIssue) : null;
+                             const deployLabel = ver?.isCurrent ? 'current' : ver?.isPrev ? 'prev' : 'older';
                              return (
-                               <div key={cluster.cls} className={`rounded-lg border px-4 py-3 ${meta.bg} ${meta.border}`}>
-                                 <div className="flex items-center gap-2 mb-2">
-                                   <span className={`text-[10px] font-black uppercase tracking-wider ${meta.color}`}>
+                               <div key={cluster.cls} className={`rounded-lg border px-3 py-2.5 ${meta.bg} ${meta.border}`}>
+                                 {/* ── Top bar: class + badge + sha + age + hits */}
+                                 <div className="flex items-center gap-1.5 mb-1.5">
+                                   <span className={`text-[10px] font-black uppercase tracking-wider shrink-0 ${meta.color}`}>
                                      {meta.icon} {meta.label}
                                    </span>
                                    {isMostImpactful && (
-                                     <span className={`text-[8px] font-black uppercase border px-1 py-0.5 rounded leading-none ${meta.color} ${meta.border}`}>
+                                     <span className={`text-[8px] font-black uppercase border px-1 py-0.5 rounded leading-none shrink-0 ${meta.color} ${meta.border}`}>
                                        ▲ Fix first
                                      </span>
                                    )}
-                                   <span className={`text-[9px] font-bold ml-auto ${meta.dimColor}`}>
+                                   {ver && (
+                                     <span className={`font-mono text-[9px] px-1 py-px rounded border shrink-0 ${
+                                       ver.isCurrent ? 'text-emerald-400 border-emerald-900/50 bg-emerald-950/20'
+                                       : ver.isPrev ? 'text-neutral-400 border-neutral-700 bg-neutral-900/40'
+                                       : 'text-neutral-600 border-neutral-800 bg-transparent'
+                                     }`}>
+                                       {ver.label}
+                                     </span>
+                                   )}
+                                   <span className="text-[9px] text-neutral-700 shrink-0">{deployLabel}{ver?.createdAt ? ` · ${timeAgo(ver.createdAt)}` : ''}</span>
+                                   <span className={`text-[9px] font-bold ml-auto shrink-0 ${meta.dimColor}`}>
                                      {cluster.totalHits} hit{cluster.totalHits > 1 ? 's' : ''} · {pct}%
                                    </span>
                                  </div>
-                                 <div className="text-[10px] text-neutral-600 mb-2 italic">{meta.description}</div>
-                                 {(() => {
-                                   const domIssue = cluster.issues.slice().sort((a, b) => b.count - a.count)[0];
-                                   const ver = domIssue ? resolveIssueVersion(domIssue) : null;
-                                   if (!ver && deploymentList.length === 0) return null;
-                                   const deployLabel = ver?.isCurrent ? 'current deploy'
-                                     : ver?.isPrev ? 'previous deploy' : 'older deploy';
-                                   return (
-                                     <div className="flex items-center gap-1.5 mb-2 flex-wrap">
-                                       <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border ${
-                                         ver?.isCurrent ? 'text-emerald-400 border-emerald-900/50 bg-emerald-950/20'
-                                         : ver?.isPrev ? 'text-neutral-400 border-neutral-700 bg-neutral-900/40'
-                                         : 'text-neutral-600 border-neutral-800 bg-neutral-900/20'
-                                       }`}>
-                                         {ver ? ver.label : (domIssue?.code_sha?.slice(0, 7) ?? '?')}
-                                       </span>
-                                       <span className={`text-[9px] font-bold ${
-                                         ver?.isCurrent ? 'text-emerald-500/60' : 'text-neutral-700'
-                                       }`}>
-                                         {deployLabel}
-                                       </span>
-                                       {ver?.createdAt && (
-                                         <span className="text-[9px] font-mono text-neutral-700">
-                                           · {timeAgo(ver.createdAt)}
-                                         </span>
-                                       )}
-                                     </div>
-                                   );
-                                 })()}
-                                 {/* Regression intro line */}
-                                 {(() => {
-                                   const domIssue = cluster.issues.slice().sort((a, b) => b.count - a.count)[0];
-                                   const ver = domIssue ? resolveIssueVersion(domIssue) : null;
-                                   const firstSeen = cluster.issues.reduce<string | null>((earliest, iss) => {
-                                     if (!iss.first_seen) return earliest;
-                                     return !earliest || iss.first_seen < earliest ? iss.first_seen : earliest;
-                                   }, null);
-                                   if (!ver || !firstSeen) return null;
-                                   return (
-                                     <div className={`font-mono text-[9px] flex items-center gap-1.5 ${
-                                       ver.isCurrent ? 'text-red-500/60' : 'text-neutral-700'
-                                     }`}>
-                                       <span>introduced</span>
-                                       <span className="font-bold">{ver.label}</span>
-                                       <span>· {timeAgo(firstSeen)}</span>
-                                     </div>
-                                   );
-                                 })()}
+                                 {/* ── Issue rows */}
                                  {cluster.issues.map((iss, ii) => {
                                    const issFrame = topUserFrame(iss.sample_stack);
                                    const issLoc = frameLabel(issFrame);
@@ -762,90 +729,54 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                      </div>
                                    );
                                  })}
-                                 {/* Infra: execution consequence chain */}
-                                 {cluster.cls === 'infra' && (
-                                   <div className="mt-2 pt-2 border-t border-orange-800/30 font-mono text-[10px] space-y-0.5">
-                                     <div className="text-neutral-600">→ execution could not start</div>
-                                     <div className="text-neutral-600">→ no user code executed</div>
-                                     <div className="text-orange-400/70 pt-0.5">Fix: run <span className="font-bold">flux deploy</span> to upload a build artifact</div>
-                                   </div>
-                                 )}
-                                 {/* External: consequence chain — always shown */}
-                                 {cluster.cls === 'external' && (
-                                   <div className="mt-2 pt-2 border-t border-blue-800/30 font-mono text-[10px] space-y-1">
-                                     <div className="text-blue-400/60">→ not handled in user code</div>
-                                     <div className="text-blue-400/40">→ request failed</div>
-                                   </div>
-                                 )}
-                                 {/* User: explicit throw hint */}
-                                 {cluster.cls === 'user' && (
-                                   <div className="mt-2 pt-2 border-t border-yellow-800/30 font-mono text-[10px] text-neutral-600">
-                                     → explicitly thrown in user code
-                                   </div>
-                                 )}
-                                 {/* Runtime: intent clarity */}
-                                 {cluster.cls === 'runtime' && (
-                                   <div className="mt-2 pt-2 border-t border-red-800/30 font-mono text-[10px] text-neutral-600">
-                                     → thrown or unhandled in user code
-                                   </div>
-                                 )}
-                                 {/* Fix impact / verification state */}
+                                 {/* ── Footer: consequence hint + verify state on one strip */}
                                  {(() => {
+                                   const consequenceText =
+                                     cluster.cls === 'infra' ? '→ no user code executed'
+                                     : cluster.cls === 'external' ? '→ not handled · request failed'
+                                     : cluster.cls === 'user' ? '→ explicitly thrown'
+                                     : cluster.cls === 'runtime' ? '→ thrown or unhandled'
+                                     : null;
                                    const te = Number(st?.total_execs ?? 0);
-                                   if (te <= 0) return null;
-                                   if (verify.state === 'verified_resolved') {
+                                   const verifyNode = (() => {
+                                     if (te <= 0) return null;
+                                     if (verify.state === 'verified_resolved') {
+                                       return (
+                                         <span className="flex items-center gap-1 shrink-0">
+                                           <span className={`font-bold ${verify.confidence === 'high' ? 'text-emerald-500' : 'text-emerald-600/70'}`}>✓ fixed</span>
+                                           <span className={`px-1 rounded border ${verify.confidence === 'high' ? 'text-emerald-700 border-emerald-900/60 bg-emerald-950/20' : 'text-neutral-600 border-neutral-800'}`}>{verify.confidence}</span>
+                                           <span className="text-neutral-700">· {verify.execCount} exec{verify.execCount !== 1 ? 's' : ''}</span>
+                                         </span>
+                                       );
+                                     }
+                                     if (verify.state === 'unverified') {
+                                       return (
+                                         <span className="flex items-center gap-1 shrink-0">
+                                           <span className="text-amber-500/80 font-bold">○ unverified</span>
+                                           <span className="text-neutral-700">· {verify.execCount}/{20} exec{verify.execCount !== 1 ? 's' : ''}</span>
+                                         </span>
+                                       );
+                                     }
+                                     // active
+                                     const currentRate = Math.round((totalFails / te) * 100);
+                                     const afterRate = Math.round(Math.max(0, (totalFails - cluster.totalHits) / te) * 100);
                                      return (
-                                       <div className="mt-2 pt-2 border-t border-neutral-800/40 font-mono text-[9px] space-y-1">
-                                         <div className="flex items-center gap-1.5 flex-wrap">
-                                           <span className={`font-bold ${
-                                             verify.confidence === 'high' ? 'text-emerald-500' : 'text-emerald-600/70'
-                                           }`}>✓ Verified fixed</span>
-                                           <span className={`px-1 py-px rounded border ${
-                                             verify.confidence === 'high' ? 'text-emerald-600 border-emerald-900/60 bg-emerald-950/20'
-                                             : 'text-neutral-600 border-neutral-800 bg-neutral-900/20'
-                                           }`}>{verify.confidence} confidence</span>
-                                         </div>
-                                         <div className="text-neutral-600">{verify.reason}</div>
-                                       </div>
-                                     );
-                                   }
-                                   if (verify.state === 'unverified') {
-                                     return (
-                                       <div className="mt-2 pt-2 border-t border-amber-900/30 font-mono text-[9px] space-y-1">
-                                         <div className="flex items-center gap-1.5 flex-wrap">
-                                           <span className="text-amber-500/80 font-bold">○ Unverified</span>
-                                           <span className="px-1 py-px rounded border text-amber-700/80 border-amber-900/40 bg-amber-950/10">low confidence</span>
-                                         </div>
-                                         <div className="text-neutral-600">{verify.reason}</div>
-                                       </div>
-                                     );
-                                   }
-                                   // active — show reproducibility + confidence + determinism
-                                   const currentRate = Math.round((totalFails / te) * 100);
-                                   const afterRate = Math.round(Math.max(0, (totalFails - cluster.totalHits) / te) * 100);
-                                   return (
-                                     <div className="mt-2 pt-2 border-t border-red-900/30 font-mono text-[9px] space-y-1">
-                                       <div className="flex items-center gap-1.5 flex-wrap">
-                                         {verify.isDeterministic ? (
-                                           <span className="text-red-400 font-bold">Deterministic failure</span>
-                                         ) : (
-                                           <span className="text-red-400/80 font-bold">Reproducible</span>
+                                       <span className="flex items-center gap-1 shrink-0">
+                                         <span className={`font-bold ${verify.isDeterministic ? 'text-red-400' : 'text-red-400/70'}`}>
+                                           {verify.isDeterministic ? 'deterministic' : 'reproducible'}
+                                         </span>
+                                         <span className={`px-1 rounded border ${verify.confidence === 'high' ? 'text-red-600 border-red-900/50 bg-red-950/10' : 'text-neutral-500 border-neutral-800'}`}>{verify.confidence}</span>
+                                         {currentRate !== afterRate && currentRate > 0 && (
+                                           <span className="text-neutral-700">· {currentRate}%→<span className="text-emerald-500 font-bold">{afterRate}%</span></span>
                                          )}
-                                         <span className={`px-1 py-px rounded border ${
-                                           verify.confidence === 'high'
-                                             ? 'text-red-500 border-red-900/60 bg-red-950/20'
-                                             : 'text-neutral-500 border-neutral-800 bg-neutral-900/20'
-                                         }`}>{verify.confidence} confidence</span>
-                                       </div>
-                                       <div className="text-neutral-600">{verify.reason}</div>
-                                       {currentRate !== afterRate && currentRate > 0 && (
-                                         <div className="flex items-center gap-1.5 pt-0.5">
-                                           <span className="text-emerald-600/60">↓ fix this:</span>
-                                           <span className="text-neutral-600">{currentRate}%</span>
-                                           <span className="text-neutral-700">→</span>
-                                           <span className="text-emerald-500 font-bold">{afterRate}%</span>
-                                         </div>
-                                       )}
+                                       </span>
+                                     );
+                                   })();
+                                   if (!consequenceText && !verifyNode) return null;
+                                   return (
+                                     <div className="mt-1.5 pt-1.5 border-t border-white/5 font-mono text-[9px] flex items-center gap-2 justify-between">
+                                       {consequenceText && <span className="text-neutral-700">{consequenceText}</span>}
+                                       {verifyNode}
                                      </div>
                                    );
                                  })()}
