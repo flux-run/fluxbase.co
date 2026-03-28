@@ -71,6 +71,29 @@ function choosePreferredErrorHeadline(...candidates: Array<string | null | undef
   return "Unhandled exception";
 }
 
+function errorTypeToFix(issue: string): string | null {
+  const key = issue.toLowerCase();
+  if (key.includes('no_artifact_loaded') || key.includes('no artifact')) {
+    return 'Function has no deployed artifact. Run `flux deploy` to upload a build, then retry.';
+  }
+  if (key.includes('referenceerror') || key.includes('is not defined')) {
+    return 'A variable or import is used before it is defined. Check spelling, import paths, and initialization order.';
+  }
+  if (key.includes('typeerror') || key.includes('is not a function') || key.includes('cannot read')) {
+    return 'A value is used where a different type is expected. Add null/undefined guards or validate incoming data shape.';
+  }
+  if (key.includes('syntaxerror')) {
+    return 'The function source contains a syntax error. Check for unbalanced brackets or TypeScript type mismatches.';
+  }
+  if (key.includes('timeout') || key.includes('timed out')) {
+    return 'Execution exceeded the timeout limit. Reduce blocking I/O or increase the timeout in Function Settings.';
+  }
+  if (key.includes('unhandled exception') || key.includes('unknown runtime error') || key.includes('unknown error')) {
+    return 'Wrap your handler in try/catch to surface the real error type and message.';
+  }
+  return null;
+}
+
 function confidenceLabel(confidence?: number) {
   if ((confidence ?? 0) >= 0.85) return "High";
   if ((confidence ?? 0) >= 0.65) return "Medium";
@@ -149,9 +172,10 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
       !statsData.root_cause.suggestion.includes("Unhandled exception detected: Unhandled exception")
     ? statsData.root_cause.suggestion
     : statsData?.root_cause
-      ? isGenericIssue
-        ? "An unhandled exception was detected. Wrap the offending code in a try-catch to handle the error gracefully."
-        : `Unhandled exception detected: ${activeIssue}. Remove or handle this throw to allow execution to complete.`
+      ? (activeIssue ? errorTypeToFix(activeIssue) : null) ??
+        (isGenericIssue
+          ? "Wrap the handler in try/catch so the real error type and message are captured."
+          : `Unhandled exception detected: ${activeIssue}. Remove or handle this throw to allow execution to complete.`)
       : null;
   const confidenceText = confidenceLabel(statsData?.root_cause?.confidence);
 
@@ -226,7 +250,34 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                       <div className="text-[11px] text-red-200/60">Phase: {statsData.root_cause.phase}</div>
                     )}
                  </div>
-                 
+
+                 {/* Error Breakdown by type */}
+                 {statsData.top_issues.length > 0 && (() => {
+                   const total = statsData.top_issues.reduce((sum, iss) => sum + iss.count, 0);
+                   const barColors = ['bg-red-500', 'bg-orange-500', 'bg-yellow-500/80', 'bg-neutral-500/60'];
+                   return (
+                     <div className="space-y-2">
+                       <span className="text-[10px] font-black uppercase tracking-[0.2em] text-red-300 block">Error Breakdown</span>
+                       <div className="space-y-2.5">
+                         {statsData.top_issues.slice(0, 4).map((iss, idx) => {
+                           const pct = total > 0 ? Math.round((iss.count / total) * 100) : 0;
+                           return (
+                             <div key={idx} className="space-y-1">
+                               <div className="flex items-center justify-between gap-3">
+                                 <span className="font-mono text-[11px] text-neutral-300 truncate">{iss.title}</span>
+                                 <span className="text-[10px] font-bold text-neutral-500 shrink-0">{pct}% · {iss.count}×</span>
+                               </div>
+                               <div className="h-1.5 bg-neutral-800/60 rounded-full overflow-hidden">
+                                 <div className={`h-full rounded-full ${barColors[idx] ?? 'bg-neutral-500/60'}`} style={{ width: `${pct}%` }} />
+                               </div>
+                             </div>
+                           );
+                         })}
+                       </div>
+                     </div>
+                   );
+                 })()}
+
                  {/* Latest Failure Snapshot */}
                  {statsData.root_cause.latest_failure && (
                     <div className="mt-6 bg-black/60 border border-neutral-800 rounded-lg p-4 max-w-2xl">
@@ -503,24 +554,41 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
             </div>
             {statsData?.top_issues && statsData.top_issues.length > 0 ? (
               <div className="flex flex-col gap-2">
-                 {statsData.top_issues.map((issue, i) => (
-                  <div key={i} className="bg-[#111] border border-neutral-800 px-4 py-3 rounded-lg flex items-center justify-between font-mono text-sm transition hover:border-neutral-700 cursor-pointer group">
-                    <div className="flex items-center gap-4 overflow-hidden">
-                      <div className="flex flex-col items-center justify-center shrink-0 w-10 h-10 bg-red-950/30 rounded border border-red-900/40 group-hover:border-red-500/50 transition-colors">
-                        <span className="text-red-500 text-xs font-bold">{issue.count}</span>
-                        <span className="text-[8px] text-red-500/60 uppercase">Hits</span>
-                      </div>
-                      <div className="flex flex-col overflow-hidden">
-                        <span className="text-neutral-200 truncate font-semibold" title={issue.title}>{issue.title}</span>
-                        <span className="text-[10px] text-neutral-500 mt-1 uppercase tracking-wider">{issue.fingerprint.slice(0, 8)}</span>
-                      </div>
-                    </div>
-                    <div className="shrink-0 text-right ml-4 hidden sm:block">
-                      <div className="text-xs text-neutral-400 font-medium">{new Date(issue.last_seen).toLocaleTimeString()}</div>
-                      <div className="text-[10px] text-neutral-600 mt-1">Last seen</div>
-                    </div>
-                  </div>
-                 ))}
+                 {statsData.top_issues.map((issue, i) => {
+                   const fixForIssue = errorTypeToFix(issue.title);
+                   const isPlatform = issue.error_source === 'platform_runtime' || issue.error_source === 'platform_executor';
+                   const badgeClass = isPlatform
+                     ? 'text-orange-500 bg-orange-950/30 border-orange-900/40'
+                     : i === 0 ? 'text-red-500 bg-red-950/30 border-red-900/40'
+                     : 'text-yellow-500 bg-yellow-950/30 border-yellow-900/40';
+                   return (
+                     <div
+                       key={i}
+                       onClick={() => setFilter(filter === issue.title ? null : issue.title)}
+                       className={`bg-[#111] border ${filter === issue.title ? 'border-red-500/50 ring-1 ring-red-500/20' : 'border-neutral-800'} px-4 py-3 rounded-lg flex items-center justify-between font-mono text-sm transition hover:border-neutral-700 cursor-pointer group`}
+                     >
+                       <div className="flex items-center gap-4 overflow-hidden">
+                         <div className={`flex flex-col items-center justify-center shrink-0 w-10 h-10 rounded border transition-colors ${badgeClass}`}>
+                           <span className="text-xs font-bold">{issue.count}</span>
+                           <span className="text-[8px] uppercase opacity-70">Hits</span>
+                         </div>
+                         <div className="flex flex-col overflow-hidden">
+                           <span className="text-neutral-200 truncate font-semibold" title={issue.title}>{issue.title}</span>
+                           <div className="flex items-center gap-2 mt-0.5 overflow-hidden">
+                             <span className="text-[10px] text-neutral-600 uppercase tracking-wider shrink-0">{issue.fingerprint.slice(0, 8)}</span>
+                             {fixForIssue && (
+                               <span className="text-[10px] text-blue-400/70 truncate">→ {fixForIssue}</span>
+                             )}
+                           </div>
+                         </div>
+                       </div>
+                       <div className="shrink-0 text-right ml-4 hidden sm:block">
+                         <div className="text-xs text-neutral-400 font-medium">{new Date(issue.last_seen).toLocaleTimeString()}</div>
+                         <div className="text-[10px] text-neutral-600 mt-1">Last seen</div>
+                       </div>
+                     </div>
+                   );
+                 })}
               </div>
             ) : (
               <div className="text-neutral-700 text-sm font-mono italic p-6 border border-dashed border-neutral-800 bg-[#0a0a0a] rounded-xl text-center">No recent issues detected.</div>

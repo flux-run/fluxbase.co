@@ -98,11 +98,53 @@ function formatThrownExpression(
   return formatErrorHeadline(errorName, errorMessage, fallback, errorStack);
 }
 
+function parseStackFrames(stack?: string | null) {
+  if (!stack) return [];
+  return stack.split('\n')
+    .filter(line => line.trim().startsWith('at '))
+    .map(line => {
+      const clean = line.trim().replace(/^at\s+/, '');
+      const full = clean.match(/^(.+?)\s+\((.+?):([\d]+):([\d]+)\)$/);
+      if (full) return { fn: full[1], file: full[2], line: full[3], col: full[4] };
+      const bare = clean.match(/^(.+?):([\d]+):([\d]+)$/);
+      if (bare) return { fn: '<anonymous>', file: bare[1], line: bare[2], col: bare[3] };
+      return null;
+    })
+    .filter(Boolean) as { fn: string; file: string; line: string; col: string }[];
+}
+
+function errorTypeToFix(errorName?: string | null, errorMessage?: string | null, errorKey?: string | null): string | null {
+  const key = (errorKey || errorMessage || '').toLowerCase();
+  const name = (errorName || '').toLowerCase();
+  if (key.includes('no_artifact_loaded') || key.includes('no artifact')) {
+    return 'Function has no deployed artifact. Run `flux deploy` to upload a build, then retry the request.';
+  }
+  if (name === 'referenceerror' || key.includes('is not defined')) {
+    return 'A variable or import is used before it is defined. Check spelling, import paths, and initialization order.';
+  }
+  if (name === 'typeerror' || key.includes('is not a function') || key.includes('cannot read')) {
+    return 'A value is used where a different type is expected. Add null/undefined guards or validate the shape of incoming data.';
+  }
+  if (name === 'syntaxerror') {
+    return 'The function source contains a syntax error. Check for unbalanced brackets, invalid JSON, or TypeScript type mismatches.';
+  }
+  if (key.includes('timeout') || key.includes('timed out')) {
+    return 'Execution exceeded the timeout limit. Reduce blocking I/O, add early returns, or raise the timeout in Function Settings.';
+  }
+  if (key.includes('fetch') || key.includes('network') || key.includes('econnrefused')) {
+    return 'An outbound network request failed. Verify the target URL is reachable and that egress is allowed from your deployment.';
+  }
+  return null;
+}
+
 export default function ExecutionDetail({ params }: { params: Promise<{ id: string, exec_id: string }> }) {
   const { id, exec_id } = use(params);
   const api = useFluxApi(id);
   const [data, setData] = useState<ExecutionDetailType | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copiedId, setCopiedId] = useState(false);
+  const [copiedCurl, setCopiedCurl] = useState(false);
+  const [showStack, setShowStack] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -185,6 +227,30 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
         ? "Execution was halted by an unhandled exception"
         : `Execution interrupted by unhandled exception: ${errorHeadline}`;
 
+  const stackFrames = parseStackFrames(exec.error_stack);
+  const userFrame = stackFrames.find(f =>
+    !f.file.includes('ext:') && !f.file.includes('deno:') && !f.file.includes('node:') && !f.file.includes('internal/')
+  );
+  const fixHint = errorTypeToFix(exec.error_name, exec.error_message, exec.error);
+
+  const reqHeaders = typeof reqObj?.headers === 'object' && reqObj.headers !== null
+    ? (reqObj.headers as Record<string, string>)
+    : {};
+  const authHeaderKeys = ['authorization', 'x-api-key', 'x-auth-token', 'cookie', 'postman-token'];
+  const infraHeaderPrefixes = ['x-', 'cdn-', 'cf-'];
+  const infraHeaderExact = ['host', 'accept-encoding', 'content-length', 'accept', 'user-agent'];
+  const authHeaders = Object.entries(reqHeaders).filter(([k]) => authHeaderKeys.includes(k.toLowerCase()));
+  const infraHeaders = Object.entries(reqHeaders).filter(([k]) =>
+    !authHeaderKeys.includes(k.toLowerCase()) &&
+    (infraHeaderPrefixes.some(p => k.toLowerCase().startsWith(p)) || infraHeaderExact.includes(k.toLowerCase()))
+  );
+  const userHeaders = Object.entries(reqHeaders).filter(([k]) =>
+    !authHeaderKeys.includes(k.toLowerCase()) &&
+    !infraHeaderPrefixes.some(p => k.toLowerCase().startsWith(p)) &&
+    !infraHeaderExact.includes(k.toLowerCase())
+  );
+  const curlCommand = `curl -X ${exec.method ?? 'GET'} 'https://your-domain${exec.path}'${authHeaders.length ? `\n  -H 'Authorization: <redacted>'` : ''}${reqObj?.body ? `\n  -d '${JSON.stringify(reqObj.body)}'` : ''}`;
+
   return (
     <div className="space-y-12 pb-24 max-w-5xl mx-auto">
       <header className="flex justify-between items-start border-b border-neutral-900 pb-8">
@@ -211,10 +277,28 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
              <span>{new Date(exec.started_at ?? new Date().toISOString()).toUTCString()}</span>
           </div>
         </div>
-        <Button onClick={copyReplay} variant="outline" size="sm" className="bg-neutral-900 border-neutral-800 text-xs font-bold hover:bg-neutral-800 hover:text-white h-9 group/cta">
-           <Zap className="w-4 h-4 mr-2 text-blue-500 group-hover/cta:animate-pulse" />
-           Replay + Debug locally
-        </Button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => { navigator.clipboard.writeText(exec_id); setCopiedId(true); setTimeout(() => setCopiedId(false), 2000); }}
+            className="flex items-center gap-1.5 bg-neutral-900 border border-neutral-800 px-3 py-2 rounded-lg text-xs font-mono text-neutral-400 hover:text-white hover:border-neutral-700 transition-all"
+            title="Copy execution ID"
+          >
+            {copiedId ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+            <span>{exec_id.slice(0, 8)}</span>
+          </button>
+          <button
+            onClick={() => { navigator.clipboard.writeText(curlCommand); setCopiedCurl(true); setTimeout(() => setCopiedCurl(false), 2000); }}
+            className="flex items-center gap-1.5 bg-neutral-900 border border-neutral-800 px-3 py-2 rounded-lg text-xs font-bold text-neutral-400 hover:text-white hover:border-neutral-700 transition-all"
+            title="Copy as cURL"
+          >
+            {copiedCurl ? <Check className="w-3 h-3 text-green-500" /> : <Terminal className="w-3 h-3" />}
+            <span>Copy cURL</span>
+          </button>
+          <Button onClick={copyReplay} variant="outline" size="sm" className="bg-neutral-900 border-neutral-800 text-xs font-bold hover:bg-neutral-800 hover:text-white h-9 group/cta">
+             <Zap className="w-4 h-4 mr-2 text-blue-500 group-hover/cta:animate-pulse" />
+             Replay
+          </Button>
+        </div>
       </header>
 
       {/* REPLAY BLOCK - THE MAGIC MOMENT */}
@@ -273,13 +357,23 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                               <span className="text-[9px] font-black text-blue-400">{(data.narrative?.confidence ?? 0.85) * 100}%</span>
                            </div>
                         </div>
-                        {exec.status !== 'ok' && !isGenericErrorHeadline(errorHeadline) && isGenericErrorHeadline(data.narrative?.issue ?? null) ? (
-                          <>
-                            <h3 className="text-3xl font-black text-white tracking-tight leading-tight">
-                              {data.narrative?.issue || "Unhandled exception"}
+                        {exec.status !== 'ok' ? (
+                          <div className="space-y-1.5">
+                            <p className="text-red-400/60 text-[10px] font-black uppercase tracking-[0.2em]">
+                              {data.narrative?.issue && !isGenericErrorHeadline(data.narrative.issue)
+                                ? data.narrative.issue
+                                : 'Unhandled exception'}
+                            </p>
+                            <h3 className={`font-black text-white tracking-tight leading-tight ${!isGenericErrorHeadline(errorHeadline) ? 'text-2xl font-mono' : 'text-3xl'}`}>
+                              {!isGenericErrorHeadline(errorHeadline) ? errorHeadline : displayIssue}
                             </h3>
-                            <p className="text-red-300 text-lg font-mono mt-1">{errorHeadline}</p>
-                          </>
+                            {userFrame && (
+                              <p className="text-neutral-600 text-[11px] font-mono">
+                                ↳ <span className="text-red-400/80">{userFrame.fn}</span>
+                                {' '}<span className="text-neutral-700">{userFrame.file}:{userFrame.line}</span>
+                              </p>
+                            )}
+                          </div>
                         ) : (
                           <h3 className="text-3xl font-black text-white tracking-tight leading-tight">
                             {displayIssue}
@@ -339,6 +433,34 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                         </div>
                      )}
 
+                     {exec.status !== 'ok' && exec.error_stack && stackFrames.length > 0 && (
+                        <div className="space-y-2">
+                           <button
+                             onClick={() => setShowStack(v => !v)}
+                             className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-red-400 hover:text-red-300 transition-colors"
+                           >
+                             <ChevronRight className={`w-3 h-3 transition-transform duration-200 ${showStack ? 'rotate-90' : ''}`} />
+                             Stack trace — {stackFrames.length} frames
+                           </button>
+                           {showStack && (
+                             <div className="bg-black/80 border border-red-900/20 rounded-lg overflow-hidden">
+                               {stackFrames.slice(0, 14).map((frame, i) => (
+                                 <div key={i} className={`px-4 py-1.5 border-b border-neutral-900/40 last:border-0 font-mono text-[11px] flex gap-3 ${i === 0 ? 'bg-red-950/30' : ''}`}>
+                                   <span className="text-neutral-700 w-5 shrink-0 text-right">{i + 1}</span>
+                                   <div className="min-w-0">
+                                     <span className={i === 0 ? 'text-red-300' : 'text-neutral-400'}>{frame.fn}</span>
+                                     {frame.file && <span className="text-neutral-700 ml-2">{frame.file}:{frame.line}</span>}
+                                   </div>
+                                 </div>
+                               ))}
+                               {stackFrames.length > 14 && (
+                                 <div className="px-4 py-2 text-[10px] text-neutral-600 font-mono italic">+{stackFrames.length - 14} more frames</div>
+                               )}
+                             </div>
+                           )}
+                        </div>
+                     )}
+
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-2 border-y border-neutral-900/50">
                         <div className="space-y-1">
                            <span className="text-[10px] font-black uppercase text-neutral-500 tracking-[0.2em]">Cause Analysis</span>
@@ -366,7 +488,7 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                            <div className="space-y-0.5">
                               <p className="text-white font-bold text-xs uppercase tracking-tight">Intelligence Recommendation</p>
                               <p className="text-neutral-400 text-xs italic">
-                              {displaySuggestion}
+                              {fixHint || displaySuggestion}
                               </p>
                            </div>
                         </div>
@@ -505,6 +627,33 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                   </pre>
                </Card>
 
+               {Object.keys(reqHeaders).length > 0 && (
+                  <Card className="bg-[#0c0c0c] border-neutral-900 shadow-inner overflow-hidden border-l-2 border-l-neutral-800">
+                     <div className="bg-neutral-900/40 border-b border-neutral-800/50 px-4 py-2 flex items-center gap-3">
+                        <span className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest">Request Headers</span>
+                        <div className="flex items-center gap-1.5 ml-1">
+                           {authHeaders.length > 0 && <span className="text-[9px] font-bold text-orange-400/70 bg-orange-950/20 border border-orange-900/30 px-1.5 py-0.5 rounded uppercase">auth {authHeaders.length}</span>}
+                           {infraHeaders.length > 0 && <span className="text-[9px] font-bold text-blue-400/60 bg-blue-950/20 border border-blue-900/30 px-1.5 py-0.5 rounded uppercase">infra {infraHeaders.length}</span>}
+                           {userHeaders.length > 0 && <span className="text-[9px] font-bold text-neutral-500 bg-neutral-900 border border-neutral-800 px-1.5 py-0.5 rounded uppercase">user {userHeaders.length}</span>}
+                        </div>
+                     </div>
+                     <div className="p-4 space-y-1.5 max-h-[220px] overflow-y-auto scrollbar-thin scrollbar-thumb-neutral-800">
+                        {[...authHeaders, ...infraHeaders, ...userHeaders].map(([k, v]) => {
+                           const isAuth = authHeaderKeys.includes(k.toLowerCase());
+                           const isInfra = !isAuth && (infraHeaderPrefixes.some(p => k.toLowerCase().startsWith(p)) || infraHeaderExact.includes(k.toLowerCase()));
+                           return (
+                             <div key={k} className="flex items-start gap-3 font-mono text-[11px] leading-relaxed">
+                               <span className={`shrink-0 font-bold ${isAuth ? 'text-orange-400/70' : isInfra ? 'text-blue-400/60' : 'text-neutral-500'}`}>{k}:</span>
+                               <span className={`break-all ${isAuth ? 'text-neutral-600 italic' : 'text-neutral-400'}`}>
+                                 {isAuth ? '[redacted]' : String(v)}
+                               </span>
+                             </div>
+                           );
+                        })}
+                     </div>
+                  </Card>
+               )}
+
                <Card className={`bg-[#0c0c0c] border-neutral-900 shadow-inner overflow-hidden border-l-2 ${exec.status === 'ok' ? 'border-l-emerald-900/30' : 'border-l-red-900/30'}`}>
                   <div className="bg-neutral-900/40 border-b border-neutral-800/50 px-4 py-2 flex items-center justify-between">
                      <span className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest">Response Output</span>
@@ -541,6 +690,25 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                    </Card>
                 </div>
               ))}
+              {exec.status !== 'ok' && (
+                <div className="flex gap-6 items-center relative">
+                   <div className="w-10 h-10 rounded-full bg-red-950 border-2 border-red-800 flex items-center justify-center z-10 shadow-xl">
+                      <span className="text-red-400 text-base leading-none font-bold">✕</span>
+                   </div>
+                   <Card className="flex-1 bg-red-950/10 border-red-900/30 p-4 flex items-center justify-between">
+                      <div className="flex flex-col">
+                        <span className="text-xs font-bold text-red-300 uppercase tracking-tighter">Failure Point</span>
+                        <code className="text-[12px] text-red-500/70 mt-1 font-mono truncate max-w-[300px]">
+                          {!isGenericErrorHeadline(errorHeadline) ? errorHeadline : (haltReason ?? 'Execution aborted')}
+                        </code>
+                        {userFrame && (
+                          <span className="text-[10px] text-neutral-600 font-mono mt-0.5">{userFrame.file}:{userFrame.line}</span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-red-500 font-bold shrink-0">✕ ABORTED</span>
+                   </Card>
+                </div>
+              )}
            </div>
         </section>
       )}
