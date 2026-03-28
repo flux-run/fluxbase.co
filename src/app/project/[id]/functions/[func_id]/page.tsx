@@ -6,214 +6,18 @@ import { toast } from "sonner";
 import { Zap, Activity, AlertCircle, Clock, Globe, Terminal, Save, Play, ArrowUpRight, BarChart3, AlertOctagon, LucideIcon, Lightbulb, AlertTriangle, ChevronDown, ChevronUp, GitCommit } from "lucide-react";
 import { Function, Execution, Route, FunctionStatsResult } from "@/types/api";
 import { ExecutionDetailDrawer } from "@/components/dashboard/ExecutionDetailDrawer";
-
-function formatErrorHeadline(
-  errorName?: string | null,
-  errorMessage?: string | null,
-  fallback?: string | null,
-  errorStack?: string | null,
-) {
-  const name = errorName?.trim();
-  const message = errorMessage?.trim();
-  const fallbackMessage = fallback?.trim();
-  const stackLine = errorStack
-    ?.split("\n")
-    .map((line) => line.trim())
-    .find((line) => line && !line.startsWith("at "))
-    ?.replace(/^Uncaught\s+/, "")
-    ?.trim();
-
-  const isGeneric = (value?: string | null) => {
-    const normalized = value?.trim().toLowerCase();
-    return !normalized ||
-      normalized === "unhandled exception" ||
-      normalized === "unknown runtime error" ||
-      normalized === "unknown error" ||
-      normalized === "runtime error" ||
-      normalized === "exception" ||
-      normalized === "error";
-  };
-
-  if (name && message) {
-    return message.startsWith(`${name}:`) ? message : `${name}: ${message}`;
-  }
-  if (stackLine && !isGeneric(stackLine)) return stackLine;
-  if (message && !isGeneric(message)) return message;
-  if (fallbackMessage && !isGeneric(fallbackMessage)) return fallbackMessage;
-  if (stackLine) return stackLine;
-  if (message) return message;
-  if (fallbackMessage) return fallbackMessage;
-  return "Unhandled exception";
-}
-
-function choosePreferredErrorHeadline(...candidates: Array<string | null | undefined>) {
-  const isGeneric = (value?: string | null) => {
-    const normalized = value?.trim().toLowerCase();
-    return !normalized ||
-      normalized === "unhandled exception" ||
-      normalized === "unknown runtime error" ||
-      normalized === "unknown error" ||
-      normalized === "runtime error" ||
-      normalized === "exception" ||
-      normalized === "error";
-  };
-
-  for (const candidate of candidates) {
-    const normalized = candidate?.trim();
-    if (normalized && !isGeneric(normalized)) return normalized;
-  }
-
-  for (const candidate of candidates) {
-    const normalized = candidate?.trim();
-    if (normalized) return normalized;
-  }
-
-  return "Unhandled exception";
-}
-
-function errorTypeToFix(issue: string): string | null {
-  const key = issue.toLowerCase();
-  if (key.includes('no_artifact_loaded') || key.includes('no artifact')) {
-    return 'Function has no deployed artifact. Run `flux deploy` to upload a build, then retry.';
-  }
-  if (key.includes('referenceerror') || key.includes('is not defined')) {
-    return 'A variable or import is used before it is defined. Check spelling, import paths, and initialization order.';
-  }
-  if (key.includes('typeerror') || key.includes('is not a function') || key.includes('cannot read')) {
-    return 'A value is used where a different type is expected. Add null/undefined guards or validate incoming data shape.';
-  }
-  if (key.includes('syntaxerror')) {
-    return 'The function source contains a syntax error. Check for unbalanced brackets or TypeScript type mismatches.';
-  }
-  if (key.includes('timeout') || key.includes('timed out')) {
-    return 'Execution exceeded the timeout limit. Reduce blocking I/O or increase the timeout in Function Settings.';
-  }
-  if (key.includes('unhandled exception') || key.includes('unknown runtime error') || key.includes('unknown error')) {
-    return 'Wrap your handler in try/catch to surface the real error type and message.';
-  }
-  return null;
-}
-
-function confidenceLabel(confidence?: number) {
-  if ((confidence ?? 0) >= 0.85) return "High";
-  if ((confidence ?? 0) >= 0.65) return "Medium";
-  return "Low";
-}
-
-function timeAgo(iso: string): string {
-  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
-}
-
-function compactIssueLabel(title: string, errorSource?: string | null): string {
-  const raw = title.trim();
-  const msg = raw.toLowerCase();
-  if (msg.includes("fetch failed") || msg.includes("failed to fetch")) {
-    const urlMatch = raw.match(/https?:\/\/([^/\s:]+)/);
-    const domain = urlMatch ? urlMatch[1] : null;
-    const hint = msg.includes("dns") || msg.includes("resolve") ? " (DNS failed)"
-      : msg.includes("timeout") ? " (timeout)"
-      : msg.includes("refused") || msg.includes("econnrefused") ? " (connection refused)"
-      : msg.includes("certificate") || msg.includes("ssl") || msg.includes("tls") ? " (TLS error)"
-      : "";
-    return domain ? `fetch → ${domain}${hint}` : `fetch failed${hint}`;
-  }
-  if (msg.includes("dns") || (msg.includes("resolve") && !msg.includes("promise"))) return "DNS lookup failed";
-  if (msg.includes("timeout")) return "Request timed out";
-  if (msg.includes("connection refused") || msg.includes("econnrefused")) return "Connection refused";
-  if (msg.includes("certificate") || (msg.includes("ssl") && !msg.includes("ssl_")) || msg.includes(" tls ")) return "TLS / certificate error";
-  const namedErr = raw.match(/^(ReferenceError|TypeError|SyntaxError|RangeError|URIError|EvalError):\s*(.+)/);
-  if (namedErr) {
-    const short = namedErr[2].length > 60 ? namedErr[2].slice(0, 60) + "…" : namedErr[2];
-    const src = errorSource === "user_code" ? " (user code)" : errorSource === "platform_runtime" ? " (runtime)" : "";
-    return `${namedErr[1]}: ${short}${src}`;
-  }
-  return raw.length > 80 ? raw.slice(0, 80) + "…" : raw;
-}
-
-function isInternalFrame(file: string): boolean {
-  return file.includes('ext:') || file.includes('deno:') || file.includes('node:') ||
-    file.includes('internal/') || file.startsWith('flux:');
-}
-
-type ErrorClass = 'infra' | 'external' | 'runtime' | 'user';
-
-const ERROR_CLASS_META: Record<ErrorClass, {
-  label: string; icon: string;
-  color: string; bg: string; border: string; dimColor: string;
-  description: string;
-}> = {
-  infra:    { label: 'Infra Failure',    icon: '⚙️', color: 'text-orange-400', dimColor: 'text-orange-400/60', bg: 'bg-orange-950/20', border: 'border-orange-800/50', description: 'Deployment or artifact issue' },
-  external: { label: 'External Failure', icon: '🌐', color: 'text-blue-400',   dimColor: 'text-blue-400/60',   bg: 'bg-blue-950/20',   border: 'border-blue-800/50',   description: 'Outside dependency failed' },
-  runtime:  { label: 'Runtime Error',    icon: '⚡',  color: 'text-red-400',    dimColor: 'text-red-400/60',    bg: 'bg-red-950/20',    border: 'border-red-800/50',    description: 'JavaScript engine error' },
-  user:     { label: 'User Code Error',  icon: '💥', color: 'text-yellow-400', dimColor: 'text-yellow-400/60', bg: 'bg-yellow-950/20', border: 'border-yellow-800/50', description: 'Thrown by your code' },
-};
-
-// Priority order for cause chains: infra → external → runtime → user
-const CLASS_ORDER: ErrorClass[] = ['infra', 'external', 'runtime', 'user'];
-
-function classifyError(title: string, errorSource?: string | null, errorType?: string | null): ErrorClass {
-  const t = title.toLowerCase();
-  const type = (errorType ?? '').toLowerCase();
-  const src = errorSource ?? '';
-  if (type.includes('no_artifact') || t.includes('no_artifact') || src.includes('executor') || t.includes('boot failed')) return 'infra';
-  if (t.includes('fetch failed') || t.includes('failed to fetch') || t.includes('dns') ||
-      t.includes('connection refused') || t.includes('econnrefused') || t.includes('timeout') ||
-      t.includes('certificate') || t.includes('tls') || t.includes('ssl') ||
-      src === 'platform_runtime') return 'external';
-  if (src === 'user_code') return 'user';
-  return 'runtime';
-}
-
-// Each error class is an independent failure pattern. Two errors are independent
-// unless they appear in the SAME execution's stack — and since top_issues are
-// already per-fingerprint, we treat each class as its own failure mode.
-// Sort by total hits so the most impactful pattern comes first.
-function buildFailureClusters(issues: FunctionStatsResult['top_issues']): Array<{
-  cls: ErrorClass;
-  totalHits: number;
-  issues: FunctionStatsResult['top_issues'];
-}> {
-  return CLASS_ORDER
-    .map(cls => {
-      const clsIssues = issues.filter(iss => classifyError(iss.title, iss.error_source, iss.error_type) === cls);
-      return { cls, totalHits: clsIssues.reduce((s, i) => s + i.count, 0), issues: clsIssues };
-    })
-    .filter(g => g.issues.length > 0)
-    .sort((a, b) => b.totalHits - a.totalHits);
-}
-
-function parseStackFrames(stack?: string | null) {
-  if (!stack) return [];
-  return stack.split('\n')
-    .filter(line => line.trim().startsWith('at '))
-    .map(line => {
-      const clean = line.trim().replace(/^at\s+/, '');
-      const full = clean.match(/^(.+?)\s+\((.+?):(\d+):(\d+)\)$/);
-      if (full) return { fn: full[1], file: full[2], line: full[3], col: full[4] };
-      const bare = clean.match(/^(.+?):(\d+):(\d+)$/);
-      if (bare) return { fn: '<anonymous>', file: bare[1], line: bare[2], col: bare[3] };
-      return null;
-    })
-    .filter(Boolean) as { fn: string; file: string; line: string; col: string }[];
-}
-
-function frameLabel(frame?: { fn?: string; file: string; line: string | number; col?: string | number } | null, short = true): string | null {
-  if (!frame) return null;
-  const file = short ? (frame.file.split('/').pop() ?? frame.file) : frame.file;
-  // Short form: file:line only. Long form: file:line:col.
-  const col = !short && frame.col != null && Number(frame.col) > 0 ? `:${frame.col}` : '';
-  return `${file}:${frame.line}${col}`;
-}
-
-function topUserFrame(stack?: string | null) {
-  return parseStackFrames(stack).find(f => !isInternalFrame(f.file)) ?? null;
-}
+import {
+  formatErrorHeadline, choosePreferredErrorHeadline, errorTypeToFix, confidenceLabel,
+  timeAgo, compactIssueLabel, isInternalFrame, parseStackFrames, frameLabel, topUserFrame,
+} from "@/lib/error-utils";
+import {
+  ErrorClass, ERROR_CLASS_META, CLASS_ORDER,
+  classifyError, buildFailureClusters, FailureCluster,
+  computeDeploySlices, DeploySlice,
+  VERIFIED_EXEC_MIN, VERIFIED_EXEC_HIGH,
+  VerifyState, VerifyResult, VerifyContext,
+  extractClusterFingerprint, execMatchesFingerprint, verifyClusterState,
+} from "@/lib/verification-engine";
 
 export default function FunctionDetail({ params }: { params: Promise<{ id: string, func_id: string }> }) {
   const { id, func_id } = use(params);
@@ -272,20 +76,9 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
   const bootFailed = latestDeployment?.status === 'boot_failed';
 
   // Deployment diff — compare fail rates across the two most recent deploys
-  const execsByDeploy = executions.reduce<Record<string, Execution[]>>((acc, e) => {
-    const key = e.code_sha ?? '__unknown__';
-    (acc[key] ??= []).push(e);
-    return acc;
-  }, {});
-  const deploySlice = (sha: string | null | undefined) => {
-    if (!sha) return null;
-    const group = execsByDeploy[sha] ?? [];
-    const total = group.length;
-    const errors = group.filter(e => e.status !== 'ok').length;
-    return { total, errors, rate: total > 0 ? errors / total : 0, execs: group };
-  };
-  const latestSlice = deploySlice(latestDeployment?.artifact_id);
-  const prevSlice = deploySlice(prevDeployment?.artifact_id);
+  const { latestSlice, prevSlice } = computeDeploySlices(
+    executions, latestDeployment?.artifact_id, prevDeployment?.artifact_id,
+  );
   const isRegression = !!(latestSlice && prevSlice && latestSlice.rate > 0.1 && prevSlice.rate < 0.1);
   const deployVersionLabel = deploymentList.length > 0 ? `v${deploymentList.length}` : null;
   // First failure after latest deploy
@@ -295,6 +88,15 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
         .sort((a, b) => new Date(a.started_at!).getTime() - new Date(b.started_at!).getTime())[0] ?? null
     : null;
   const deployedAt = latestDeployment ? new Date(latestDeployment.created_at).getTime() : null;
+  const verifyCtx: VerifyContext = {
+    latestSlice,
+    prevSlice,
+    deployedAt,
+    prevDeployCreatedAt: prevDeployment?.created_at ?? null,
+    functionName: data.name ?? null,
+    functionPath: data.path ?? null,
+    functionMethod: data.method ?? null,
+  };
   const firstFailDelaySec = (firstFailAfterDeploy?.started_at && deployedAt)
     ? Math.max(0, Math.floor((new Date(firstFailAfterDeploy.started_at).getTime() - deployedAt) / 1000))
     : null;
@@ -326,203 +128,8 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
     return oldest ? { label: oldest.artifact_id?.slice(0, 7) ?? oldest.artifact_id, isCurrent: false, isPrev: deploymentList.length === 2, createdAt: oldest.created_at } : null;
   };
 
-  // ── Verification Engine ────────────────────────────────────────────────────
-  // Thresholds for "enough traffic to trust no-failure signal"
-  const VERIFIED_EXEC_MIN = 20;
-  const VERIFIED_EXEC_HIGH = 50;
 
-  type VerifyState = 'active' | 'unverified' | 'verified_fixed' | 'regressed';
 
-  // Build a deterministic fingerprint for a cluster from its issue metadata +
-  // the paths those errors were seen on across all known deploy slices.
-  const extractClusterFingerprint = (cluster: ReturnType<typeof buildFailureClusters>[number]) => {
-    const errorFingerprints = new Set<string>();
-    const errorTypeSources  = new Set<string>();
-    const paths             = new Set<string>();
-    for (const issue of cluster.issues) {
-      if (issue.fingerprint) errorFingerprints.add(issue.fingerprint);
-      const ts = [issue.error_type, issue.error_source].filter(Boolean).join('|');
-      if (ts) errorTypeSources.add(ts);
-    }
-    // Harvest paths from historical failing execs across latest + prev deploy
-    const historicalExecs = [...(latestSlice?.execs ?? []), ...(prevSlice?.execs ?? [])];
-    for (const exec of historicalExecs) {
-      if (exec.status === 'ok') continue;
-      const fp = exec.error_fingerprint;
-      if (fp && errorFingerprints.has(fp)) { if (exec.path) paths.add(exec.path); continue; }
-      const ts = [exec.error_type, exec.error_source].filter(Boolean).join('|');
-      if (ts && errorTypeSources.has(ts) && exec.path) paths.add(exec.path);
-    }
-    return { errorFingerprints, errorTypeSources, paths };
-  };
-
-  const execMatchesFingerprint = (exec: Execution, fp: ReturnType<typeof extractClusterFingerprint>): boolean => {
-    if (exec.error_fingerprint && fp.errorFingerprints.has(exec.error_fingerprint)) return true;
-    const ts = [exec.error_type, exec.error_source].filter(Boolean).join('|');
-    return !!(ts && fp.errorTypeSources.has(ts));
-  };
-
-  const verifyClusterState = (cluster: ReturnType<typeof buildFailureClusters>[number]): {
-    state: VerifyState; confidence: 'high' | 'medium' | 'low';
-    execCount: number; errorCount: number; failureRate: number;
-    matchedTotal: number; matchedSuccess: number; matchedFail: number;
-    reason: string; isDeterministic: boolean; isRegressed: boolean; pathsTracked: boolean;
-    observationState: 'not_observed' | 'partially_observed' | 'likely_fixed' | 'verified';
-    lastMatchedAt: string | null;
-    matchingCriteria: { codeSha: string | null; callSites: string[]; externalDep: string | null; errorType: string | null; errorSource: string | null; errorSignature: string | null };
-    confidenceScore: number;
-    verifyMode: 'deterministic' | 'probabilistic' | 'deployment';
-    requiredToVerify: number;
-    pathCoveredCount: number;
-    deployElapsedSec: number | null;
-    expectedByNow: number | null;
-    isSuspiciouslyLow: boolean;
-    lastFailedExecId: string | null;
-  } => {
-    const fp               = extractClusterFingerprint(cluster);
-    const pathsTracked     = fp.paths.size > 0;
-    const activeInCurrentDeploy = cluster.issues.some(i => (i as any).active_in_current_deploy === true);
-    const execCount        = latestSlice?.total ?? 0;
-    const currentErrors    = latestSlice?.errors ?? 0;
-    const failureRate      = execCount > 0 ? Math.round((currentErrors / execCount) * 100) : 0;
-    const isDeterministic  = execCount >= 5 && failureRate >= 80;
-
-    const currentExecs     = latestSlice?.execs ?? [];
-    // Execs that hit paths known to have caused this error (path coverage)
-    const pathCoveredExecs = pathsTracked ? currentExecs.filter(e => fp.paths.has(e.path)) : [];
-    // Execs whose error fingerprint / type+source directly matches this cluster
-    const matchedFail      = currentExecs.filter(e => e.status !== 'ok' && execMatchesFingerprint(e, fp)).length;
-    const matchedSuccess   = pathCoveredExecs.filter(e => e.status === 'ok').length;
-    const matchedTotal     = matchedFail + matchedSuccess;
-
-    // Regression: was the same path clean in the previous deploy, but is now failing?
-    const prevExecs          = prevSlice?.execs ?? [];
-    const prevMatchedFail    = prevExecs.filter(e => e.status !== 'ok' && execMatchesFingerprint(e, fp)).length;
-    const prevPathCovered    = pathsTracked ? prevExecs.filter(e => fp.paths.has(e.path)).length : 0;
-    const wasCleanInPrev     = prevMatchedFail === 0 && prevPathCovered >= 3;
-    const isActiveNow        = activeInCurrentDeploy || matchedFail > 0 || (!pathsTracked && currentErrors > 0);
-    const isRegressed        = wasCleanInPrev && isActiveNow;
-
-    // ── Expected traffic baseline (prev-deploy path rate vs current elapsed) ──
-    const prevDeployStartMs  = prevDeployment ? new Date(prevDeployment.created_at).getTime() : null;
-    const prevWindowHrs      = (prevDeployStartMs && deployedAt && prevDeployStartMs < deployedAt)
-      ? Math.max(0.1, (deployedAt - prevDeployStartMs) / 3_600_000)
-      : null;
-    const prevPathCoveredPerHr = (prevWindowHrs && prevPathCovered > 0)
-      ? prevPathCovered / prevWindowHrs
-      : null;
-    const currWindowHrs      = deployedAt ? (Date.now() - deployedAt) / 3_600_000 : null;
-    const expectedByNow      = (prevPathCoveredPerHr !== null && currWindowHrs !== null)
-      ? Math.round(prevPathCoveredPerHr * currWindowHrs)
-      : null;
-    const isSuspiciouslyLow  = expectedByNow !== null && expectedByNow >= 3 && pathCoveredExecs.length === 0;
-
-    // ── Adaptive verification mode ───────────────────────────────────
-    // Deterministic failure (80%+) needs only 1 successful matching exec to prove the fix.
-    // Probabilistic failure needs VERIFIED_EXEC_MIN matched execs for statistical confidence.
-    const prevFailureRate    = (prevSlice?.total ?? 0) > 0 ? Math.round(((prevSlice?.errors ?? 0) / (prevSlice?.total ?? 1)) * 100) : 0;
-    const wasHistoricallyDeterministic = (prevSlice?.total ?? 0) >= 5 && prevFailureRate >= 80;
-    const effectiveDeterministic = isDeterministic || wasHistoricallyDeterministic;
-    const verifyMode: 'deterministic' | 'probabilistic' = effectiveDeterministic ? 'deterministic' : 'probabilistic';
-    const requiredToVerify = effectiveDeterministic ? 1 : VERIFIED_EXEC_MIN;
-    // ── Observation state: 3 tiers independent of verify state ────────────
-    const observationState: 'not_observed' | 'partially_observed' | 'likely_fixed' | 'verified' =
-      matchedFail === 0 && (effectiveDeterministic ? matchedSuccess >= 1 : matchedSuccess > 0 && matchedTotal >= 3)
-        ? 'verified'
-        : matchedFail === 0 && matchedTotal >= 2
-        ? 'likely_fixed'
-        : matchedTotal === 0
-        ? 'not_observed'
-        : 'partially_observed';
-    const confidenceScore =
-      observationState === 'verified'
-        ? Math.min(95, 25 + Math.round((matchedSuccess / Math.max(VERIFIED_EXEC_MIN, 1)) * 70))
-        : observationState === 'likely_fixed'
-        ? Math.min(80, 20 + Math.round((matchedTotal / Math.max(VERIFIED_EXEC_MIN, 1)) * 60))
-        : observationState === 'partially_observed' && isActiveNow
-        ? Math.min(90, isDeterministic
-            ? 60 + Math.round((matchedFail / Math.max(VERIFIED_EXEC_MIN, 1)) * 30)
-            : 25 + Math.round((matchedFail / Math.max(VERIFIED_EXEC_MIN, 1)) * 45))
-        : observationState === 'partially_observed'
-        ? Math.min(50, Math.round((matchedTotal / Math.max(VERIFIED_EXEC_MIN, 1)) * 50))
-        : 0;
-    // Last matching execution timestamp + last failed exec ID (for replay)
-    const allMatchedExecs = currentExecs.filter(e => execMatchesFingerprint(e, fp));
-    const lastMatchedAt = allMatchedExecs.reduce<string | null>(
-      (best, e) => e.started_at && (!best || e.started_at > best) ? e.started_at : best, null
-    );
-    const lastFailedExec = allMatchedExecs
-      .filter(e => e.status !== 'ok')
-      .sort((a, b) => (b.started_at ?? '').localeCompare(a.started_at ?? ''))[0] ?? null;
-    const lastFailedExecId = lastFailedExec?.id ?? null;
-    // Explicit matching criteria shown to the user
-    const matchingCodeSha = currentExecs.find(e => e.code_sha)?.code_sha?.slice(0, 7) ?? null;
-    const matchingCallSites = [...fp.paths].slice(0, 3);
-    const externalMatchedExec = allMatchedExecs.find(e => e.error_source?.includes('external'));
-    let matchingExternalDep: string | null = null;
-    if (externalMatchedExec?.error_message) {
-      const urlMatch = externalMatchedExec.error_message.match(/(?:https?:\/\/)?([a-z0-9\-\.]+\.[a-z]{2,}(?::\d+)?)/i);
-      matchingExternalDep = urlMatch?.[1] ?? null;
-    }
-    const clusterErrorType   = cluster.issues[0]?.error_type ?? null;
-    const clusterErrorSource = cluster.issues[0]?.error_source ?? null;
-    // Error signature: normalize to "ErrorType: short-message (context)" for stable display
-    const normalizeErrorSig = (raw: string | null | undefined): string | null => {
-      if (!raw) return null;
-      // Already has structured form — just truncate
-      const colonIdx = raw.indexOf(':');
-      if (colonIdx !== -1) {
-        const type = raw.slice(0, colonIdx).trim();
-        let msg    = raw.slice(colonIdx + 1).trim();
-        // Strip stack-like suffixes (" at ...", "\n", long hex addresses)
-        msg = msg.replace(/\s+at\s+\S+.*$/i, '').replace(/\n.*$/, '').trim();
-        // Try to extract a parenthetical context hint from the message
-        const ctxMatch = msg.match(/\(([^)]{4,40})\)/);
-        const ctx      = ctxMatch ? ` (${ctxMatch[1]})` : '';
-        const short    = msg.replace(/\s*\(.*\)\s*$/, '').slice(0, 40).trim();
-        return `${type}: ${short}${ctx}`;
-      }
-      return raw.slice(0, 55);
-    };
-    const clusterErrorSignature = normalizeErrorSig(cluster.issues[0]?.title) ?? clusterErrorType ?? null;
-    const matchingCriteria = { codeSha: matchingCodeSha, callSites: matchingCallSites, externalDep: matchingExternalDep, errorType: clusterErrorType, errorSource: clusterErrorSource, errorSignature: clusterErrorSignature };
-    // Infra failures (boot issues, no artifact) cannot be traffic-verified
-    const isInfra = cluster.cls === 'infra';
-    const effectiveVerifyMode: 'deterministic' | 'probabilistic' | 'deployment' = isInfra ? 'deployment' : effectiveDeterministic ? 'deterministic' : 'probabilistic';
-    const effectiveRequired = isInfra ? 0 : requiredToVerify;
-    // Time since latest deploy (for "waiting since Xm" context)
-    const deployElapsedSec = deployedAt ? Math.floor((Date.now() - deployedAt) / 1000) : null;
-
-    if (isActiveNow) {
-      const confidence: 'high' | 'medium' | 'low' = matchedFail > 0 || activeInCurrentDeploy ? 'high' : 'medium';
-      const reason = isRegressed
-        ? `Re-emerged after ${prevPathCovered} clean exec${prevPathCovered !== 1 ? 's' : ''} in prev deploy`
-        : isDeterministic
-        ? `Deterministic — fails ${failureRate}% across ${execCount} exec${execCount !== 1 ? 's' : ''}`
-        : `Reproducible · ${execCount} exec${execCount !== 1 ? 's' : ''}, ${failureRate}% failure rate`;
-      return { state: isRegressed ? 'regressed' : 'active', confidence, execCount, errorCount: currentErrors, failureRate, matchedTotal, matchedSuccess, matchedFail, reason, isDeterministic, isRegressed, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode: effectiveVerifyMode, requiredToVerify: effectiveRequired, pathCoveredCount: pathCoveredExecs.length, deployElapsedSec, expectedByNow, isSuspiciouslyLow, lastFailedExecId };
-    }
-
-    // No active failures — determine if the same scenario was exercised successfully
-    // Deterministic: 1 success is enough to prove fix. Probabilistic: need 3+ matched execs.
-    if (effectiveDeterministic ? matchedSuccess >= 1 : matchedTotal >= 3) {
-      const confidence: 'high' | 'medium' | 'low' = effectiveDeterministic ? 'high' : matchedTotal >= 15 ? 'high' : matchedTotal >= 5 ? 'medium' : 'low';
-      const reason = `Verified — ${matchedSuccess} exec${matchedSuccess !== 1 ? 's' : ''} on same path, no recurrence`;
-      return { state: 'verified_fixed', confidence, execCount, errorCount: 0, failureRate: 0, matchedTotal, matchedSuccess, matchedFail: 0, reason, isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode: effectiveVerifyMode, requiredToVerify: effectiveRequired, pathCoveredCount: pathCoveredExecs.length, deployElapsedSec, expectedByNow, isSuspiciouslyLow, lastFailedExecId };
-    }
-    if (execCount >= VERIFIED_EXEC_HIGH)
-      return { state: 'verified_fixed', confidence: 'medium', execCount, errorCount: 0, failureRate: 0, matchedTotal, matchedSuccess, matchedFail: 0,
-        reason: `Not reproduced across ${execCount} execs — path not yet exercised`, isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode: effectiveVerifyMode, requiredToVerify: effectiveRequired, pathCoveredCount: pathCoveredExecs.length, deployElapsedSec, expectedByNow, isSuspiciouslyLow, lastFailedExecId };
-    if (execCount >= VERIFIED_EXEC_MIN)
-      return { state: 'verified_fixed', confidence: 'low', execCount, errorCount: 0, failureRate: 0, matchedTotal, matchedSuccess, matchedFail: 0,
-        reason: `Not reproduced across ${execCount} execs — insufficient path coverage`, isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode: effectiveVerifyMode, requiredToVerify: effectiveRequired, pathCoveredCount: pathCoveredExecs.length, deployElapsedSec, expectedByNow, isSuspiciouslyLow, lastFailedExecId };
-
-    return { state: 'unverified', confidence: 'low', execCount, errorCount: 0, failureRate: 0, matchedTotal, matchedSuccess, matchedFail: 0,
-      reason: pathsTracked
-        ? `Failure path not yet exercised in current deploy (${execCount}/${VERIFIED_EXEC_MIN} execs)`
-        : `Only ${execCount} of ${VERIFIED_EXEC_MIN} executions needed to verify`,
-      isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode: effectiveVerifyMode, requiredToVerify: effectiveRequired, pathCoveredCount: pathCoveredExecs.length, deployElapsedSec, expectedByNow, isSuspiciouslyLow, lastFailedExecId };
-  };
 
   const st = statsData?.stats;
   const stats = [
@@ -682,7 +289,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
       {statsData?.root_cause && (() => {
         const _clusters = buildFailureClusters(statsData.top_issues ?? []);
         // Compute verification state per cluster
-        const _clusterVerify = _clusters.map(c => verifyClusterState(c));
+        const _clusterVerify = _clusters.map(c => verifyClusterState(c, verifyCtx));
         const hasActive    = _clusterVerify.some(v => v.state === 'active');
         const hasRegressed  = _clusterVerify.some(v => v.state === 'regressed');
         const allHistorical = _clusters.length > 0 && latestDeployment?.artifact_id != null && !hasActive && !hasRegressed;
@@ -1444,7 +1051,8 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                     const activeClusterFps = (() => {
                       if (!statsData?.top_issues) return [];
                       const clusters = buildFailureClusters(statsData.top_issues);
-                      return clusters.map(c => extractClusterFingerprint(c));
+                      const allExecs = [...(latestSlice?.execs ?? []), ...(prevSlice?.execs ?? [])];
+                      return clusters.map(c => extractClusterFingerprint(c, allExecs));
                     })();
                     const execMatchesAnyCluster = (exec: Execution) =>
                       activeClusterFps.some(fp => execMatchesFingerprint(exec, fp));
@@ -1844,7 +1452,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                 <div className="text-neutral-700 text-xs italic">No deployments yet.</div>
               )}
               {deploymentList.map((dep, i) => {
-                const slice = deploySlice(dep.artifact_id);
+                const slice = computeDeploySlices(executions, dep.artifact_id, undefined).latestSlice;
                 // Only the first (most recent) row whose artifact_id matches latest_artifact_id is "active"
                 const isActive = dep.artifact_id === data.latest_artifact_id &&
                   deploymentList.findIndex(d => d.artifact_id === data.latest_artifact_id) === i;
