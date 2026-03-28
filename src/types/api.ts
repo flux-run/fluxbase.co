@@ -123,6 +123,7 @@ export interface LogEntry extends ExecutionConsoleLog {
 
 export interface ExecutionDetail {
   execution: Execution;
+  checkpoints?: Checkpoint[];
   spans: {
     type: string;
     label: string | null;

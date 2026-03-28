@@ -1,8 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
-import { X, Clock, Terminal, Globe, Activity, ChevronRight, AlertCircle, Cpu } from "lucide-react";
+import { X, Clock, Globe, Activity, AlertCircle, GitMerge, Terminal } from "lucide-react";
 import { ExecutionDetail } from "@/types/api";
 import { useFluxApi } from "@/lib/api";
+import { ExecutionTimeline } from "./ExecutionTimeline";
 
 function formatErrorHeadline(
   errorName?: string | null,
@@ -121,37 +122,16 @@ export function ExecutionDetailDrawer({ isOpen, onClose, execId, projectId }: Ex
                 </div>
               </section>
 
-              {/* Temporal Breakdown (Waterfall) */}
+              {/* Execution Timeline */}
               <section>
-                <h4 className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                  <Cpu className="w-3.5 h-3.5" /> Temporal Breakdown
+                <h4 className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                  <GitMerge className="w-3.5 h-3.5" /> Execution Trace
                 </h4>
-                <div className="space-y-2">
-                  {detail.spans.map((span, i) => (
-                    <div key={i} className="group flex items-center gap-4">
-                      <div className="w-24 shrink-0 text-[10px] font-mono text-neutral-600 uppercase tracking-tight truncate" title={span.type}>
-                         {span.type}
-                      </div>
-                      <div className="flex-1 h-6 bg-neutral-950 rounded relative overflow-hidden ring-1 ring-neutral-900">
-                        <div 
-                          className={`absolute inset-y-0 ${
-                            span.type === 'js' ? 'bg-blue-600/60' : 
-                            span.type === 'db' ? 'bg-purple-600/60' : 
-                            span.type === 'http' ? 'bg-orange-600/60' : 'bg-neutral-600/60'
-                          } border-x border-white/10`}
-                          style={{ 
-                            left: `${(span.start_ms / detail.execution.duration_ms!) * 100}%`,
-                            width: `${(span.duration_ms / detail.execution.duration_ms!) * 100}%`,
-                            minWidth: '2px'
-                          }}
-                        />
-                        <div className="absolute inset-0 flex items-center px-2 pointer-events-none">
-                           <span className="text-[9px] font-mono font-bold text-white/50">{span.label || span.type} ({span.duration_ms}ms)</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <ExecutionTimeline
+                  execution={detail.execution}
+                  checkpoints={detail.checkpoints ?? []}
+                  logs={detail.logs ?? []}
+                />
               </section>
 
               {/* Request Metadata */}
@@ -199,25 +179,7 @@ export function ExecutionDetailDrawer({ isOpen, onClose, execId, projectId }: Ex
                 </section>
               )}
 
-              {/* Logs */}
-              {detail.logs && detail.logs.length > 0 && (
-                <section className="space-y-4">
-                   <h4 className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest flex items-center gap-2">
-                     <Terminal className="w-3.5 h-3.5" /> Console Logs
-                   </h4>
-                   <div className="bg-black border border-neutral-900 rounded-lg divide-y divide-neutral-900">
-                      {detail.logs.map((log, i) => (
-                        <div key={i} className="px-4 py-3 flex gap-4 font-mono text-[11px]">
-                           <span className={`shrink-0 w-12 font-bold ${
-                             log.level === 'error' ? 'text-red-500' : 
-                             log.level === 'warn' ? 'text-yellow-500' : 'text-neutral-600'
-                           }`}>{log.level.toUpperCase()}</span>
-                           <span className="text-neutral-300 break-all">{log.message}</span>
-                        </div>
-                      ))}
-                   </div>
-                </section>
-              )}
+
             </>
           ) : (
             <div className="h-full flex items-center justify-center text-neutral-600 font-mono text-xs">Failed to load execution context.</div>
