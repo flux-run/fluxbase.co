@@ -42,6 +42,15 @@ export default function LoginPage() {
     }
   };
 
+  const clearAuthUi = () => {
+    setError("");
+    setNeedsVerification(false);
+    setResendState("idle");
+    setName("");
+    setEmail("");
+    setPassword("");
+  };
+
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -62,6 +71,12 @@ export default function LoginPage() {
           setNeedsVerification(true);
         }
         return;
+      }
+
+      // Keep the login screen clean after successful auth transitions.
+      clearAuthUi();
+      if (mode === "register") {
+        setMode("login");
       }
 
       router.push(data.redirect || "/dashboard");
@@ -217,7 +232,7 @@ export default function LoginPage() {
               <button
                 onClick={() => {
                   setMode(mode === "login" ? "register" : "login");
-                  setError("");
+                  clearAuthUi();
                 }}
                 className="text-neutral-400 hover:text-white font-black transition-colors underline underline-offset-4"
               >

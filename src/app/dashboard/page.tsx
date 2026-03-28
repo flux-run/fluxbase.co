@@ -5,9 +5,21 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { useFluxApi } from "@/lib/api";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Plus, ArrowRight, Box, Clock, Activity } from "lucide-react";
+import { LayoutDashboard, Plus, ArrowRight, Box, Clock, Activity, Mail } from "lucide-react";
 import { Project, Org } from "@/types/api";
 import { CreateDialog } from "@/components/dashboard/CreateDialog";
+
+type PendingInvite = {
+  id: string;
+  token: string;
+  email: string;
+  role: string;
+  org_id: string;
+  org_name: string;
+  org_slug: string;
+  expires_at: string;
+  created_at: string;
+};
 
 function DashboardContent() {
   const { session, status } = useAuth();
@@ -20,6 +32,7 @@ function DashboardContent() {
   const [redirecting, setRedirecting] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [activeOrgId, setActiveOrgId] = useState<string | null>(null);
+  const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
 
   useEffect(() => {
     if (status === "loading") return;
@@ -30,13 +43,15 @@ function DashboardContent() {
 
     const init = async () => {
       try {
-        const [orgsData, projectsData] = await Promise.all([
+        const [orgsData, projectsData, invitesData] = await Promise.all([
           api.getOrgs(),
-          api.getProjects()
+          api.getProjects(),
+          api.getMyInvitations().catch(() => ({ invitations: [] }))
         ]);
         
         setOrgs(orgsData);
         setProjects(projectsData);
+        setPendingInvites(invitesData.invitations || []);
 
         // Check for manual "Back to Dashboard" intent
         const lastProjectId = localStorage.getItem("flux_last_project");
@@ -101,6 +116,42 @@ function DashboardContent() {
           </header>
 
           <div className="space-y-20">
+            {pendingInvites.length > 0 && (
+              <section className="animate-in fade-in slide-in-from-bottom-8 duration-700">
+                <div className="flex items-center justify-between mb-8 pb-4 border-b border-white/[0.05]">
+                  <div className="flex items-center gap-3">
+                    <Mail className="w-4 h-4 text-blue-500" />
+                    <h2 className="text-sm font-black uppercase tracking-[0.2em] text-white">Pending Invitations</h2>
+                  </div>
+                  <p className="text-[10px] text-neutral-500 font-mono uppercase tracking-widest">{pendingInvites.length} waiting</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {pendingInvites.map((invite) => (
+                    <Card
+                      key={invite.id}
+                      className="bg-[#0D0D0D] border-amber-500/20 relative overflow-hidden"
+                    >
+                      <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-amber-500/40 to-transparent" />
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base font-black text-white">{invite.org_name}</CardTitle>
+                        <div className="text-[10px] text-neutral-500 font-mono uppercase tracking-widest">Role: {invite.role}</div>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <p className="text-[11px] text-neutral-400">Invite expires {new Date(invite.expires_at).toLocaleDateString()}.</p>
+                        <Button
+                          onClick={() => router.push(`/invite/accept?token=${encodeURIComponent(invite.token)}`)}
+                          className="w-full h-10 bg-white text-black hover:bg-neutral-200 font-black text-[11px] uppercase tracking-widest"
+                        >
+                          Review Invite
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </section>
+            )}
+
             {orgs.map((org, orgIdx) => {
               const orgProjects = projects.filter(p => p.org_id === org.id);
               

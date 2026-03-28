@@ -191,6 +191,9 @@ export function useFluxApi(projectId?: string) {
       getInvitation: (inviteToken: string) =>
         request<{ invitation: { id: string; email: string; role: string; org_id: string; org_name: string; org_slug: string; expires_at: string } }>(
           `/invitations/accept?token=${encodeURIComponent(inviteToken)}`, null),
+      getMyInvitations: () =>
+        request<{ invitations: { id: string; token: string; email: string; role: string; org_id: string; org_name: string; org_slug: string; expires_at: string; created_at: string }[] }>(
+          "/me/invitations", token()),
 
       /* Service Tokens */
       getServiceTokens: (id?: string) =>
