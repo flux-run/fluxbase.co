@@ -377,9 +377,10 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                               {!isGenericErrorHeadline(errorHeadline) ? errorHeadline : displayIssue}
                             </h3>
                             {userFrame && (
-                              <p className="text-neutral-600 text-[11px] font-mono">
-                                ↳ <span className="text-red-400/80">{userFrame.fn ?? '<anonymous>'}</span>
-                                {' '}<span className="text-neutral-700">{frameLabel(userFrame)}</span>
+                              <p className="text-[12px] font-mono mt-0.5 flex items-center gap-1.5">
+                                <span className="text-red-400/50">↳</span>
+                                <span className="text-red-300/70">{userFrame.fn ?? '<anonymous>'}</span>
+                                <span className="text-red-400/80 font-bold">{frameLabel(userFrame)}</span>
                               </p>
                             )}
                           </div>
@@ -616,11 +617,11 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                        <Terminal className="w-3.5 h-3.5 text-red-500" />
                        <span className="text-[10px] font-black uppercase text-red-500 tracking-widest">Halt Reason</span>
                     </div>
-                  <code className="text-[11px] text-red-400 font-mono italic whitespace-pre-wrap">
+                    <code className="text-[11px] text-red-400 font-mono italic whitespace-pre-wrap">
                      {!isGenericErrorHeadline(errorHeadline) ? (
                        <>
                          {errorHeadline}
-                         {userFrame && <><br /><span className="text-neutral-600">at {frameLabel(userFrame, false)}</span></>}
+                         {userFrame && <><br /><span className="text-neutral-400">at {frameLabel(userFrame, false)}</span></>}
                        </>
                      ) : haltReason}
                   </code>
@@ -726,7 +727,7 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                           {!isGenericErrorHeadline(errorHeadline) ? errorHeadline : (haltReason ?? 'Execution aborted')}
                         </code>
                         {userFrame && (
-                          <span className="text-[10px] text-neutral-600 font-mono mt-0.5">at {frameLabel(userFrame)}</span>
+                          <span className="text-[10px] text-red-400/70 font-mono font-bold mt-0.5">at {frameLabel(userFrame)}</span>
                         )}
                       </div>
                       <span className="text-[10px] text-red-500 font-bold shrink-0">✕ ABORTED</span>

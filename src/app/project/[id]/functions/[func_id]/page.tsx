@@ -273,7 +273,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                  {(() => {
                    const frame = topUserFrame(statsData.root_cause.sample_stack);
                    return frame ? (
-                     <p className="text-red-400/60 text-[12px] font-mono -mt-1">↳ {frameLabel(frame)}</p>
+                     <p className="text-red-400/80 text-[12px] font-mono font-bold -mt-1">↳ {frameLabel(frame)}</p>
                    ) : null;
                  })()}
                  <div className="text-red-200/80 font-mono text-sm border-l-2 border-red-500/30 pl-4 py-1 space-y-1">
@@ -300,7 +300,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                              <div key={idx} className="space-y-1">
                                <div className="flex items-center justify-between gap-3">
                                  <span className="font-mono text-[11px] text-neutral-300 truncate" title={issLoc ? `${iss.title} @ ${issLoc}` : iss.title}>
-                                   {iss.title}{issLoc ? <span className="text-neutral-600"> @ {issLoc}</span> : null}
+                                   {iss.title}{issLoc ? <span className="text-red-400/60"> @ {issLoc}</span> : null}
                                  </span>
                                  <span className="text-[10px] font-bold text-neutral-500 shrink-0">{pct}% · {iss.count}×</span>
                                </div>
@@ -341,7 +341,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                const frame = topUserFrame(statsData.root_cause.sample_stack);
                                const loc = frameLabel(frame);
                                return loc ? (
-                                 <div className="text-[9px] font-mono text-neutral-600 mt-0.5 truncate">↳ {loc}</div>
+                                 <div className="text-[10px] font-mono font-bold text-red-400/70 mt-0.5 truncate">↳ {loc}</div>
                                ) : null;
                              })()}
                           </div>
@@ -536,7 +536,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                className="text-[10px] text-red-400/80 mt-1 truncate max-w-[240px] font-mono"
                                title={loc ? `${headline} (${loc})` : headline}
                              >
-                               {headline}{loc ? <span className="text-neutral-600"> ({loc})</span> : null}
+                               {headline}{loc ? <span className="text-red-400/60 font-bold"> ({loc})</span> : null}
                              </div>
                            );
                         })()}
@@ -625,7 +625,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                          </div>
                          <div className="flex flex-col overflow-hidden">
                            <span className="text-neutral-200 truncate font-semibold" title={issueLoc ? `${issue.title} @ ${issueLoc}` : issue.title}>
-                             {issue.title}{issueLoc ? <span className="text-neutral-600"> @ {issueLoc}</span> : null}
+                             {issue.title}{issueLoc ? <span className="text-red-400/60 font-normal"> @ {issueLoc}</span> : null}
                            </span>
                            <div className="flex items-center gap-2 mt-0.5 overflow-hidden">
                              <span className="text-[10px] text-neutral-600 uppercase tracking-wider shrink-0">{issue.fingerprint.slice(0, 8)}</span>
