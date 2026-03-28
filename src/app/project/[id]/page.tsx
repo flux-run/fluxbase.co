@@ -358,12 +358,12 @@ export default function ProjectPage({
                         <span className="text-neutral-600"> — ~{suggestedFocus.usersPer10} in 10 users affected</span>
                       )}
                     </p>
-                    {/* 3. relative comparison — always show, wording is precise about groups vs raw counts */}
+                    {/* 3. relative comparison */}
                     <p className="text-[9px] text-neutral-500 font-mono">
                       <span className="text-red-500/50 mr-1.5 select-none">·</span>
                       {incidentGroups.length === 1
                         ? overview!.incidents.length > 1
-                          ? `only incident type — all ${overview!.incidents.length} events are the same issue`
+                          ? `single incident — all ${overview!.incidents.length} failures share same root cause`
                           : "only active incident"
                         : suggestedFocus.impactMultiple !== null && suggestedFocus.impactMultiple > 1.2
                         ? `${suggestedFocus.impactMultiple}× larger than next issue`
@@ -372,21 +372,27 @@ export default function ProjectPage({
                         <span className="text-neutral-600"> — next: {suggestedFocus.secondTrafficPct}% traffic</span>
                       )}
                     </p>
-                    {/* 4. timing + deploy causality — show whenever deployId exists, not gated by isRegression */}
-                    <p className="text-[9px] text-neutral-500 font-mono">
-                      <span className="text-red-500/50 mr-1.5 select-none">·</span>
-                      {suggestedFocus.deployId
-                        ? (
-                          <>
-                            started {timeAgo(suggestedFocus.firstSeen)} · after deploy {suggestedFocus.deployId}
-                            {suggestedFocus.deployDeltaMin !== null && suggestedFocus.deployDeltaMin > 0 && (
-                              <span> (+{suggestedFocus.deployDeltaMin}m)</span>
-                            )}
-                            <span className="text-neutral-700"> — likely caused by deployment</span>
-                          </>
-                        )
-                        : `first seen ${timeAgo(suggestedFocus.firstSeen)}`}
-                    </p>
+                    {/* 4. deploy causality — structured two-line when delta available */}
+                    {suggestedFocus.deployId ? (
+                      <>
+                        <p className="text-[9px] text-neutral-500 font-mono">
+                          <span className="text-red-500/50 mr-1.5 select-none">·</span>
+                          started {timeAgo(suggestedFocus.firstSeen)}
+                          {suggestedFocus.deployDeltaMin !== null && suggestedFocus.deployDeltaMin > 0
+                            ? ` — ${suggestedFocus.deployDeltaMin}m after deploy ${suggestedFocus.deployId}`
+                            : ` · after deploy ${suggestedFocus.deployId}`}
+                        </p>
+                        <p className="text-[9px] font-mono">
+                          <span className="text-red-500/50 mr-1.5 select-none">·</span>
+                          <span className="text-orange-500/70 font-black">→ likely caused by this deployment</span>
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-[9px] text-neutral-500 font-mono">
+                        <span className="text-red-500/50 mr-1.5 select-none">·</span>
+                        first seen {timeAgo(suggestedFocus.firstSeen)}
+                      </p>
+                    )}
                     {suggestedFocus.affectedFns.length > 1 && (
                       <p className="text-[9px] text-neutral-500 font-mono">
                         <span className="text-red-500/50 mr-1.5 select-none">·</span>
@@ -536,7 +542,16 @@ export default function ProjectPage({
                           ) : (
                             <span className="text-[8px] text-neutral-600 font-mono">{group.affectedFns[0]}</span>
                           )}
-                          <span className="text-[8px] text-neutral-700 font-mono ml-auto">{timeAgo(topInc.lastSeen)}</span>
+                          <div className="ml-auto flex items-center gap-1.5">
+                            {group.trafficContributionPct > 0 && (
+                              <span className={`text-[7px] font-black px-1 py-0.5 rounded border ${
+                                tier === 'critical' ? "text-red-400 border-red-900/50 bg-red-950/50" :
+                                tier === 'high' ? "text-orange-400 border-orange-900/40 bg-orange-950/40" :
+                                "text-neutral-600 border-neutral-800 bg-neutral-900"
+                              }`}>{group.trafficContributionPct}% traffic</span>
+                            )}
+                            <span className="text-[8px] text-neutral-700 font-mono">{timeAgo(topInc.lastSeen)}</span>
+                          </div>
                         </div>
                       </div>
                     );
