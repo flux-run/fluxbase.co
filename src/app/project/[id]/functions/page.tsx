@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useFluxApi } from "@/lib/api";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { Zap, Activity, AlertCircle, Plus, Trash2 } from "lucide-react";
+import { Zap, Activity, AlertCircle, AlertTriangle, Plus, Trash2 } from "lucide-react";
 import { 
   Table, 
   TableBody, 
@@ -26,6 +26,40 @@ function timeAgo(iso: string): string {
   if (h < 24) return `${h}h ago`;
   return `${Math.floor(h / 24)}d ago`;
 }
+
+// Same compact-label logic as ExecutionTimeline — surfaces the real failure op
+function compactIssueLabel(title: string, errorSource?: string): string {
+  const raw = title.trim();
+  const msg = raw.toLowerCase();
+
+  // fetch errors
+  if (msg.includes("fetch failed") || msg.includes("failed to fetch")) {
+    const urlMatch = raw.match(/https?:\/\/([^/\s:]+)/);
+    const domain = urlMatch ? urlMatch[1] : null;
+    const hint = msg.includes("dns") || msg.includes("resolve") ? " (DNS failed)"
+      : msg.includes("timeout") ? " (timeout)"
+      : msg.includes("refused") || msg.includes("econnrefused") ? " (connection refused)"
+      : msg.includes("certificate") || msg.includes("ssl") || msg.includes("tls") ? " (TLS error)"
+      : "";
+    return domain ? `fetch → ${domain}${hint}` : `fetch failed${hint}`;
+  }
+  if (msg.includes("dns") || (msg.includes("resolve") && !msg.includes("promise"))) return "DNS lookup failed";
+  if (msg.includes("timeout")) return "Request timed out";
+  if (msg.includes("connection refused") || msg.includes("econnrefused")) return "Connection refused";
+  if (msg.includes("certificate") || (msg.includes("ssl") && !msg.includes("ssl_")) || msg.includes(" tls ")) return "TLS / certificate error";
+
+  // Named JS errors — extract name + short message
+  const namedErr = raw.match(/^(ReferenceError|TypeError|SyntaxError|RangeError|URIError|EvalError):\s*(.+)/);
+  if (namedErr) {
+    const short = namedErr[2].length > 55 ? namedErr[2].slice(0, 55) + "…" : namedErr[2];
+    // Add source hint for user code errors
+    const src = errorSource === "user_code" ? " (user code)" : errorSource === "platform_runtime" ? " (runtime)" : "";
+    return `${namedErr[1]}: ${short}${src}`;
+  }
+
+  // Generic — truncate
+  return raw.length > 72 ? raw.slice(0, 72) + "…" : raw;
+}
 import { CLIInitDialog } from "@/components/dashboard/CLIInitDialog";
 
 export default function FunctionsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -43,10 +77,15 @@ export default function FunctionsPage({ params }: { params: Promise<{ id: string
   useEffect(() => {
     if (!api.ready) return;
     api.getFunctions().then(data => {
-      // Sort worst-first: highest failure rate at top
+      // Sort by urgency: failing-now (recent error) first, then by failure rate
+      const now = Date.now();
       const sorted = [...data].sort((a, b) => {
         const rateA = (a.total_execs ?? 0) > 0 ? (a.total_errors ?? 0) / a.total_execs! : 0;
         const rateB = (b.total_execs ?? 0) > 0 ? (b.total_errors ?? 0) / b.total_execs! : 0;
+        // Recency bonus: errors in last 30 min boost to top
+        const recentA = a.last_error_at && (now - new Date(a.last_error_at).getTime()) < 30 * 60_000 ? 1 : 0;
+        const recentB = b.last_error_at && (now - new Date(b.last_error_at).getTime()) < 30 * 60_000 ? 1 : 0;
+        if (recentB !== recentA) return recentB - recentA;
         return rateB - rateA;
       });
       setFunctions(sorted);
@@ -117,10 +156,21 @@ export default function FunctionsPage({ params }: { params: Promise<{ id: string
             {functions.map(f => {
               const st = funcStats[f.id!];
               const failureRate = (f.total_execs ?? 0) > 0 ? (f.total_errors ?? 0) / f.total_execs! * 100 : 0;
-              const causeText = st?.top_issues?.[0]?.title ?? null;
-              const shortSha = f.latest_artifact_id?.slice(0, 7) ?? null;
-              // Status label: >20% → Failing, 1-20% → Intermittent, 0% → Healthy
+              const topIssue = st?.top_issues?.[0] ?? null;
+              const causeText = topIssue
+                ? compactIssueLabel(topIssue.title, topIssue.error_source)
+                : null;
+              // Version comes directly from the functions list response
+              const artifactId = f.latest_artifact_id ?? null;
+              const shortSha = artifactId?.slice(0, 7) ?? null;
+              const bootFailed = f.latest_deploy_status === 'boot_failed';
               const stateLabel = failureRate >= 20 ? 'failing' : failureRate > 0 ? 'intermittent' : 'healthy';
+              // Regression signal: errors appeared after the most recent deploy
+              const brokAfterDeploy =
+                !!f.latest_deploy_at &&
+                !!f.last_error_at &&
+                new Date(f.last_error_at) > new Date(f.latest_deploy_at) &&
+                failureRate >= 10;
               return (
               <TableRow key={f.id} className="border-neutral-900 hover:bg-neutral-900/30 transition-colors group cursor-pointer">
                 <TableCell>
@@ -129,17 +179,36 @@ export default function FunctionsPage({ params }: { params: Promise<{ id: string
                       <Zap className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
                       <span className="text-neutral-100 font-bold group-hover:text-blue-400 transition-colors">{f.name}</span>
                       {shortSha && (
-                        <span className="text-neutral-700 text-[10px] font-mono">• {shortSha}</span>
+                        <>
+                          <span className="text-neutral-700 text-[10px] font-mono select-none">•</span>
+                          <span
+                            className={`inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+                              bootFailed
+                                ? 'text-red-400 border-red-900/60 bg-red-950/30'
+                                : 'text-neutral-500 border-neutral-800 bg-neutral-900'
+                            }`}
+                            title={bootFailed ? 'Boot failed — function did not start' : `Artifact: ${artifactId}`}
+                          >
+                            {shortSha}
+                            {bootFailed && <span className="text-red-500">!</span>}
+                          </span>
+                        </>
                       )}
                     </div>
-                    {(causeText) ? (
+                    {causeText ? (
                       <div className="flex items-center gap-1.5 ml-[22px]">
-                        <span className={`text-[11px] font-mono ${failureRate >= 20 ? 'text-red-400' : 'text-yellow-400'}`}>
+                        <span className={`text-[11px] font-mono leading-snug ${failureRate >= 20 ? 'text-red-400' : 'text-yellow-400'}`}>
                           {failureRate >= 20 ? '❌' : '⚠️'} {causeText}
                         </span>
+                        {f.last_error_at && (
+                          <span className="text-[10px] text-neutral-700 font-mono whitespace-nowrap">• {timeAgo(f.last_error_at)}</span>
+                        )}
+                        {brokAfterDeploy && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-mono text-amber-400 px-1.5 py-0.5 rounded border border-amber-800/50 bg-amber-950/20 whitespace-nowrap">
+                            <AlertTriangle className="w-3 h-3" /> broke after deploy
+                          </span>
+                        )}
                       </div>
-                    ) : (failureRate > 0 && !st) ? (
-                      <span className="text-[10px] font-mono text-neutral-700 ml-[22px] animate-pulse">loading cause…</span>
                     ) : null}
                   </Link>
                 </TableCell>
@@ -164,9 +233,9 @@ export default function FunctionsPage({ params }: { params: Promise<{ id: string
                 <TableCell className="text-center">
                   <div className="text-xs text-neutral-400 font-mono flex items-center justify-center gap-1">
                     {(f.p95 && f.p95 > 0) ? (
-                      <>{Math.round(f.p95)}ms{f.p95 > 500 && <span className="text-[10px] text-yellow-500 ml-1" title="Slow">⚠️</span>}</>
+                      <>{Math.round(f.p95)}ms{f.p95 > 500 && <span className="text-[10px] text-yellow-500 ml-1" title="Slow response time">⚠️</span>}</>
                     ) : (
-                      <span className="text-neutral-700">—</span>
+                      <span className="text-neutral-700" title="No successful executions yet">—</span>
                     )}
                   </div>
                 </TableCell>
@@ -186,8 +255,14 @@ export default function FunctionsPage({ params }: { params: Promise<{ id: string
                     </span>
                   </div>
                 </TableCell>
-                <TableCell className="text-right text-neutral-600 text-[11px] font-mono">
-                  {f.created_at ? new Date(f.created_at).toLocaleDateString() : 'N/A'}
+                <TableCell className="text-right text-[11px] font-mono" title={f.latest_deploy_at ? new Date(f.latest_deploy_at).toLocaleString() : undefined}>
+                  {f.latest_deploy_at ? (
+                    <span className="text-neutral-500">{timeAgo(f.latest_deploy_at)}</span>
+                  ) : f.created_at ? (
+                    <span className="text-neutral-700">{timeAgo(f.created_at)}</span>
+                  ) : (
+                    <span className="text-neutral-800">—</span>
+                  )}
                 </TableCell>
                 <TableCell className="text-right">
                   <Button

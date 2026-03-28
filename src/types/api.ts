@@ -104,6 +104,9 @@ export interface Function extends BaseFunction {
   severity?: "critical" | "warning" | "healthy";
   status_message?: string;
   status?: string;
+  latest_artifact_id?: string | null;
+  latest_deploy_at?: string | null;
+  latest_deploy_status?: string | null;
   stats?: {
     total_execs: number;
     errors: number;
@@ -114,6 +117,8 @@ export interface Function extends BaseFunction {
 
 export interface Execution extends BaseExecution {
   external_calls?: number;
+  function_id?: string | null;
+  function_name?: string | null;
 }
 
 export interface LogEntry extends ExecutionConsoleLog {
