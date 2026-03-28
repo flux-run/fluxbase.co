@@ -363,7 +363,7 @@ export default function ProjectPage({
                       <span className="text-red-500/50 mr-1.5 select-none">·</span>
                       {incidentGroups.length === 1
                         ? overview!.incidents.length > 1
-                          ? `single incident — all ${overview!.incidents.length} failures share same root cause`
+                          ? "single incident — all failures share the same root cause"
                           : "only active incident"
                         : suggestedFocus.impactMultiple !== null && suggestedFocus.impactMultiple > 1.2
                         ? `${suggestedFocus.impactMultiple}× larger than next issue`
@@ -372,19 +372,23 @@ export default function ProjectPage({
                         <span className="text-neutral-600"> — next: {suggestedFocus.secondTrafficPct}% traffic</span>
                       )}
                     </p>
-                    {/* 4. deploy causality — structured two-line when delta available */}
+                    {/* 4. deploy causality — lead with delta, then conclusion */}
                     {suggestedFocus.deployId ? (
                       <>
                         <p className="text-[9px] text-neutral-500 font-mono">
                           <span className="text-red-500/50 mr-1.5 select-none">·</span>
-                          started {timeAgo(suggestedFocus.firstSeen)}
                           {suggestedFocus.deployDeltaMin !== null && suggestedFocus.deployDeltaMin > 0
-                            ? ` — ${suggestedFocus.deployDeltaMin}m after deploy ${suggestedFocus.deployId}`
-                            : ` · after deploy ${suggestedFocus.deployId}`}
+                            ? `started ${suggestedFocus.deployDeltaMin}m after deploy ${suggestedFocus.deployId}`
+                            : `started after deploy ${suggestedFocus.deployId}`}
+                          <span className="text-neutral-700"> ({timeAgo(suggestedFocus.firstSeen)})</span>
                         </p>
                         <p className="text-[9px] font-mono">
                           <span className="text-red-500/50 mr-1.5 select-none">·</span>
                           <span className="text-orange-500/70 font-black">→ likely caused by this deployment</span>
+                        </p>
+                        <p className="text-[9px] text-neutral-600 font-mono">
+                          <span className="text-red-500/50 mr-1.5 select-none">·</span>
+                          all failures started after this deploy
                         </p>
                       </>
                     ) : (
@@ -412,7 +416,9 @@ export default function ProjectPage({
                   </div>
                   <div className="flex items-center justify-end pt-1">
                     <span className="text-[10px] font-bold text-red-300 flex items-center gap-1.5 group-hover:gap-2.5 transition-all">
-                      Investigate {suggestedFocus.topFunctionName} <ArrowRight className="w-3 h-3" />
+                      {suggestedFocus.deployId
+                        ? <>View root cause <ArrowRight className="w-3 h-3" /></>
+                        : <>Investigate {suggestedFocus.topFunctionName} <ArrowRight className="w-3 h-3" /></>}
                     </span>
                   </div>
                 </div>
