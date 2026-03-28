@@ -44,9 +44,11 @@ type IncidentStatus = 'active' | 'investigating' | 'resolved';
 
 type ActivityEvent = {
   id: string;
+  /** system = automated event · comment = human freeform · ai = AI response */
   type: 'system' | 'comment' | 'ai';
   text: string;
-  author?: string;
+  /** human actor — when set on a system event it renders as a human-action row */
+  actor?: string;
   ts: string;
 };
 
@@ -379,38 +381,41 @@ export default function IncidentDetailPage({
   }, [title]);
 
   const updateStatus = useCallback((s: IncidentStatus, currentActivity: ActivityEvent[]) => {
-    setIncidentStatus(s);
-    localStorage.setItem(`incident-status:${title}`, s);
-    const label = s === 'investigating' ? 'Marked as Investigating'
-      : s === 'resolved' ? 'Marked as Resolved'
-      : 'Reopened as Active';
-    const evs: ActivityEvent[] = [{
-      id: `system-status-${Date.now()}`,
-      type: 'system',
-      text: label,
-      ts: new Date().toISOString(),
-    }];
-    // If resolving, auto-post a resolution summary
-    if (s === 'resolved' && group) {
-      const { failureRatePct, totalErrors, totalExecs, firstSeen, rateBeforePct } = group;
-      const durationMin = Math.round(
-        (Date.now() - new Date(firstSeen).getTime()) / 60000
-      );
-      const summary = [
-        `Failure rate: ${failureRatePct}%${totalErrors === 0 ? ' → 0% ✓' : ' (still elevated — monitor)'}`,
-        `Total errors: ${totalErrors} over ${totalExecs} executions`,
-        `Duration: ${durationMin >= 60 ? `${Math.floor(durationMin / 60)}h ${durationMin % 60}m` : `${durationMin}m`}`,
-        rateBeforePct !== null ? `Baseline (before deploy): ${rateBeforePct}%` : null,
-      ].filter(Boolean).join(' · ');
-      evs.push({
-        id: `system-resolve-summary-${Date.now()}`,
+    setIncidentStatus(prev => {
+      const who = owner || 'Someone';
+      const fromLabel = prev === 'active' ? 'Active' : prev === 'investigating' ? 'Investigating' : 'Resolved';
+      const toLabel   = s   === 'active' ? 'Active' : s   === 'investigating' ? 'Investigating' : 'Resolved';
+      const evs: ActivityEvent[] = [{
+        id: `system-status-${Date.now()}`,
         type: 'system',
-        text: `Resolution summary — ${summary}`,
-        ts: new Date(Date.now() + 100).toISOString(),
-      });
-    }
-    persistActivity([...currentActivity, ...evs]);
-  }, [title, persistActivity, group]);
+        text: `Status: ${fromLabel} → ${toLabel}`,
+        actor: who,
+        ts: new Date().toISOString(),
+      }];
+      // If resolving, auto-post a resolution summary
+      if (s === 'resolved' && group) {
+        const { failureRatePct, totalErrors, totalExecs, firstSeen, rateBeforePct } = group;
+        const durationMin = Math.round(
+          (Date.now() - new Date(firstSeen).getTime()) / 60000
+        );
+        const summary = [
+          `Failure rate: ${failureRatePct}%${totalErrors === 0 ? ' → 0% ✓' : ' (still elevated — monitor)'}`,
+          `Total errors: ${totalErrors} over ${totalExecs} executions`,
+          `Duration: ${durationMin >= 60 ? `${Math.floor(durationMin / 60)}h ${durationMin % 60}m` : `${durationMin}m`}`,
+          rateBeforePct !== null ? `Baseline: ${rateBeforePct}%` : null,
+        ].filter(Boolean).join(' · ');
+        evs.push({
+          id: `system-resolve-summary-${Date.now()}`,
+          type: 'system',
+          text: `Resolution summary — ${summary}`,
+          ts: new Date(Date.now() + 100).toISOString(),
+        });
+      }
+      persistActivity([...currentActivity, ...evs]);
+      return s;
+    });
+    localStorage.setItem(`incident-status:${title}`, s);
+  }, [title, persistActivity, group, owner]);
 
   const assignOwner = useCallback((name: string, currentActivity: ActivityEvent[]) => {
     const trimmed = name.trim();
@@ -418,23 +423,27 @@ export default function IncidentDetailPage({
     localStorage.setItem(`incident-owner:${title}`, trimmed);
     setEditingOwner(false);
     if (!trimmed) return;
+    const who = owner || 'Someone';
     const ev: ActivityEvent = {
       id: `system-owner-${Date.now()}`,
       type: 'system',
-      text: `Assigned to ${trimmed}`,
+      text: `assigned to ${trimmed}`,
+      actor: who,
       ts: new Date().toISOString(),
     };
     persistActivity([...currentActivity, ev]);
-  }, [title, persistActivity]);
+  }, [title, persistActivity, owner]);
 
   const addComment = useCallback((text: string, currentActivity: ActivityEvent[]) => {
     const trimmed = text.trim();
     if (!trimmed) return;
 
     // --- Slash commands ---
-    const slashAssign = trimmed.match(/^\/assign\s+@?(.+)/i);
-    const slashResolve = /^\/resolve\b/i.test(trimmed);
-    const slashNote    = trimmed.match(/^\/note\s+(.+)/i);
+    const slashAssign      = trimmed.match(/^\/assign\s+@?(.+)/i);
+    const slashResolve     = /^\/resolve\b/i.test(trimmed);
+    const slashInvestigate = /^\/invest(igate)?\b/i.test(trimmed);
+    const slashReopen      = /^\/reopen\b/i.test(trimmed);
+    const slashNote        = trimmed.match(/^\/note\s+(.+)/i);
 
     if (slashAssign) {
       const assignee = slashAssign[1].trim();
@@ -447,12 +456,23 @@ export default function IncidentDetailPage({
       setCommentDraft('');
       return;
     }
+    if (slashInvestigate) {
+      updateStatus('investigating', currentActivity);
+      setCommentDraft('');
+      return;
+    }
+    if (slashReopen) {
+      updateStatus('active', currentActivity);
+      setCommentDraft('');
+      return;
+    }
     if (slashNote) {
       const noteText = slashNote[1].trim();
       const ev: ActivityEvent = {
         id: `note-${Date.now()}`,
         type: 'system',
-        text: `📌 Note: ${noteText}`,
+        text: `noted: ${noteText}`,
+        actor: owner || 'You',
         ts: new Date().toISOString(),
       };
       persistActivity([...currentActivity, ev]);
@@ -460,33 +480,36 @@ export default function IncidentDetailPage({
       return;
     }
 
-    // --- Regular comment + AI reply ---
+    // --- Regular comment — AI reply only when it's a question ---
     const commentEv: ActivityEvent = {
       id: `comment-${Date.now()}`,
       type: 'comment',
       text: trimmed,
-      author: owner || 'You',
+      actor: owner || 'You',
       ts: new Date().toISOString(),
     };
-    // Generate AI reply inline
-    const aiText = generateAiReply(
-      trimmed,
-      group?.cls ?? '',
-      group?.deployMode ?? null,
-      group?.deployId ?? null,
-      title,
-      group?.rateBeforePct ?? null,
-      group?.rateAfterPct ?? null,
-      group?.affectedFns ?? [],
-    );
-    const aiEv: ActivityEvent = {
-      id: `ai-${Date.now() + 1}`,
-      type: 'ai',
-      text: aiText,
-      author: 'Flux AI',
-      ts: new Date(Date.now() + 500).toISOString(),
-    };
-    persistActivity([...currentActivity, commentEv, aiEv]);
+    const isQuestion = /\?|^why|^how|^what|^when|^explain|^is |^does /i.test(trimmed);
+    if (isQuestion) {
+      const aiText = generateAiReply(
+        trimmed,
+        group?.cls ?? '',
+        group?.deployMode ?? null,
+        group?.deployId ?? null,
+        title,
+        group?.rateBeforePct ?? null,
+        group?.rateAfterPct ?? null,
+        group?.affectedFns ?? [],
+      );
+      const aiEv: ActivityEvent = {
+        id: `ai-${Date.now() + 1}`,
+        type: 'ai',
+        text: aiText,
+        ts: new Date(Date.now() + 500).toISOString(),
+      };
+      persistActivity([...currentActivity, commentEv, aiEv]);
+    } else {
+      persistActivity([...currentActivity, commentEv]);
+    }
     setCommentDraft('');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [owner, persistActivity, group, title, assignOwner, updateStatus]);
@@ -504,11 +527,12 @@ export default function IncidentDetailPage({
     const ev: ActivityEvent = {
       id: `pin-${Date.now()}`,
       type: 'system',
-      text: `📌 ${text}`,
+      text: `pinned: ${text}`,
+      actor: owner || undefined,
       ts: new Date().toISOString(),
     };
     persistActivity([...currentActivity, ev]);
-  }, [persistActivity]);
+  }, [persistActivity, owner]);
 
   useEffect(() => {
     if (!api.ready) return;
@@ -1083,7 +1107,7 @@ export default function IncidentDetailPage({
                 </div>
                 <button
                   onClick={() => {
-                    pinToTimeline(`Reproduction started — tracing execution ${executions[0].id.slice(0, 8)}`, activity);
+                    pinToTimeline(`started reproduction — tracing execution ${executions[0].id.slice(0, 8)}`, activity);
                     router.push(`/project/${id}/executions/${executions[0].id}`);
                   }}
                   className="flex items-center gap-1.5 text-[9px] font-black text-neutral-400 hover:text-white border border-neutral-800 hover:border-neutral-600 rounded-lg px-3 py-1.5 transition-all shrink-0"
@@ -1281,63 +1305,152 @@ export default function IncidentDetailPage({
 
       {/* Activity & Comments — full width collaboration layer */}
       <div className="rounded-xl border border-neutral-800/60 bg-neutral-950/60 overflow-hidden">
+        {/* Header */}
         <div className="px-4 py-2.5 border-b border-neutral-800/40 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <MessageSquare className="w-3 h-3 text-neutral-500" />
             <span className="text-[9px] font-black uppercase tracking-widest text-neutral-500">Activity</span>
           </div>
-          <span className="text-[8px] text-neutral-700 font-mono">{activity.length} event{activity.length !== 1 ? 's' : ''}</span>
+          <div className="flex items-center gap-3">
+            {/* Legend */}
+            <div className="hidden sm:flex items-center gap-2.5">
+              <span className="flex items-center gap-1 text-[8px] text-neutral-700 font-mono">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500/60 inline-block" />System
+              </span>
+              <span className="flex items-center gap-1 text-[8px] text-neutral-700 font-mono">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/60 inline-block" />Human
+              </span>
+              <span className="flex items-center gap-1 text-[8px] text-neutral-700 font-mono">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-500/60 inline-block" />AI
+              </span>
+            </div>
+            <span className="text-[8px] text-neutral-700 font-mono">{activity.length} event{activity.length !== 1 ? 's' : ''}</span>
+          </div>
         </div>
 
         {/* Timeline */}
-        <div className="px-4 pt-3 pb-1 space-y-0">
+        <div className="px-4 pt-4 pb-2 space-y-0">
           {activity.length === 0 && (
-            <p className="text-[10px] text-neutral-700 font-mono py-2">No activity yet.</p>
-          )}
-          {[...activity].reverse().map((event, idx, arr) => (
-            <div key={event.id} className="flex gap-3 relative">
-              {/* connector line */}
-              {idx < arr.length - 1 && (
-                <div className="absolute left-[11px] top-5 bottom-0 w-px bg-neutral-800/60" />
-              )}
-              {/* dot */}
-              <div className={`mt-1 shrink-0 w-[22px] h-[22px] rounded-full border flex items-center justify-center z-10 ${
-                event.type === 'comment'
-                  ? 'bg-neutral-800 border-neutral-700'
-                  : event.type === 'ai'
-                  ? 'bg-cyan-950/60 border-cyan-900/50'
-                  : 'bg-neutral-900 border-neutral-800'
-              }`}>
-                {event.type === 'comment' ? (
-                  <User className="w-2.5 h-2.5 text-neutral-500" />
-                ) : event.type === 'ai' ? (
-                  <Bot className="w-2.5 h-2.5 text-cyan-500" />
-                ) : (
-                  <Clock className="w-2.5 h-2.5 text-neutral-600" />
-                )}
+            <div className="py-6 flex flex-col items-center gap-3 text-center">
+              <div className="w-8 h-8 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center">
+                <MessageSquare className="w-3.5 h-3.5 text-neutral-600" />
               </div>
-              <div className={`flex-1 pb-4 min-w-0 ${event.type === 'ai' ? 'bg-cyan-950/10 border border-cyan-900/20 rounded-lg px-3 py-2 -ml-1' : ''}`}>
-                <div className="flex items-baseline gap-2 flex-wrap">
-                  {event.type === 'comment' && event.author && (
-                    <span className="text-[10px] font-black text-neutral-300">{event.author}</span>
-                  )}
-                  {event.type === 'ai' && (
-                    <span className="text-[10px] font-black text-cyan-400">Flux AI</span>
-                  )}
-                  <span className={`text-[10px] font-mono ${
-                    event.type === 'system' ? 'text-neutral-500'
-                    : event.type === 'ai' ? 'text-neutral-300'
-                    : 'text-neutral-300'
-                  }`}>{event.text}</span>
-                  <span className="text-[9px] text-neutral-700 font-mono shrink-0">{formatTs(event.ts)}</span>
-                </div>
+              <div>
+                <p className="text-[10px] font-black text-neutral-500">No activity yet</p>
+                <p className="text-[9px] text-neutral-700 font-mono mt-1 leading-relaxed">
+                  Start by assigning an owner or adding a note.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap justify-center">
+                <button
+                  onClick={() => setEditingOwner(true)}
+                  className="text-[9px] font-black text-neutral-500 hover:text-white border border-neutral-800 hover:border-neutral-600 rounded-lg px-2.5 py-1 transition-all"
+                >
+                  Assign owner
+                </button>
               </div>
             </div>
-          ))}
+          )}
+          {[...activity].reverse().map((event, idx, arr) => {
+            // is this a human-attributed system event?
+            const isHumanAction = event.type === 'system' && !!event.actor;
+            const isSystemAuto  = event.type === 'system' && !event.actor;
+            const isComment     = event.type === 'comment';
+            const isAi          = event.type === 'ai';
+            const actorInitial  = (event.actor ?? '?')[0].toUpperCase();
+
+            return (
+              <div key={event.id} className="flex gap-3 relative">
+                {/* connector line */}
+                {idx < arr.length - 1 && (
+                  <div className="absolute left-[11px] top-6 bottom-0 w-px bg-neutral-800/50" />
+                )}
+                {/* avatar / dot */}
+                {(isHumanAction || isComment) ? (
+                  <div className={`mt-0.5 shrink-0 w-[22px] h-[22px] rounded-full flex items-center justify-center z-10 text-[8px] font-black ${
+                    isComment
+                      ? 'bg-emerald-950/60 border border-emerald-800/60 text-emerald-300'
+                      : 'bg-emerald-950/40 border border-emerald-900/50 text-emerald-400'
+                  }`}>
+                    {actorInitial}
+                  </div>
+                ) : isAi ? (
+                  <div className="mt-0.5 shrink-0 w-[22px] h-[22px] rounded-full bg-cyan-950/60 border border-cyan-900/50 flex items-center justify-center z-10">
+                    <Bot className="w-2.5 h-2.5 text-cyan-400" />
+                  </div>
+                ) : (
+                  <div className="mt-0.5 shrink-0 w-[22px] h-[22px] rounded-full bg-blue-950/30 border border-blue-900/40 flex items-center justify-center z-10">
+                    <Clock className="w-2.5 h-2.5 text-blue-500/70" />
+                  </div>
+                )}
+
+                {/* content */}
+                <div className={`flex-1 pb-4 min-w-0 ${isAi ? 'bg-cyan-950/10 border border-cyan-900/20 rounded-lg px-3 py-2 -ml-1 mb-3' : ''}`}>
+                  <div className="flex items-baseline gap-1.5 flex-wrap">
+                    {/* actor name */}
+                    {(isHumanAction || isComment) && event.actor && (
+                      <span className={`text-[10px] font-black ${isComment ? 'text-emerald-300' : 'text-neutral-300'}`}>
+                        {event.actor}
+                      </span>
+                    )}
+                    {isAi && (
+                      <span className="text-[10px] font-black text-cyan-400">Flux AI</span>
+                    )}
+                    {/* event text */}
+                    <span className={`text-[10px] font-mono leading-relaxed ${
+                      isSystemAuto  ? 'text-blue-400/70'
+                      : isHumanAction ? 'text-neutral-400'
+                      : isAi          ? 'text-neutral-300'
+                      : 'text-neutral-300'
+                    }`}>{event.text}</span>
+                    {/* timestamp */}
+                    <span className="text-[9px] text-neutral-700 font-mono shrink-0 ml-auto">{formatTs(event.ts)}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
-        {/* Comment input */}
-        <div className="px-4 pb-4 pt-1 border-t border-neutral-800/40 mt-2">
+        {/* Comment input + quick actions */}
+        <div className="px-4 pb-4 pt-2 border-t border-neutral-800/40 space-y-2">
+          {/* Quick action buttons — always visible */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[8px] font-black uppercase tracking-widest text-neutral-700 mr-1">Actions</span>
+            {incidentStatus !== 'investigating' && (
+              <button
+                onClick={() => updateStatus('investigating', activity)}
+                className="text-[9px] font-black text-amber-400 hover:text-amber-300 border border-amber-900/50 hover:border-amber-700 rounded-md px-2.5 py-1 transition-all"
+              >
+                Mark investigating
+              </button>
+            )}
+            {incidentStatus === 'investigating' && (
+              <button
+                onClick={() => updateStatus('resolved', activity)}
+                className="text-[9px] font-black text-emerald-400 hover:text-emerald-300 border border-emerald-900/50 hover:border-emerald-700 rounded-md px-2.5 py-1 transition-all"
+              >
+                Mark resolved
+              </button>
+            )}
+            {incidentStatus === 'resolved' && (
+              <button
+                onClick={() => updateStatus('active', activity)}
+                className="text-[9px] font-black text-neutral-400 hover:text-white border border-neutral-800 hover:border-neutral-600 rounded-md px-2.5 py-1 transition-all"
+              >
+                Reopen
+              </button>
+            )}
+            {!owner && (
+              <button
+                onClick={() => setEditingOwner(true)}
+                className="text-[9px] font-black text-neutral-500 hover:text-white border border-neutral-800 hover:border-neutral-600 rounded-md px-2.5 py-1 transition-all"
+              >
+                Assign owner
+              </button>
+            )}
+          </div>
+          {/* Comment box */}
           <div className="flex gap-2 items-end">
             <div className="flex-1">
               <textarea
@@ -1349,15 +1462,15 @@ export default function IncidentDetailPage({
                     addComment(commentDraft, activity);
                   }
                 }}
-                placeholder={`Add a comment${owner ? ` as ${owner}` : ''}… (Enter to send, /assign @user, /resolve, /note ...)`}
-                rows={2}
+                placeholder={`Comment${owner ? ` as ${owner}` : ''}… or /assign @user · /investigate · /resolve · /note ...`}
+                rows={1}
                 className="w-full text-[10px] font-mono bg-neutral-900/60 border border-neutral-800 hover:border-neutral-700 focus:border-neutral-600 rounded-lg px-3 py-2 text-neutral-300 placeholder-neutral-700 outline-none transition-colors resize-none"
               />
             </div>
             <button
               onClick={() => addComment(commentDraft, activity)}
               disabled={!commentDraft.trim()}
-              className="shrink-0 text-[9px] font-black text-neutral-400 hover:text-white disabled:text-neutral-700 disabled:cursor-not-allowed border border-neutral-800 hover:border-neutral-600 disabled:border-neutral-800/40 rounded-lg px-3 py-2 transition-all mb-[1px]"
+              className="shrink-0 text-[9px] font-black text-neutral-400 hover:text-white disabled:text-neutral-700 disabled:cursor-not-allowed border border-neutral-800 hover:border-neutral-600 disabled:border-neutral-800/40 rounded-lg px-3 py-2 transition-all"
             >
               Send
             </button>
