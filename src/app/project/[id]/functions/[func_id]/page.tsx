@@ -297,6 +297,31 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
   const latestFailPaths = (latestSlice?.execs ?? []).filter(e => e.status !== 'ok').map(e => e.path);
   const pathCounts = latestFailPaths.reduce<Record<string, number>>((acc, p) => { acc[p] = (acc[p] ?? 0) + 1; return acc; }, {});
   const topFailPath = Object.entries(pathCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  // Map artifact_id → version metadata for version-aware cluster display
+  const deployVersionMap = deploymentList.reduce<Record<string, { label: string; isCurrent: boolean; isPrev: boolean; createdAt: string }>>((acc, dep, i) => {
+    if (dep.artifact_id) {
+      acc[dep.artifact_id] = { label: `v${deploymentList.length - i}`, isCurrent: i === 0, isPrev: i === 1, createdAt: dep.created_at };
+    }
+    return acc;
+  }, {});
+  // Resolve version for an issue: try direct sha match, then fall back to time window
+  const resolveIssueVersion = (issue: { code_sha?: string | null; first_seen?: string | null }) => {
+    if (issue.code_sha && deployVersionMap[issue.code_sha]) return deployVersionMap[issue.code_sha];
+    if (!issue.first_seen || deploymentList.length === 0) return null;
+    const t = new Date(issue.first_seen).getTime();
+    for (let i = 0; i < deploymentList.length; i++) {
+      const dep = deploymentList[i];
+      const depAt = new Date(dep.created_at).getTime();
+      // deploymentList is newest-first; next boundary is the previous entry
+      const nextAt = i > 0 ? new Date(deploymentList[i - 1].created_at).getTime() : Infinity;
+      if (t >= depAt && t < nextAt) {
+        return { label: `v${deploymentList.length - i}`, isCurrent: i === 0, isPrev: i === 1, createdAt: dep.created_at };
+      }
+    }
+    // issue predates all deployments — assign to oldest
+    const oldest = deploymentList[deploymentList.length - 1];
+    return oldest ? { label: `v1`, isCurrent: false, isPrev: deploymentList.length === 2, createdAt: oldest.created_at } : null;
+  };
 
   const st = statsData?.stats;
   const stats = [
@@ -525,12 +550,44 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                        const totalFails = clusters.reduce((s, c) => s + c.totalHits, 0);
                        const hasUserErrors = clusters.some(c => c.cls === 'user');
                        const topCluster = clusters[0];
+                       const clusterDomShas = clusters.map(c => c.issues.slice().sort((a, b) => b.count - a.count)[0]?.code_sha ?? null);
+                       const uniqueDeployShas = new Set(clusterDomShas.filter(Boolean));
+                       const isCrossVersion = uniqueDeployShas.size > 1;
 
                        return (
                          <div className="space-y-3">
-                           <div className="flex items-center gap-2">
+                           {/* Current version status strip */}
+                           {(() => {
+                             const currentLabel = deployVersionMap[latestDeployment?.artifact_id ?? '']?.label ?? (deploymentList.length > 0 ? `v${deploymentList.length}` : null);
+                             if (!currentLabel) return null;
+                             const currentCluster = clusters.find(c => {
+                               const domIssue = c.issues.slice().sort((a, b) => b.count - a.count)[0];
+                               const ver = domIssue ? resolveIssueVersion(domIssue) : null;
+                               return ver?.isCurrent;
+                             });
+                             return (
+                               <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-[10px] font-mono ${
+                                 currentCluster
+                                   ? 'bg-red-950/20 border-red-900/40 text-red-400/80'
+                                   : 'bg-emerald-950/20 border-emerald-900/40 text-emerald-500/70'
+                               }`}>
+                                 <span className="font-black uppercase tracking-wider">{currentLabel}</span>
+                                 <span className="text-neutral-700">· current deploy</span>
+                                 {currentCluster ? (
+                                   <span className="ml-auto flex items-center gap-1">
+                                     <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+                                     {ERROR_CLASS_META[currentCluster.cls].icon} {ERROR_CLASS_META[currentCluster.cls].label.toLowerCase()} still active
+                                   </span>
+                                 ) : (
+                                   <span className="ml-auto">✓ no failures detected</span>
+                                 )}
+                               </div>
+                             );
+                           })()}
+                           <div className="flex items-center gap-2 flex-wrap">
                              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500">
                                {clusters.length} independent failure mode{clusters.length > 1 ? 's' : ''} detected
+                               {isCrossVersion && <span className="normal-case font-semibold text-neutral-700"> · across {uniqueDeployShas.size} deployments</span>}
                              </span>
                              {clusters.length > 1 && (
                                <span className="text-[9px] font-bold text-neutral-700 border border-neutral-800 px-1.5 py-0.5 rounded">
@@ -558,6 +615,53 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                    </span>
                                  </div>
                                  <div className="text-[10px] text-neutral-600 mb-2 italic">{meta.description}</div>
+                                 {(() => {
+                                   const domIssue = cluster.issues.slice().sort((a, b) => b.count - a.count)[0];
+                                   const ver = domIssue ? resolveIssueVersion(domIssue) : null;
+                                   if (!ver && deploymentList.length === 0) return null;
+                                   const deployLabel = ver?.isCurrent ? 'current deploy'
+                                     : ver?.isPrev ? 'previous deploy' : 'older deploy';
+                                   return (
+                                     <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+                                       <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border ${
+                                         ver?.isCurrent ? 'text-emerald-400 border-emerald-900/50 bg-emerald-950/20'
+                                         : ver?.isPrev ? 'text-neutral-400 border-neutral-700 bg-neutral-900/40'
+                                         : 'text-neutral-600 border-neutral-800 bg-neutral-900/20'
+                                       }`}>
+                                         {ver ? ver.label : (domIssue?.code_sha?.slice(0, 7) ?? '?')}
+                                       </span>
+                                       <span className={`text-[9px] font-bold ${
+                                         ver?.isCurrent ? 'text-emerald-500/60' : 'text-neutral-700'
+                                       }`}>
+                                         {deployLabel}
+                                       </span>
+                                       {ver?.createdAt && (
+                                         <span className="text-[9px] font-mono text-neutral-700">
+                                           · {timeAgo(ver.createdAt)}
+                                         </span>
+                                       )}
+                                     </div>
+                                   );
+                                 })()}
+                                 {/* Regression intro line */}
+                                 {(() => {
+                                   const domIssue = cluster.issues.slice().sort((a, b) => b.count - a.count)[0];
+                                   const ver = domIssue ? resolveIssueVersion(domIssue) : null;
+                                   const firstSeen = cluster.issues.reduce<string | null>((earliest, iss) => {
+                                     if (!iss.first_seen) return earliest;
+                                     return !earliest || iss.first_seen < earliest ? iss.first_seen : earliest;
+                                   }, null);
+                                   if (!ver || !firstSeen) return null;
+                                   return (
+                                     <div className={`font-mono text-[9px] flex items-center gap-1.5 ${
+                                       ver.isCurrent ? 'text-red-500/60' : 'text-neutral-700'
+                                     }`}>
+                                       <span>introduced</span>
+                                       <span className="font-bold">{ver.label}</span>
+                                       <span>· {timeAgo(firstSeen)}</span>
+                                     </div>
+                                   );
+                                 })()}
                                  {cluster.issues.map((iss, ii) => {
                                    const issFrame = topUserFrame(iss.sample_stack);
                                    const issLoc = frameLabel(issFrame);
@@ -610,16 +714,29 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                  {(() => {
                                    const te = Number(st?.total_execs ?? 0);
                                    if (te <= 0) return null;
+                                   const domIssue = cluster.issues.slice().sort((a, b) => b.count - a.count)[0];
+                                   const ver = domIssue ? resolveIssueVersion(domIssue) : null;
+                                   const isHistorical = ver ? !ver.isCurrent : !!(domIssue?.code_sha && latestDeployment?.artifact_id && domIssue.code_sha !== latestDeployment.artifact_id);
+                                   if (isHistorical) {
+                                     return (
+                                       <div className="mt-2 pt-2 border-t border-neutral-800/40 font-mono text-[9px] flex items-center gap-1.5">
+                                         <span className="text-emerald-600/60">✓ resolved</span>
+                                         <span className="text-neutral-700">— not present in current deploy</span>
+                                       </div>
+                                     );
+                                   }
                                    const currentRate = Math.round((totalFails / te) * 100);
                                    const afterRate = Math.round(Math.max(0, (totalFails - cluster.totalHits) / te) * 100);
                                    if (currentRate === afterRate || currentRate === 0) return null;
                                    return (
-                                     <div className="mt-2 pt-2 border-t border-neutral-800/40 font-mono text-[9px] flex items-center gap-1.5 flex-wrap">
-                                       <span className="text-emerald-500/60">↓ fix this:</span>
-                                       <span className="text-neutral-600">failure rate</span>
-                                       <span className="text-neutral-500 font-bold">{currentRate}%</span>
-                                       <span className="text-neutral-700">→</span>
-                                       <span className="text-emerald-500 font-bold">{afterRate}%</span>
+                                     <div className="mt-2 pt-2 border-t border-neutral-800/40 font-mono text-[9px] space-y-0.5">
+                                       <div className="flex items-center gap-1.5 flex-wrap">
+                                         <span className="text-emerald-500/60">↓ fix this now:</span>
+                                         <span className="text-neutral-600">failure rate</span>
+                                         <span className="text-neutral-500 font-bold">{currentRate}%</span>
+                                         <span className="text-neutral-700">→</span>
+                                         <span className="text-emerald-500 font-bold">{afterRate}%</span>
+                                       </div>
                                      </div>
                                    );
                                  })()}
@@ -1014,13 +1131,17 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
               const totalFails = clusters.reduce((s, c) => s + c.totalHits, 0);
               const hasUserErrors = clusters.some(c => c.cls === 'user');
               const topCluster = clusters[0];
+              const tiClusterDomShas = clusters.map(c => c.issues.slice().sort((a, b) => b.count - a.count)[0]?.code_sha ?? null);
+              const tiUniqueDeployShas = new Set(tiClusterDomShas.filter(Boolean));
+              const tiIsCrossVersion = tiUniqueDeployShas.size > 1;
 
               return (
                 <div className="space-y-3">
                   {/* Section header */}
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <span className="text-[10px] font-black uppercase tracking-[0.18em] text-neutral-600">
                       {clusters.length} independent failure mode{clusters.length > 1 ? 's' : ''} detected
+                      {tiIsCrossVersion && <span className="normal-case font-semibold text-neutral-700"> · across {tiUniqueDeployShas.size} deployments</span>}
                     </span>
                     {clusters.length > 1 && (
                       <span className="text-[9px] font-bold text-neutral-700 border border-neutral-800 px-1.5 py-0.5 rounded">⚠ Independent failures (no shared root cause)</span>
@@ -1045,6 +1166,20 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                           <span className="text-[9px] text-neutral-600 ml-auto">
                             {cluster.totalHits} hit{cluster.totalHits > 1 ? 's' : ''} · {pct}%
                           </span>
+                          {(() => {
+                            const sha = cluster.issues.slice().sort((a, b) => b.count - a.count)[0]?.code_sha;
+                            const domIssue = cluster.issues.slice().sort((a, b) => b.count - a.count)[0];
+                            const ver = domIssue ? resolveIssueVersion(domIssue) : null;
+                            if (!ver && deploymentList.length === 0) return null;
+                            return (
+                              <span className={`text-[9px] font-mono font-bold px-1 py-0.5 rounded border ${
+                                ver?.isCurrent ? 'text-emerald-500/70 border-emerald-900/50'
+                                : 'text-neutral-600 border-neutral-800'
+                              }`}>
+                                {ver ? ver.label : (sha?.slice(0, 7) ?? '?')}{!ver?.isCurrent && <span className="text-neutral-700 ml-1">hist</span>}
+                              </span>
+                            );
+                          })()}
                         </div>
                         {/* Issues in this cluster */}
                         {cluster.issues.map((issue, i) => {
