@@ -321,6 +321,21 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
     return oldest ? { label: oldest.artifact_id?.slice(0, 7) ?? oldest.artifact_id, isCurrent: false, isPrev: deploymentList.length === 2, createdAt: oldest.created_at } : null;
   };
 
+  // Verification thresholds: how many executions in the current deploy before we trust "not seen"
+  const VERIFIED_EXEC_MIN = 20;
+  const VERIFIED_EXEC_HIGH = 50;
+  type VerifyState = 'active' | 'unverified' | 'verified_resolved';
+  const verifyClusterState = (cluster: ReturnType<typeof buildFailureClusters>[number]): { state: VerifyState; confidence: 'high' | 'medium' | 'low'; execCount: number } => {
+    const domIssue = cluster.issues.slice().sort((a, b) => b.count - a.count)[0];
+    const ver = domIssue ? resolveIssueVersion(domIssue) : null;
+    const execCount = latestSlice?.total ?? 0;
+    if (!ver || ver.isCurrent) return { state: 'active', confidence: 'high', execCount };
+    // Historical — check if current deploy has enough traffic to trust absence
+    if (execCount >= VERIFIED_EXEC_HIGH) return { state: 'verified_resolved', confidence: 'high', execCount };
+    if (execCount >= VERIFIED_EXEC_MIN) return { state: 'verified_resolved', confidence: 'medium', execCount };
+    return { state: 'unverified', confidence: 'low', execCount };
+  };
+
   const st = statsData?.stats;
   const stats = [
     { name: "Executions", value: st?.total_execs || 0, icon: Activity as LucideIcon },
@@ -478,28 +493,35 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
 
       {statsData?.root_cause && (() => {
         const _clusters = buildFailureClusters(statsData.top_issues ?? []);
-        const isFullyResolved = _clusters.length > 0 && latestDeployment?.artifact_id != null && _clusters.every(c => {
-          const domIssue = c.issues.slice().sort((a, b) => b.count - a.count)[0];
-          const ver = domIssue ? resolveIssueVersion(domIssue) : null;
-          return ver != null && !ver.isCurrent;
-        });
+        // Compute verification state per cluster
+        const _clusterVerify = _clusters.map(c => verifyClusterState(c));
+        const allHistorical = _clusters.length > 0 && latestDeployment?.artifact_id != null && _clusterVerify.every(v => v.state !== 'active');
+        const allVerified = allHistorical && _clusterVerify.every(v => v.state === 'verified_resolved');
+        // Panel colour: red = active, amber = unverified, neutral = verified resolved
+        const panelTheme = !allHistorical ? 'red' : allVerified ? 'green' : 'amber';
         return (
         <div className={`rounded-xl overflow-hidden shadow-2xl border ${
-          isFullyResolved
-            ? 'bg-gradient-to-br from-neutral-950 to-black border-neutral-800'
-            : 'bg-gradient-to-br from-red-950/40 to-black border-red-900/50'
+          panelTheme === 'green' ? 'bg-gradient-to-br from-neutral-950 to-black border-neutral-800'
+          : panelTheme === 'amber' ? 'bg-gradient-to-br from-amber-950/20 to-black border-amber-900/40'
+          : 'bg-gradient-to-br from-red-950/40 to-black border-red-900/50'
         }`}>
           {/* Collapsed headline — always visible */}
           <button
             onClick={() => setAnomalyExpanded(v => !v)}
             className={`w-full flex items-center justify-between gap-4 px-6 py-4 transition-colors text-left group ${
-              isFullyResolved ? 'hover:bg-neutral-900/40' : 'hover:bg-red-950/20'
+              panelTheme === 'green' ? 'hover:bg-neutral-900/40'
+              : panelTheme === 'amber' ? 'hover:bg-amber-950/20'
+              : 'hover:bg-red-950/20'
             }`}
           >
             <div className="flex items-center gap-3 min-w-0">
-              {isFullyResolved ? (
+              {panelTheme === 'green' ? (
                 <span className="bg-emerald-900/60 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1.5 uppercase tracking-wider border border-emerald-800/50 shrink-0">
-                  ✓ Past anomaly
+                  ✓ Verified Fixed
+                </span>
+              ) : panelTheme === 'amber' ? (
+                <span className="bg-amber-900/40 text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1.5 uppercase tracking-wider border border-amber-800/50 shrink-0">
+                  ○ Unverified
                 </span>
               ) : (
                 <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1.5 uppercase tracking-wider shadow-[0_0_10px_theme(colors.red.500/50)] animate-pulse shrink-0">
@@ -512,7 +534,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                 const clusters = _clusters;
                 const top = clusters[0];
                 if (!top) {
-                  return <span className={`text-base font-bold font-mono truncate ${isFullyResolved ? 'text-neutral-400' : 'text-red-100'}`}>{activeIssue}</span>;
+                  return <span className={`text-base font-bold font-mono truncate ${panelTheme !== 'red' ? 'text-neutral-400' : 'text-red-100'}`}>{activeIssue}</span>;
                 }
                 const topMeta = ERROR_CLASS_META[top.cls];
                 const topLabel = compactIssueLabel(top.issues[0].title, top.issues[0].error_source);
@@ -523,16 +545,16 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                 return (
                   <>
                     <span className={`text-[10px] font-black uppercase tracking-wider shrink-0 ${
-                      isFullyResolved ? 'text-neutral-600' : topMeta.color
+                      panelTheme !== 'red' ? 'text-neutral-600' : topMeta.color
                     }`}>
                       {topMeta.label}
                     </span>
                     <span className={`text-sm font-bold font-mono truncate ${
-                      isFullyResolved ? 'text-neutral-400 line-through decoration-neutral-700' : 'text-red-100'
+                      panelTheme !== 'red' ? 'text-neutral-400 line-through decoration-neutral-700' : 'text-red-100'
                     }`}>
                       {topLabel}
-                      {errorPct && !isFullyResolved && <span className="text-red-400/70 font-normal"> · affecting {errorPct}</span>}
-                      {errorPct && isFullyResolved && <span className="text-neutral-600 font-normal no-underline"> · previously affected {errorPct}</span>}
+                      {errorPct && panelTheme === 'red' && <span className="text-red-400/70 font-normal"> · affecting {errorPct}</span>}
+                      {errorPct && panelTheme !== 'red' && <span className="text-neutral-600 font-normal no-underline"> · previously affected {errorPct}</span>}
                     </span>
                     {clusters.length > 1 && (
                       <span className="text-[9px] font-bold text-neutral-600 shrink-0 border border-neutral-800 px-1.5 py-0.5 rounded">
@@ -544,12 +566,12 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
               })()}
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              {statsData.root_cause.impact && !isFullyResolved && (
+              {statsData.root_cause.impact && panelTheme === 'red' && (
                 <span className="text-[10px] font-mono text-red-400">{statsData.root_cause.impact}</span>
               )}
               {anomalyExpanded
-                ? <ChevronUp className={`w-4 h-4 ${isFullyResolved ? 'text-neutral-500' : 'text-red-400'}`} />
-                : <ChevronDown className={`w-4 h-4 text-neutral-600 group-hover:${isFullyResolved ? 'text-neutral-400' : 'text-red-400'} transition-colors`} />}
+                ? <ChevronUp className={`w-4 h-4 ${panelTheme === 'red' ? 'text-red-400' : panelTheme === 'amber' ? 'text-amber-500' : 'text-neutral-500'}`} />
+                : <ChevronDown className={`w-4 h-4 text-neutral-600 transition-colors ${panelTheme === 'red' ? 'group-hover:text-red-400' : panelTheme === 'amber' ? 'group-hover:text-amber-400' : 'group-hover:text-neutral-400'}`} />}
             </div>
           </button>
 
@@ -557,8 +579,10 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
           {anomalyExpanded && (
             <div className="px-6 pb-8 pt-2 relative overflow-hidden">
                <div className={`absolute top-0 left-0 w-1 h-full ${
-                 isFullyResolved
+                 panelTheme === 'green'
                    ? 'bg-emerald-700 shadow-[0_0_12px_theme(colors.emerald.700)]'
+                   : panelTheme === 'amber'
+                   ? 'bg-amber-600 shadow-[0_0_12px_theme(colors.amber.600)]'
                    : 'bg-red-500 shadow-[0_0_20px_theme(colors.red.500)]'
                }`} />
                <div className="relative z-10 flex flex-col xl:flex-row gap-8 items-start justify-between">
@@ -572,6 +596,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                      {/* Failure Patterns — independent, one card per error class, no causal arrows */}
                      {(() => {
                        const clusters = _clusters;
+                       const clusterVerify = _clusterVerify;
                        if (clusters.length === 0) return null;
                        const totalFails = clusters.reduce((s, c) => s + c.totalHits, 0);
                        const hasUserErrors = clusters.some(c => c.cls === 'user');
@@ -586,11 +611,8 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                            {(() => {
                              const currentLabel = deployVersionMap[latestDeployment?.artifact_id ?? '']?.label ?? latestDeployment?.artifact_id?.slice(0, 7) ?? null;
                              if (!currentLabel) return null;
-                             const currentCluster = clusters.find(c => {
-                               const domIssue = c.issues.slice().sort((a, b) => b.count - a.count)[0];
-                               const ver = domIssue ? resolveIssueVersion(domIssue) : null;
-                               return ver?.isCurrent;
-                             });
+                             const currentCluster = clusters.find((c, ci) => _clusterVerify[ci]?.state === 'active');
+                             const unverifiedCount = _clusterVerify.filter(v => v.state === 'unverified').length;
                              return (
                                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-[10px] font-mono ${
                                  currentCluster
@@ -604,6 +626,8 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                      <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
                                      {ERROR_CLASS_META[currentCluster.cls].icon} {ERROR_CLASS_META[currentCluster.cls].label.toLowerCase()} still active
                                    </span>
+                                 ) : unverifiedCount > 0 ? (
+                                   <span className="ml-auto text-amber-500/70">○ {unverifiedCount} unverified — awaiting traffic</span>
                                  ) : (
                                    <span className="ml-auto">✓ no failures detected</span>
                                  )}
@@ -625,6 +649,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                              const meta = ERROR_CLASS_META[cluster.cls];
                              const pct = totalFails > 0 ? Math.round((cluster.totalHits / totalFails) * 100) : 0;
                              const isMostImpactful = ci === 0 && clusters.length > 1;
+                             const verify = clusterVerify[ci];
                              return (
                                <div key={cluster.cls} className={`rounded-lg border px-4 py-3 ${meta.bg} ${meta.border}`}>
                                  <div className="flex items-center gap-2 mb-2">
@@ -736,21 +761,39 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                      → thrown or unhandled in user code
                                    </div>
                                  )}
-                                 {/* Fix impact preview */}
+                                 {/* Fix impact / verification state */}
                                  {(() => {
                                    const te = Number(st?.total_execs ?? 0);
                                    if (te <= 0) return null;
-                                   const domIssue = cluster.issues.slice().sort((a, b) => b.count - a.count)[0];
-                                   const ver = domIssue ? resolveIssueVersion(domIssue) : null;
-                                   const isHistorical = ver ? !ver.isCurrent : !!(domIssue?.code_sha && latestDeployment?.artifact_id && domIssue.code_sha !== latestDeployment.artifact_id);
-                                   if (isHistorical) {
+                                   if (verify.state === 'verified_resolved') {
                                      return (
-                                       <div className="mt-2 pt-2 border-t border-neutral-800/40 font-mono text-[9px] flex items-center gap-1.5">
-                                         <span className="text-emerald-600/60">✓ resolved</span>
-                                         <span className="text-neutral-700">— not present in current deploy</span>
+                                       <div className="mt-2 pt-2 border-t border-neutral-800/40 font-mono text-[9px] space-y-0.5">
+                                         <div className="flex items-center gap-1.5 flex-wrap">
+                                           <span className={`font-bold ${
+                                             verify.confidence === 'high' ? 'text-emerald-500' : 'text-emerald-600/70'
+                                           }`}>✓ Verified fixed</span>
+                                           <span className={`px-1 py-px rounded border ${
+                                             verify.confidence === 'high' ? 'text-emerald-600 border-emerald-900/60 bg-emerald-950/20'
+                                             : 'text-neutral-600 border-neutral-800 bg-neutral-900/20'
+                                           }`}>{verify.confidence} confidence</span>
+                                           <span className="text-neutral-700">· {verify.execCount} exec{verify.execCount !== 1 ? 's' : ''} in current deploy</span>
+                                         </div>
                                        </div>
                                      );
                                    }
+                                   if (verify.state === 'unverified') {
+                                     return (
+                                       <div className="mt-2 pt-2 border-t border-amber-900/30 font-mono text-[9px] space-y-0.5">
+                                         <div className="flex items-center gap-1.5 flex-wrap">
+                                           <span className="text-amber-500/80 font-bold">○ Unverified</span>
+                                           <span className="text-neutral-700">— not reproduced yet</span>
+                                           <span className="text-neutral-600">· {verify.execCount}/{20} executions</span>
+                                         </div>
+                                         <div className="text-neutral-700">need {Math.max(0, 20 - verify.execCount)} more exec{20 - verify.execCount !== 1 ? 's' : ''} to confirm</div>
+                                       </div>
+                                     );
+                                   }
+                                   // active — show fix-impact
                                    const currentRate = Math.round((totalFails / te) * 100);
                                    const afterRate = Math.round(Math.max(0, (totalFails - cluster.totalHits) / te) * 100);
                                    if (currentRate === afterRate || currentRate === 0) return null;
