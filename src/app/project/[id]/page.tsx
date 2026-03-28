@@ -1,5 +1,5 @@
 "use client";
-import { useState, use, useEffect, useCallback } from "react";
+import { useState, use, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
@@ -11,6 +11,9 @@ import {
   ChevronRight,
   Zap,
   Activity,
+  ArrowRight,
+  Flame,
+  Target,
 } from "lucide-react";
 import { useFluxApi } from "@/lib/api";
 import { ProjectOverviewResult } from "@/types/api";
@@ -36,30 +39,6 @@ function ErrorClassBadge({ cls }: { cls: string }) {
     <span className={`shrink-0 text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded border ${m.color}`}>
       {m.label}
     </span>
-  );
-}
-
-function SectionLabel({
-  icon: Icon,
-  label,
-  count,
-  color,
-}: {
-  icon: React.ElementType;
-  label: string;
-  count: number;
-  color: string;
-}) {
-  return (
-    <div className="flex items-center gap-2 mb-3">
-      <Icon className={`w-3.5 h-3.5 ${color}`} />
-      <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">{label}</span>
-      {count > 0 && (
-        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full border border-current/20 ${color}`}>
-          {count}
-        </span>
-      )}
-    </div>
   );
 }
 
@@ -106,256 +85,407 @@ export default function ProjectPage({
   }, [load]);
 
   const health = overview?.health;
+  const isBroken = !!health && (health.activeIncidents > 0 || health.functionsFailing > 0);
+
+  // Group incidents by errorClass for cross-function display
+  type IncidentGroup = {
+    cls: string;
+    incidents: ProjectOverviewResult["incidents"];
+    combinedImpact: number; // sum of failureRatePct * totalExecs
+    maxTrafficPct: number;
+    affectedFns: string[];
+  };
+
+  const incidentGroups = useMemo((): IncidentGroup[] => {
+    if (!overview?.incidents.length) return [];
+    const map = new Map<string, ProjectOverviewResult["incidents"]>();
+    for (const inc of overview.incidents) {
+      const key = inc.errorClass;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(inc);
+    }
+    return [...map.entries()]
+      .map(([cls, incs]) => ({
+        cls,
+        incidents: incs,
+        combinedImpact: incs.reduce((s, i) => s + i.failureRatePct * i.totalExecs, 0),
+        maxTrafficPct: Math.max(...incs.map((i) => i.trafficImpactPct)),
+        affectedFns: [...new Set(incs.map((i) => i.functionName))],
+      }))
+      .sort((a, b) => b.combinedImpact - a.combinedImpact);
+  }, [overview?.incidents]);
+
+  // Suggested focus: the group with highest combined impact, cross-referenced with regressions
+  const suggestedFocus = useMemo(() => {
+    if (!isBroken || incidentGroups.length === 0) return null;
+    const top = incidentGroups[0];
+    const topInc = top.incidents[0];
+    const isRegression = overview!.brokenAfterDeploy.some((b) =>
+      top.incidents.some((i) => i.functionId === b.functionId)
+    );
+    return {
+      title: topInc.title,
+      cls: top.cls,
+      affectedFns: top.affectedFns,
+      trafficImpactPct: top.maxTrafficPct,
+      failureRatePct: topInc.failureRatePct,
+      isRegression,
+      topFunctionId: topInc.functionId,
+      deployId: topInc.deployId,
+    };
+  }, [incidentGroups, isBroken, overview]);
 
   if (loading) {
     return (
-      <div className="py-6 space-y-8 animate-in fade-in duration-300">
-        <div className="flex items-center justify-between">
-          <div className="w-40 h-5 bg-neutral-800 rounded animate-pulse" />
-          <div className="flex gap-2">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="w-20 h-7 bg-neutral-900 rounded-lg animate-pulse" />
-            ))}
-          </div>
+      <div className="py-6 space-y-6 animate-in fade-in duration-300">
+        <div className="h-16 bg-neutral-900/60 rounded-xl border border-neutral-800/50 animate-pulse" />
+        <div className="h-28 bg-neutral-900/40 rounded-xl border border-neutral-800/30 animate-pulse" />
+        <div className="space-y-2">
+          <div className="w-32 h-3 bg-neutral-800 rounded animate-pulse" />
+          {[1, 2].map((i) => (
+            <div key={i} className="h-16 bg-neutral-900/40 rounded-xl border border-neutral-800/30 animate-pulse" />
+          ))}
         </div>
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="space-y-2">
-            <div className="w-28 h-3 bg-neutral-800 rounded animate-pulse" />
-            <div className="border border-neutral-900 rounded-xl p-4 animate-pulse space-y-2.5">
-              <div className="w-3/4 h-3 bg-neutral-800/60 rounded" />
-              <div className="w-1/2 h-2 bg-neutral-800/40 rounded" />
-            </div>
-          </div>
-        ))}
       </div>
     );
   }
 
-  const isHealthy =
-    !health || (health.activeIncidents === 0 && health.functionsFailing === 0);
-
   return (
-    <div className="py-6 space-y-8 animate-in fade-in duration-300 pb-20">
-      {/* ── HEALTH HEADER ──────────────────────────────────────────── */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-base font-black text-white tracking-tight">Production Overview</h1>
-          <p className="text-[10px] text-neutral-600 font-mono mt-0.5">
-            {lastRefreshed ? `refreshed ${timeAgo(lastRefreshed.toISOString())}` : "loading..."}
-          </p>
-        </div>
+    <div className="py-6 space-y-6 animate-in fade-in duration-300 pb-20">
 
-        <div className="flex items-center gap-2">
-          {health && (
-            <>
-              <div
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] font-bold ${
-                  health.activeIncidents > 0
-                    ? "border-red-900/50 bg-red-950/40 text-red-400"
-                    : "border-neutral-800/50 bg-neutral-900/30 text-neutral-500"
-                }`}
-              >
-                <AlertCircle className="w-3 h-3" />
-                {health.activeIncidents} incident{health.activeIncidents !== 1 ? "s" : ""}
-              </div>
-              <div
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] font-bold ${
-                  health.functionsFailing > 0
-                    ? "border-orange-900/50 bg-orange-950/40 text-orange-400"
-                    : "border-neutral-800/50 bg-neutral-900/30 text-neutral-500"
-                }`}
-              >
-                <Zap className="w-3 h-3" />
-                {health.functionsFailing} fn failing
-              </div>
-              <div
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] font-bold ${
-                  health.trafficImpactPct > 5
-                    ? "border-red-900/50 bg-red-950/40 text-red-400"
-                    : health.trafficImpactPct > 0
-                    ? "border-amber-900/50 bg-amber-950/40 text-amber-400"
-                    : "border-neutral-800/50 bg-neutral-900/30 text-neutral-500"
-                }`}
-              >
-                <TrendingUp className="w-3 h-3" />
-                {health.trafficImpactPct}% traffic
-              </div>
-            </>
+      {/* ── STATUS HEADER ──────────────────────────────────────────── */}
+      <div
+        className={`rounded-xl border px-4 py-3.5 flex items-center justify-between gap-4 flex-wrap transition-colors ${
+          isBroken
+            ? "border-red-900/50 bg-red-950/25"
+            : "border-neutral-800/50 bg-neutral-900/20"
+        }`}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          {isBroken ? (
+            <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+          ) : (
+            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
           )}
+          <div className="min-w-0">
+            <p className={`text-sm font-black leading-none ${isBroken ? "text-red-300" : "text-emerald-300"}`}>
+              {isBroken
+                ? `${health!.activeIncidents} incident${health!.activeIncidents !== 1 ? "s" : ""} affecting ${health!.trafficImpactPct}% of traffic`
+                : "System healthy"}
+            </p>
+            <p className="text-[9px] text-neutral-600 font-mono mt-0.5">
+              {isBroken
+                ? `${health!.functionsFailing} function${health!.functionsFailing !== 1 ? "s" : ""} failing`
+                : `0 incidents · 0 failing · 0% traffic impacted`}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          {isBroken && (
+            <div className="flex items-center gap-2">
+              <span className={`text-[9px] font-black px-2 py-1 rounded border ${
+                health!.trafficImpactPct >= 20
+                  ? "text-red-400 border-red-900/60 bg-red-950/40"
+                  : "text-amber-400 border-amber-900/60 bg-amber-950/40"
+              }`}>
+                <TrendingUp className="w-2.5 h-2.5 inline mr-1" />
+                {health!.trafficImpactPct}% traffic
+              </span>
+              <span className="text-[9px] font-black px-2 py-1 rounded border text-orange-400 border-orange-900/60 bg-orange-950/40">
+                <Zap className="w-2.5 h-2.5 inline mr-1" />
+                {health!.functionsFailing} fn
+              </span>
+            </div>
+          )}
+          <p className="text-[9px] text-neutral-700 font-mono">
+            {lastRefreshed ? timeAgo(lastRefreshed.toISOString()) : "—"}
+          </p>
           <button
             onClick={() => load(true)}
-            className="p-1.5 text-neutral-700 hover:text-white transition-colors"
+            className="p-1 text-neutral-700 hover:text-white transition-colors"
           >
             <RefreshCw className="w-3 h-3" />
           </button>
         </div>
       </div>
 
-      {/* all-clear banner */}
-      {!loading && isHealthy && overview && (
-        <div className="border border-emerald-900/30 bg-emerald-950/15 rounded-xl px-4 py-4 flex items-center gap-3">
-          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-          <div>
-            <p className="text-xs font-bold text-emerald-300">All clear</p>
-            <p className="text-[10px] text-neutral-600 mt-0.5">No active incidents, regressions, or pending verifications</p>
+      {/* ── FIX THIS FIRST ─────────────────────────────────────────── */}
+      {suggestedFocus && (
+        <div
+          onClick={() => router.push(`/project/${id}/functions/${suggestedFocus.topFunctionId}`)}
+          className="relative cursor-pointer rounded-xl border border-red-800/50 bg-gradient-to-b from-red-950/40 to-red-950/20 overflow-hidden group hover:border-red-700/70 transition-all"
+        >
+          {/* hot accent bar */}
+          <div className="h-[3px] bg-gradient-to-r from-red-500 via-orange-500/70 to-transparent" />
+          <div className="px-4 py-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Flame className="w-3.5 h-3.5 text-red-400 shrink-0" />
+              <span className="text-[9px] font-black uppercase tracking-widest text-red-400">
+                Fix This First
+              </span>
+              {suggestedFocus.isRegression && (
+                <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded border text-orange-300 border-orange-800/50 bg-orange-950/50">
+                  Started after deploy
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <p className="text-base font-black text-white leading-tight truncate">
+                  {suggestedFocus.title}
+                </p>
+                <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                  <ErrorClassBadge cls={suggestedFocus.cls} />
+                  {suggestedFocus.affectedFns.length > 1 ? (
+                    <span className="text-[9px] text-neutral-500 font-mono">
+                      {suggestedFocus.affectedFns.length} functions affected
+                    </span>
+                  ) : (
+                    <span className="text-[9px] text-neutral-500 font-mono">
+                      {suggestedFocus.affectedFns[0]}
+                    </span>
+                  )}
+                  {suggestedFocus.deployId && (
+                    <span className="text-[9px] text-neutral-700 font-mono">
+                      · deploy {suggestedFocus.deployId}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="shrink-0 text-right">
+                <div className="text-3xl font-black tabular-nums text-red-400 leading-none">
+                  {suggestedFocus.failureRatePct}%
+                </div>
+                <div className="text-[8px] text-neutral-600 mt-0.5">failure rate</div>
+              </div>
+            </div>
+
+            {/* affected functions list when multi-function */}
+            {suggestedFocus.affectedFns.length > 1 && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[8px] text-neutral-700 uppercase font-black tracking-widest">Affected:</span>
+                {suggestedFocus.affectedFns.map((fn) => (
+                  <span key={fn} className="text-[9px] font-bold text-neutral-400 bg-neutral-900 border border-neutral-800 px-1.5 py-0.5 rounded font-mono">
+                    {fn}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-1">
+              <p className="text-[9px] text-neutral-700 font-mono">
+                {suggestedFocus.trafficImpactPct}% of traffic impacted · impact = {suggestedFocus.cls} failure
+              </p>
+              <span className="text-[10px] font-bold text-red-300 flex items-center gap-1 group-hover:gap-2 transition-all">
+                Investigate <ArrowRight className="w-3 h-3" />
+              </span>
+            </div>
           </div>
         </div>
       )}
 
-      {/* ── ACTIVE INCIDENTS ───────────────────────────────────────── */}
-      <div>
-        <SectionLabel
-          icon={AlertCircle}
-          label="Active Incidents"
-          count={overview?.incidents.length ?? 0}
-          color="text-red-400"
-        />
-        {!overview?.incidents.length ? (
-          <div className="border border-neutral-900/40 rounded-xl px-4 py-5 flex items-center gap-3">
-            <Activity className="w-4 h-4 text-neutral-800 shrink-0" />
-            <p className="text-[11px] text-neutral-700">No active incidents</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {overview.incidents.map((inc) => (
-              <div
-                key={inc.id}
-                onClick={() => router.push(`/project/${id}/functions/${inc.functionId}`)}
-                className="group border border-red-900/40 bg-red-950/20 rounded-xl px-4 py-3 cursor-pointer hover:border-red-800/60 hover:bg-red-950/30 transition-all"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <ErrorClassBadge cls={inc.errorClass} />
-                      <span className="text-[9px] font-bold text-neutral-500 font-mono truncate">
-                        {inc.functionName}
-                      </span>
-                      {inc.deployId && (
-                        <span className="text-[9px] text-neutral-700 font-mono ml-auto shrink-0">
-                          deploy {inc.deployId}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[12px] font-bold text-red-200/90 leading-tight truncate">
-                      {inc.title}
-                    </p>
-                    <div className="flex items-center gap-3 mt-1.5">
-                      <span className="text-[9px] text-neutral-600 font-mono">
-                        {inc.totalErrors.toLocaleString()} errors /{" "}
-                        {inc.totalExecs.toLocaleString()} execs
-                      </span>
-                      <span className="text-[9px] text-neutral-700 font-mono">
-                        last {timeAgo(inc.lastSeen)}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <div
-                      className={`text-xl font-black tabular-nums leading-none ${
-                        inc.failureRatePct >= 50
-                          ? "text-red-400"
-                          : inc.failureRatePct >= 20
-                          ? "text-red-500/70"
-                          : "text-orange-400/70"
-                      }`}
-                    >
-                      {inc.failureRatePct}%
-                    </div>
-                    <div className="text-[8px] text-neutral-700 mt-0.5">failure rate</div>
-                  </div>
-                  <ChevronRight className="w-3.5 h-3.5 text-neutral-800 shrink-0 self-center opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* all-clear state */}
+      {!isBroken && overview && overview.incidents.length === 0 && overview.brokenAfterDeploy.length === 0 && (
+        <div className="border border-neutral-900/40 rounded-xl px-4 py-8 flex flex-col items-center gap-2 text-center">
+          <Activity className="w-5 h-5 text-neutral-800" />
+          <p className="text-xs font-bold text-neutral-500">Nothing to act on</p>
+          <p className="text-[10px] text-neutral-700">
+            No incidents or regressions · {overview.verificationQueue.length > 0 ? `${overview.verificationQueue.length} pending verification` : "all functions verified"}
+          </p>
+        </div>
+      )}
 
       {/* ── BROKE AFTER DEPLOY ─────────────────────────────────────── */}
-      <div>
-        <SectionLabel
-          icon={TrendingUp}
-          label="Broke After Deploy"
-          count={overview?.brokenAfterDeploy.length ?? 0}
-          color="text-orange-400"
-        />
-        {!overview?.brokenAfterDeploy.length ? (
-          <div className="border border-neutral-900/40 rounded-xl px-4 py-5">
-            <p className="text-[11px] text-neutral-700">No regressions detected</p>
+      {!!overview?.brokenAfterDeploy.length && (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <Flame className="w-3.5 h-3.5 text-orange-400" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-orange-400">
+              Broke After Deploy
+            </span>
+            <span className="text-[8px] font-black px-1.5 py-0.5 rounded-full bg-orange-950/60 border border-orange-800/50 text-orange-400">
+              {overview.brokenAfterDeploy.length}
+            </span>
           </div>
-        ) : (
           <div className="space-y-2">
             {overview.brokenAfterDeploy.map((item) => (
               <div
                 key={item.functionId}
                 onClick={() => router.push(`/project/${id}/functions/${item.functionId}`)}
-                className="group border border-orange-900/40 bg-orange-950/20 rounded-xl px-4 py-3 cursor-pointer hover:border-orange-800/60 hover:bg-orange-950/30 transition-all"
+                className="group relative border border-orange-800/50 bg-gradient-to-r from-orange-950/40 to-transparent rounded-xl px-4 py-3.5 cursor-pointer hover:border-orange-700/70 hover:from-orange-950/60 transition-all overflow-hidden"
               >
-                <div className="flex items-center gap-3">
+                <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-orange-500/70 rounded-l-xl" />
+                <div className="flex items-center gap-4 pl-1">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span className="text-[10px] font-black text-orange-300">{item.functionName}</span>
+                      <span className="text-[11px] font-black text-orange-200">{item.functionName}</span>
                       {item.deployId && (
-                        <span className="text-[9px] text-neutral-600 font-mono">
-                          deploy {item.deployId}
+                        <span className="text-[9px] font-mono text-neutral-500 bg-neutral-900 border border-neutral-800 px-1.5 py-0.5 rounded">
+                          {item.deployId}
                         </span>
                       )}
-                      <span className="text-[9px] text-neutral-700 font-mono ml-auto">
-                        {timeAgo(item.deployedAt)}
+                      <span className="text-[8px] font-black uppercase tracking-widest text-orange-500 ml-auto">
+                        regression
                       </span>
                     </div>
                     {item.topIssue && (
-                      <p className="text-[11px] text-neutral-400 leading-tight truncate">
+                      <p className="text-[11px] text-neutral-400 leading-tight truncate mb-1.5">
                         {item.topIssue}
                       </p>
                     )}
-                    <div className="text-[9px] text-neutral-700 mt-1 font-mono">
-                      prev {item.prevExecs} exec{item.prevExecs !== 1 ? "s" : ""} · now {item.currentExecs} exec{item.currentExecs !== 1 ? "s" : ""}
-                    </div>
+                    <p className="text-[9px] text-neutral-600 font-mono">
+                      failures started {timeAgo(item.deployedAt)} · {item.currentExecs} exec{item.currentExecs !== 1 ? "s" : ""} since deploy
+                    </p>
                   </div>
-                  {/* Before → After */}
-                  <div className="shrink-0 flex items-center gap-2">
+                  {/* Before → After delta */}
+                  <div className="shrink-0 flex items-center gap-3">
                     <div className="text-center">
-                      <div className="text-sm font-black text-neutral-500 tabular-nums">
+                      <div className="text-[13px] font-black text-neutral-600 tabular-nums leading-none">
                         {item.prevFailurePct}%
                       </div>
-                      <div className="text-[7px] text-neutral-700 uppercase">before</div>
+                      <div className="text-[7px] text-neutral-700 uppercase mt-0.5">before</div>
                     </div>
-                    <div className="text-neutral-700 text-xs">→</div>
+                    <ArrowRight className="w-3 h-3 text-orange-600" />
                     <div className="text-center">
-                      <div className="text-sm font-black text-orange-400 tabular-nums">
+                      <div className="text-[20px] font-black text-orange-400 tabular-nums leading-none">
                         {item.currentFailurePct}%
                       </div>
-                      <div className="text-[7px] text-neutral-700 uppercase">after</div>
+                      <div className="text-[7px] text-neutral-700 uppercase mt-0.5">now</div>
+                    </div>
+                    <div className="text-[10px] font-black text-orange-500 bg-orange-950/60 border border-orange-800/40 px-1.5 py-1 rounded ml-1">
+                      +{item.currentFailurePct - item.prevFailurePct}pp
                     </div>
                   </div>
-                  <ChevronRight className="w-3.5 h-3.5 text-neutral-800 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <ChevronRight className="w-3.5 h-3.5 text-neutral-700 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
               </div>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* ── ACTIVE INCIDENTS ───────────────────────────────────────── */}
+      {!!incidentGroups.length && (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <AlertCircle className="w-3.5 h-3.5 text-red-400" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-red-400">
+              Active Incidents
+            </span>
+            <span className="text-[8px] font-black px-1.5 py-0.5 rounded-full bg-red-950/60 border border-red-800/50 text-red-400">
+              {overview!.incidents.length}
+            </span>
+            {incidentGroups.some((g) => g.affectedFns.length > 1) && (
+              <span className="text-[8px] text-neutral-600 font-mono ml-1">grouped by type</span>
+            )}
+          </div>
+          <div className="space-y-2">
+            {incidentGroups.map((group, gi) => {
+              const topInc = group.incidents[0];
+              const isTopPriority = gi === 0;
+              return (
+                <div
+                  key={group.cls}
+                  onClick={() => router.push(`/project/${id}/functions/${topInc.functionId}`)}
+                  className={`group border rounded-xl px-4 py-3.5 cursor-pointer transition-all ${
+                    isTopPriority
+                      ? "border-red-800/60 bg-red-950/30 hover:border-red-700/80 hover:bg-red-950/40"
+                      : "border-red-900/40 bg-red-950/15 hover:border-red-800/60 hover:bg-red-950/25"
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                        <ErrorClassBadge cls={group.cls} />
+                        {isTopPriority && (
+                          <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded border text-red-300 border-red-700/60 bg-red-950/60 flex items-center gap-0.5">
+                            <Target className="w-2 h-2" /> Fix first
+                          </span>
+                        )}
+                        {topInc.deployId && (
+                          <span className="text-[9px] text-neutral-700 font-mono ml-auto shrink-0">
+                            deploy {topInc.deployId}
+                          </span>
+                        )}
+                      </div>
+
+                      <p className={`font-bold leading-tight truncate mb-1.5 ${isTopPriority ? "text-[13px] text-red-100" : "text-[12px] text-red-200/80"}`}>
+                        {topInc.title}
+                      </p>
+
+                      {/* cross-function: show all affected functions */}
+                      {group.affectedFns.length > 1 ? (
+                        <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+                          <span className="text-[8px] text-neutral-700 uppercase font-black tracking-widest">Affected:</span>
+                          {group.affectedFns.map((fn) => (
+                            <span key={fn} className="text-[9px] font-bold text-neutral-400 bg-neutral-900 border border-neutral-800/60 px-1.5 py-0.5 rounded font-mono">
+                              {fn}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[9px] text-neutral-600 font-mono mb-1">
+                          {group.affectedFns[0]}
+                        </p>
+                      )}
+
+                      <div className="flex items-center gap-3">
+                        <span className="text-[9px] text-neutral-700 font-mono">
+                          {group.incidents.reduce((s, i) => s + i.totalErrors, 0).toLocaleString()} errors / {group.incidents.reduce((s, i) => s + i.totalExecs, 0).toLocaleString()} execs
+                        </span>
+                        <span className="text-[9px] text-neutral-700 font-mono">
+                          last {timeAgo(topInc.lastSeen)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 text-right">
+                      <div
+                        className={`font-black tabular-nums leading-none ${
+                          isTopPriority ? "text-2xl" : "text-lg"
+                        } ${
+                          topInc.failureRatePct >= 50
+                            ? "text-red-400"
+                            : topInc.failureRatePct >= 20
+                            ? "text-red-500/80"
+                            : "text-orange-400/80"
+                        }`}
+                      >
+                        {topInc.failureRatePct}%
+                      </div>
+                      <div className="text-[8px] text-neutral-700 mt-0.5">failure rate</div>
+                      {group.maxTrafficPct > 0 && (
+                        <div className="text-[8px] text-neutral-600 mt-0.5">{group.maxTrafficPct}% traffic</div>
+                      )}
+                    </div>
+                    <ChevronRight className="w-3.5 h-3.5 text-neutral-800 shrink-0 self-center opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── VERIFICATION QUEUE ─────────────────────────────────────── */}
-      <div>
-        <SectionLabel
-          icon={ShieldCheck}
-          label="Verification Queue"
-          count={overview?.verificationQueue.length ?? 0}
-          color="text-amber-400"
-        />
-        {!overview?.verificationQueue.length ? (
-          <div className="border border-neutral-900/40 rounded-xl px-4 py-5">
-            <p className="text-[11px] text-neutral-700">Nothing pending verification</p>
+      {!!overview?.verificationQueue.length && (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">
+              Verification Queue
+            </span>
+            <span className="text-[8px] font-black px-1.5 py-0.5 rounded-full bg-amber-950/50 border border-amber-800/40 text-amber-400">
+              {overview.verificationQueue.length}
+            </span>
           </div>
-        ) : (
           <div className="space-y-2">
             {overview.verificationQueue.map((item, i) => (
               <div
                 key={`${item.functionId}-${i}`}
                 onClick={() => router.push(`/project/${id}/functions/${item.functionId}`)}
-                className="group border border-amber-900/30 bg-amber-950/15 rounded-xl px-4 py-3 cursor-pointer hover:border-amber-800/50 hover:bg-amber-950/25 transition-all"
+                className="group border border-amber-900/30 bg-amber-950/10 rounded-xl px-4 py-3 cursor-pointer hover:border-amber-800/50 hover:bg-amber-950/20 transition-all"
               >
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
@@ -392,28 +522,27 @@ export default function ProjectPage({
               </div>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* ── RECENTLY FIXED ─────────────────────────────────────────── */}
-      <div>
-        <SectionLabel
-          icon={CheckCircle2}
-          label="Recently Fixed"
-          count={overview?.recentFixes.length ?? 0}
-          color="text-emerald-400"
-        />
-        {!overview?.recentFixes.length ? (
-          <div className="border border-neutral-900/40 rounded-xl px-4 py-5">
-            <p className="text-[11px] text-neutral-700">No recent fixes to show</p>
+      {!!overview?.recentFixes.length && (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-neutral-500">
+              Recently Fixed
+            </span>
+            <span className="text-[8px] font-black px-1.5 py-0.5 rounded-full bg-emerald-950/40 border border-emerald-900/40 text-emerald-600">
+              {overview.recentFixes.length}
+            </span>
           </div>
-        ) : (
           <div className="space-y-2">
             {overview.recentFixes.map((item, i) => (
               <div
                 key={`${item.functionId}-${i}`}
                 onClick={() => router.push(`/project/${id}/functions/${item.functionId}`)}
-                className="group border border-emerald-900/30 bg-emerald-950/15 rounded-xl px-4 py-3 cursor-pointer hover:border-emerald-800/50 hover:bg-emerald-950/25 transition-all"
+                className="group border border-emerald-900/25 bg-emerald-950/10 rounded-xl px-4 py-3 cursor-pointer hover:border-emerald-800/40 hover:bg-emerald-950/20 transition-all"
               >
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
@@ -449,8 +578,8 @@ export default function ProjectPage({
               </div>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
