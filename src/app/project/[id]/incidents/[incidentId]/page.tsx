@@ -192,17 +192,31 @@ export default function IncidentDetailPage({
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [incidentStatus, setIncidentStatus] = useState<IncidentStatus>('active');
+  const [checkedActions, setCheckedActions] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     const saved = localStorage.getItem(`incident-status:${title}`);
     if (saved === 'active' || saved === 'investigating' || saved === 'resolved') {
       setIncidentStatus(saved);
     }
+    const savedChecks = localStorage.getItem(`incident-checks:${title}`);
+    if (savedChecks) {
+      try { setCheckedActions(new Set(JSON.parse(savedChecks))); } catch {}
+    }
   }, [title]);
 
   const updateStatus = useCallback((s: IncidentStatus) => {
     setIncidentStatus(s);
     localStorage.setItem(`incident-status:${title}`, s);
+  }, [title]);
+
+  const toggleAction = useCallback((i: number) => {
+    setCheckedActions(prev => {
+      const next = new Set(prev);
+      next.has(i) ? next.delete(i) : next.add(i);
+      localStorage.setItem(`incident-checks:${title}`, JSON.stringify([...next]));
+      return next;
+    });
   }, [title]);
 
   useEffect(() => {
@@ -328,13 +342,43 @@ export default function IncidentDetailPage({
   } = group;
 
   const suggestedFix = generateSuggestedFix(cls, title);
-  const deployVerdict =
-    !deployId ? null
-    : deployMode === 'introduced' ? { label: `Likely caused by deploy ${deployId}`, tone: 'danger', confidence: 'High' } as const
-    : deployMode === 'regressed'  ? { label: `Likely worsened by deploy ${deployId}`, tone: 'danger', confidence: postDeploySampleLow ? 'Low' : 'Medium' } as const
-    : deployMode === 'improved'   ? { label: `Improved since deploy ${deployId}`, tone: 'good', confidence: 'Medium' } as const
-    : deployMode === 'unchanged'  ? { label: `Not related to deploy ${deployId}`, tone: 'neutral', confidence: 'Medium' } as const
-    : { label: `Active around deploy ${deployId}`, tone: 'neutral', confidence: 'Low' } as const;
+
+  const deployVerdict = !deployId ? null : (() => {
+    const delta = rateAfterPct !== null && rateBeforePct !== null
+      ? `${rateBeforePct}% → ${rateAfterPct}%`
+      : null;
+    const deltaNum = rateAfterPct !== null && rateBeforePct !== null
+      ? rateAfterPct - rateBeforePct
+      : null;
+    if (deployMode === 'introduced') return {
+      headline: `Regression introduced by deploy ${deployId}`,
+      sub: 'No failures before this deploy — failures started immediately after',
+      delta: null, deltaNum: null, tone: 'danger' as const, confidence: 'High',
+    };
+    if (deployMode === 'regressed') return {
+      headline: postDeploySampleLow
+        ? `Possible regression after deploy ${deployId}`
+        : `Regression detected after deploy ${deployId}`,
+      sub: delta ? `Failure rate: ${delta}${deltaNum !== null ? ` (Δ +${deltaNum}%)` : ''}` : 'Failure rate worsened after deploy',
+      delta, deltaNum, tone: 'danger' as const,
+      confidence: postDeploySampleLow ? 'Low' : 'Medium',
+    };
+    if (deployMode === 'improved') return {
+      headline: `Failure rate improved after deploy ${deployId}`,
+      sub: delta ? `Failure rate: ${delta}` : 'Failure rate decreased after deploy',
+      delta, deltaNum, tone: 'good' as const, confidence: 'Medium',
+    };
+    if (deployMode === 'unchanged') return {
+      headline: `Not caused by deploy ${deployId}`,
+      sub: 'Failure rate unchanged before and after this deployment',
+      delta, deltaNum, tone: 'neutral' as const, confidence: 'Medium',
+    };
+    return {
+      headline: `Active around deploy ${deployId}`,
+      sub: 'Temporal correlation detected — deploy may be related',
+      delta: null, deltaNum: null, tone: 'neutral' as const, confidence: 'Low',
+    };
+  })();
 
   return (
     <div className="py-4 space-y-4 animate-in fade-in duration-300 pb-16">
@@ -393,38 +437,79 @@ export default function IncidentDetailPage({
         </div>
       </div>
 
-      {/* Deploy Verdict — full-width binary verdict */}
+      {/* Deploy Verdict — strong binary verdict */}
       {deployVerdict && (
         <div className={`rounded-xl border overflow-hidden ${
-          deployVerdict.tone === 'danger' ? 'border-orange-700/50 bg-orange-950/15'
+          deployVerdict.tone === 'danger' ? 'border-orange-700/50 bg-orange-950/20'
           : deployVerdict.tone === 'good'  ? 'border-emerald-700/50 bg-emerald-950/15'
           : 'border-neutral-700/50 bg-neutral-900/30'
         }`}>
-          <div className="px-5 py-3 flex items-center justify-between gap-4">
+          <div className="px-5 py-4 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               {deployVerdict.tone === 'danger' ? (
-                <AlertTriangle className="w-4 h-4 text-orange-400 shrink-0" />
+                <AlertTriangle className="w-5 h-5 text-orange-400 shrink-0" />
               ) : deployVerdict.tone === 'good' ? (
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
               ) : (
-                <Info className="w-4 h-4 text-neutral-400 shrink-0" />
+                <Info className="w-5 h-5 text-neutral-400 shrink-0" />
               )}
               <div>
-                <p className={`text-sm font-black ${
-                  deployVerdict.tone === 'danger' ? 'text-orange-300'
-                  : deployVerdict.tone === 'good'  ? 'text-emerald-300'
-                  : 'text-neutral-300'
-                }`}>{deployVerdict.label}</p>
-                <p className="text-[10px] text-neutral-500 font-mono mt-0.5">
-                  Confidence: {deployVerdict.confidence}
-                  {deployedAt && <span className="ml-2">· deployed {timeAgo(deployedAt)}</span>}
+                <p className={`text-base font-black ${
+                  deployVerdict.tone === 'danger' ? 'text-orange-200'
+                  : deployVerdict.tone === 'good'  ? 'text-emerald-200'
+                  : 'text-neutral-200'
+                }`}>{deployVerdict.headline}</p>
+                <p className="text-[11px] text-neutral-400 font-mono mt-0.5">
+                  {deployVerdict.sub}
+                  {deployedAt && <span className="text-neutral-600 ml-2">· {timeAgo(deployedAt)}</span>}
                 </p>
               </div>
             </div>
-            <span className="text-[9px] font-mono text-neutral-700 shrink-0 hidden sm:block">deploy · {deployId}</span>
+            <div className="shrink-0 text-right">
+              <span className={`text-xs font-black px-2 py-1 rounded border ${
+                deployVerdict.confidence === 'High'   ? 'text-red-400 bg-red-950/40 border-red-800/40'
+                : deployVerdict.confidence === 'Medium' ? 'text-orange-400 bg-orange-950/40 border-orange-800/40'
+                : 'text-neutral-500 bg-neutral-900/40 border-neutral-800/40'
+              }`}>{deployVerdict.confidence} confidence</span>
+            </div>
           </div>
         </div>
       )}
+
+      {/* Next Step CTAs */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[9px] font-black uppercase tracking-widest text-neutral-600 mr-1">Next step</span>
+        {executions.length > 0 && (
+          <button
+            onClick={() => router.push(`/project/${id}/executions/${executions[0].id}`)}
+            className="flex items-center gap-1.5 text-[10px] font-black text-white bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 hover:border-neutral-500 rounded-lg px-3 py-1.5 transition-all"
+          >
+            <Terminal className="w-3 h-3" /> Debug latest failure
+          </button>
+        )}
+        <button
+          onClick={() => router.push(`/project/${id}/executions`)}
+          className="flex items-center gap-1.5 text-[10px] font-black text-neutral-400 hover:text-white border border-neutral-800 hover:border-neutral-600 rounded-lg px-3 py-1.5 transition-all"
+        >
+          <ArrowRight className="w-3 h-3" /> View all executions
+        </button>
+        {incidentStatus === 'active' && (
+          <button
+            onClick={() => updateStatus('investigating')}
+            className="flex items-center gap-1.5 text-[10px] font-black text-amber-400 hover:text-amber-300 border border-amber-900/50 hover:border-amber-700/60 rounded-lg px-3 py-1.5 transition-all"
+          >
+            <Zap className="w-3 h-3" /> Mark investigating
+          </button>
+        )}
+        {incidentStatus === 'investigating' && (
+          <button
+            onClick={() => updateStatus('resolved')}
+            className="flex items-center gap-1.5 text-[10px] font-black text-emerald-400 hover:text-emerald-300 border border-emerald-900/50 hover:border-emerald-700/60 rounded-lg px-3 py-1.5 transition-all"
+          >
+            <CheckCircle2 className="w-3 h-3" /> Mark resolved
+          </button>
+        )}
+      </div>
 
       {/* Impact Summary — decision-grade metrics */}
       <div className="grid grid-cols-4 gap-2">
@@ -465,146 +550,140 @@ export default function IncidentDetailPage({
       {/* Two-column body */}
       <div className="grid grid-cols-5 gap-3 items-start">
 
-        {/* LEFT col: deploy analysis + recent failures */}
+        {/* LEFT col */}
         <div className="col-span-3 space-y-3">
 
-          {/* Deploy analysis */}
-          {deployId && (
-            <SectionCard title="Deploy Analysis">
-              <div className="space-y-1.5 font-mono">
-                {/* Timing */}
-                <p className="text-[10px] text-neutral-300">
-                  <span className="text-neutral-600 mr-2">·</span>
-                  {deployDeltaMin !== null && deployDeltaMin > 0
-                    ? `started ${deployDeltaMin}m after deploy ${deployId}`
-                    : `started after deploy ${deployId}`}
-                  {deployedAt && <span className="text-neutral-500 ml-1">({timeAgo(deployedAt)})</span>}
-                </p>
-
-                {/* Before deploy counts */}
-                {errorsAfterDeploy > 0 && (
-                  <p className="text-[10px] text-neutral-400">
-                    <span className="text-neutral-600 mr-2">·</span>
-                    before deploy: {errorsBeforeDeploy} failures
-                    {execsBeforeDeploy > 0 && (
-                      <span className="text-neutral-500"> / {execsBeforeDeploy} execs ({Math.round(errorsBeforeDeploy / execsBeforeDeploy * 100)}%)</span>
-                    )}
-                  </p>
-                )}
-
-                {/* After deploy counts */}
-                {errorsAfterDeploy > 0 && (
-                  <p className="text-[10px] text-neutral-400">
-                    <span className="text-neutral-600 mr-2">·</span>
-                    after deploy: {errorsAfterDeploy} failures
-                    {execsAfterDeploy > 0 && (
-                      <span className="text-neutral-500"> / {execsAfterDeploy} execs ({Math.round(errorsAfterDeploy / execsAfterDeploy * 100)}%)</span>
-                    )}
-                  </p>
-                )}
-
-                {/* Rate summary line */}
-                <p className="text-[10px] text-neutral-400">
-                  <span className="text-neutral-600 mr-2">·</span>
-                  {deployMode === 'introduced'
-                    ? 'no failures before this deploy'
-                    : deployMode === 'regressed' && rateBeforePct !== null && rateAfterPct !== null
-                    ? `failure rate increased after deploy (${rateBeforePct}% → ${rateAfterPct}%)`
-                    : deployMode === 'improved' && rateBeforePct !== null && rateAfterPct !== null
-                    ? `failure rate decreased after deploy (${rateBeforePct}% → ${rateAfterPct}%)`
-                    : deployMode === 'unchanged' && rateBeforePct !== null && rateAfterPct !== null
-                    ? `failure rate stable before and after deploy (${rateBeforePct}% → ${rateAfterPct}%)`
-                    : 'active around this deployment'}
-                </p>
-
-                {/* Low sample warning */}
-                {postDeploySampleLow && (
-                  <p className="text-[10px] text-neutral-500">
-                    <span className="text-neutral-700 mr-2">·</span>
-                    low sample size after deploy ({execsAfterDeploy} executions)
-                  </p>
-                )}
-
-                {/* Fact line */}
-                {deployMode === 'regressed' && (
-                  <p className="text-[10px] font-black">
-                    <span className="text-neutral-600 mr-2">·</span>
-                    <span className="text-orange-300">
-                      {postDeploySampleLow
-                        ? `failure rate increased after deployment${rateBeforePct !== null && rateAfterPct !== null ? ` (${rateBeforePct}% → ${rateAfterPct}%)` : ''}`
-                        : '→ worsened by this deployment'}
-                    </span>
-                  </p>
-                )}
-
-                {/* Interpretation line */}
-                {deployMode === 'regressed' && postDeploySampleLow && (
-                  <p className="text-[10px] font-black">
-                    <span className="text-neutral-600 mr-2">·</span>
-                    <span className="text-orange-400/80">→ possible regression (low impact confidence)</span>
-                  </p>
-                )}
-                {deployMode === 'introduced' && (
-                  <p className="text-[10px] font-black">
-                    <span className="text-neutral-600 mr-2">·</span>
-                    <span className="text-orange-400">→ caused by this deployment</span>
-                  </p>
-                )}
-                {deployMode === 'improved' && (
-                  <p className="text-[10px] font-black">
-                    <span className="text-neutral-600 mr-2">·</span>
-                    <span className="text-emerald-400">→ improved by this deployment</span>
-                  </p>
-                )}
-                {deployMode === 'unchanged' && (
-                  <p className="text-[10px] font-black">
-                    <span className="text-neutral-600 mr-2">·</span>
-                    <span className="text-amber-400">
-                      → persistent failure — {postDeploySampleLow ? 'no evidence of improvement after deployment' : 'unchanged by deployment'}
-                    </span>
-                  </p>
-                )}
-                {!deployMode && (
-                  <p className="text-[10px] font-black">
-                    <span className="text-neutral-600 mr-2">·</span>
-                    <span className="text-orange-400">→ likely caused by this deployment</span>
-                  </p>
-                )}
-              </div>
-            </SectionCard>
-          )}
-
-          {/* Suggested Fix */}
+          {/* Suggested Fix — top of stack, above the fold */}
           {suggestedFix && (
-            <div className="rounded-xl border border-cyan-900/40 bg-cyan-950/10 overflow-hidden">
-              <div className="px-4 py-2.5 border-b border-cyan-900/30 flex items-center gap-2">
-                <Zap className="w-3 h-3 text-cyan-500" />
-                <span className="text-[9px] font-black uppercase tracking-widest text-cyan-600">Suggested Fix</span>
+            <div className="rounded-xl border border-cyan-900/50 bg-cyan-950/10 overflow-hidden">
+              <div className="px-4 py-2.5 border-b border-cyan-900/30 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Zap className="w-3 h-3 text-cyan-400" />
+                  <span className="text-[9px] font-black uppercase tracking-widest text-cyan-500">Suggested Actions</span>
+                </div>
+                {checkedActions.size > 0 && (
+                  <span className="text-[8px] font-black text-cyan-600">
+                    {checkedActions.size}/{suggestedFix.actions.length} done
+                  </span>
+                )}
               </div>
               <div className="px-4 py-3 space-y-3">
-                <p className="text-[10px] text-neutral-300 font-mono leading-relaxed">{suggestedFix.summary}</p>
-                <div>
-                  <p className="text-[8px] font-black uppercase tracking-widest text-neutral-600 mb-1.5">Likely causes</p>
-                  <ul className="space-y-1">
+                <p className="text-[10px] text-neutral-400 font-mono leading-relaxed">{suggestedFix.summary}</p>
+                {/* Checklist actions */}
+                <div className="space-y-1">
+                  {suggestedFix.actions.map((a, i) => (
+                    <button
+                      key={i}
+                      onClick={() => toggleAction(i)}
+                      className={`w-full flex items-start gap-2.5 text-left px-2.5 py-2 rounded-lg transition-colors ${
+                        checkedActions.has(i)
+                          ? 'bg-cyan-950/30 hover:bg-cyan-950/50'
+                          : 'hover:bg-neutral-900/60'
+                      }`}
+                    >
+                      <span className={`mt-0.5 shrink-0 w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${
+                        checkedActions.has(i)
+                          ? 'bg-cyan-600 border-cyan-500'
+                          : 'border-neutral-700 bg-transparent'
+                      }`}>
+                        {checkedActions.has(i) && (
+                          <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 8 8">
+                            <path d="M1 4l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </span>
+                      <span className={`text-[10px] font-mono leading-relaxed transition-colors ${
+                        checkedActions.has(i) ? 'text-neutral-600 line-through' : 'text-neutral-300'
+                      }`}>{a}</span>
+                    </button>
+                  ))}
+                </div>
+                {/* Causes disclosure */}
+                <details className="group">
+                  <summary className="text-[8px] font-black uppercase tracking-widest text-neutral-700 cursor-pointer hover:text-neutral-500 select-none transition-colors list-none flex items-center gap-1">
+                    <span className="group-open:rotate-90 transition-transform inline-block">›</span> Likely causes
+                  </summary>
+                  <ul className="mt-1.5 space-y-1 pl-3">
                     {suggestedFix.causes.map((c, i) => (
-                      <li key={i} className="text-[10px] text-neutral-400 font-mono flex gap-2">
-                        <span className="text-neutral-700 shrink-0">–</span>
-                        {c}
+                      <li key={i} className="text-[9px] text-neutral-500 font-mono flex gap-1.5">
+                        <span className="text-neutral-700 shrink-0">–</span>{c}
                       </li>
                     ))}
                   </ul>
-                </div>
-                <div>
-                  <p className="text-[8px] font-black uppercase tracking-widest text-neutral-600 mb-1.5">Recommended actions</p>
-                  <ol className="space-y-1">
-                    {suggestedFix.actions.map((a, i) => (
-                      <li key={i} className="text-[10px] text-neutral-300 font-mono flex gap-2">
-                        <span className="text-cyan-700 shrink-0 font-black">{i + 1}.</span>
-                        {a}
-                      </li>
+                </details>
+              </div>
+            </div>
+          )}
+
+          {/* Deploy Analysis — compressed signal table */}
+          {deployId && (
+            <div className="rounded-xl border border-neutral-800/60 bg-neutral-950/60 overflow-hidden">
+              <div className="px-4 py-2.5 border-b border-neutral-800/40">
+                <span className="text-[9px] font-black uppercase tracking-widest text-neutral-500">Deploy Signal</span>
+              </div>
+              <div className="px-4 py-3 space-y-3">
+                {/* Before / After table */}
+                {(execsBeforeDeploy > 0 || execsAfterDeploy > 0) && (
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      {
+                        label: 'Before deploy',
+                        rate: rateBeforePct !== null ? `${rateBeforePct}%` : '—',
+                        detail: execsBeforeDeploy > 0 ? `${errorsBeforeDeploy}/${execsBeforeDeploy} execs` : 'no data',
+                        color: rateBeforePct !== null && rateBeforePct > 0 ? 'text-orange-400' : 'text-neutral-400',
+                      },
+                      {
+                        label: 'After deploy',
+                        rate: rateAfterPct !== null ? `${rateAfterPct}%` : '—',
+                        detail: execsAfterDeploy > 0 ? `${errorsAfterDeploy}/${execsAfterDeploy} execs` : 'no data',
+                        color: rateAfterPct !== null && rateAfterPct > 0 ? 'text-red-400' : 'text-emerald-400',
+                      },
+                      {
+                        label: 'Delta',
+                        rate: rateAfterPct !== null && rateBeforePct !== null
+                          ? `${rateAfterPct - rateBeforePct > 0 ? '+' : ''}${rateAfterPct - rateBeforePct}%`
+                          : deployMode === 'introduced' ? '+100%' : '—',
+                        detail: deployMode === 'introduced' ? 'new failure'
+                          : deployMode === 'regressed'  ? 'regression'
+                          : deployMode === 'improved'   ? 'improvement'
+                          : deployMode === 'unchanged'  ? 'no change'
+                          : 'unknown',
+                        color: deployMode === 'regressed' || deployMode === 'introduced' ? 'text-red-400'
+                          : deployMode === 'improved' ? 'text-emerald-400'
+                          : 'text-neutral-400',
+                      },
+                    ].map(col => (
+                      <div key={col.label} className="bg-neutral-900/40 rounded-lg px-3 py-2">
+                        <p className={`text-base font-black tabular-nums leading-none ${col.color}`}>{col.rate}</p>
+                        <p className="text-[8px] text-neutral-600 font-mono mt-1">{col.label}</p>
+                        <p className="text-[8px] text-neutral-700 font-mono mt-0.5 truncate">{col.detail}</p>
+                      </div>
                     ))}
-                  </ol>
+                  </div>
+                )}
+                {/* Single verdict line */}
+                <div className="flex items-center gap-2 font-mono">
+                  <span className="text-neutral-700">›</span>
+                  <span className={`text-[10px] font-black ${
+                    deployMode === 'introduced' || deployMode === 'regressed' ? 'text-orange-300'
+                    : deployMode === 'improved' ? 'text-emerald-300'
+                    : 'text-neutral-400'
+                  }`}>
+                    {deployMode === 'introduced' ? 'Failures introduced by this deploy'
+                    : deployMode === 'regressed'  ? postDeploySampleLow ? 'Worsened after deploy (low sample)' : 'Worsened by this deploy'
+                    : deployMode === 'improved'   ? 'Improved by this deploy'
+                    : deployMode === 'unchanged'  ? 'Pre-existing failure — deploy not the cause'
+                    : 'Active around this deploy'}
+                  </span>
+                  {deployDeltaMin !== null && deployDeltaMin > 0 && (
+                    <span className="text-[9px] text-neutral-600 ml-auto shrink-0">+{deployDeltaMin}m after deploy</span>
+                  )}
                 </div>
+                {postDeploySampleLow && (
+                  <p className="text-[9px] text-neutral-600 font-mono">
+                    ⚠ only {execsAfterDeploy} executions after deploy — confidence limited
+                  </p>
+                )}
               </div>
             </div>
           )}
