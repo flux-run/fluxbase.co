@@ -453,7 +453,17 @@ export function ExecutionTimeline({ execution, checkpoints = [], logs = [] }: Ex
       if (msg.includes("fetch failed") || msg.includes("failed to fetch")) {
         const urlMatch = errMsg.match(/https?:\/\/([^/\s:]+)/);
         const domain = urlMatch ? urlMatch[1] : null;
-        const hint = msg.includes("dns") || msg.includes("resolve") ? " (DNS failed)"
+        const dnsDetail = (() => {
+          // Try to extract the specific OS-level DNS error text from the message
+          const m = errMsg.match(/dns error[:\s]+([^\n;]+)/i)
+            || errMsg.match(/dns failed[:\s]+([^\n;]+)/i)
+            || errMsg.match(/failed to lookup[^:]*:\s*([^\n;]+)/i)
+            || errMsg.match(/resolve[:\s]+([^\n;.]+)/i)
+            || errMsg.match(/getaddrinfo\s+\S+\s+([^\n;]+)/i);
+          const detail = m ? m[1].trim().replace(/\s+/g, " ") : null;
+          return detail ? ` (DNS failed: ${detail.toLowerCase()})` : " (DNS failed)";
+        })();
+        const hint = msg.includes("dns") || msg.includes("resolve") ? dnsDetail
           : msg.includes("timeout") ? " (timeout)"
           : msg.includes("refused") || msg.includes("econnrefused") ? " (connection refused)"
           : msg.includes("certificate") || msg.includes("ssl") || msg.includes("tls") ? " (TLS error)"

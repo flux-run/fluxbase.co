@@ -62,15 +62,20 @@ export default function ExecutionsPage({ params }: { params: Promise<{ id: strin
         <Table>
           <TableHeader className="bg-[#111] hover:bg-[#111]">
             <TableRow className="border-neutral-900 hover:bg-transparent">
-              <TableHead className="w-[100px] font-mono text-[10px] uppercase tracking-widest text-neutral-500">Status</TableHead>
+              <TableHead className="w-[80px] font-mono text-[10px] uppercase tracking-widest text-neutral-500">Status</TableHead>
               <TableHead className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">Execution ID</TableHead>
-              <TableHead className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">Method / Path</TableHead>
+              <TableHead className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">Function</TableHead>
+              <TableHead className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">Deployment</TableHead>
               <TableHead className="text-center font-mono text-[10px] uppercase tracking-widest text-neutral-500">Duration</TableHead>
               <TableHead className="text-right font-mono text-[10px] uppercase tracking-widest text-neutral-500">Timestamp</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map(exec => (
+            {filtered.map(exec => {
+               // Derive display function name from path first segment (e.g. "/create-order/…" → "create-order")
+               const funcName = exec.path.split("/").filter(Boolean)[0] ?? exec.path;
+               const shortSha = exec.code_sha ? exec.code_sha.slice(0, 7) : null;
+               return (
                <TableRow key={exec.id} className="border-neutral-900 hover:bg-neutral-900/30 transition-colors group cursor-pointer">
                  <TableCell>
                     <Badge variant={exec.status === 'ok' ? 'success' : 'destructive'} className="font-mono font-bold text-[10px]">
@@ -83,10 +88,24 @@ export default function ExecutionsPage({ params }: { params: Promise<{ id: strin
                    </Link>
                  </TableCell>
                  <TableCell>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <Badge variant="outline" className="text-[9px] h-4 px-1.5 border-neutral-800 text-neutral-500">{exec.method}</Badge>
-                      <span className="text-neutral-300 text-xs truncate max-w-[200px]">{exec.path}</span>
+                      <span className="text-neutral-200 text-xs font-mono font-medium">{funcName}</span>
+                      {exec.path.split("/").filter(Boolean).length > 1 && (
+                        <span className="text-neutral-600 text-xs font-mono truncate max-w-[120px]">
+                          /{exec.path.split("/").filter(Boolean).slice(1).join("/")}
+                        </span>
+                      )}
                     </div>
+                 </TableCell>
+                 <TableCell>
+                    {shortSha ? (
+                      <span className="font-mono text-[11px] text-neutral-500 bg-neutral-900 border border-neutral-800 rounded px-1.5 py-0.5 tracking-tight">
+                        {shortSha}
+                      </span>
+                    ) : (
+                      <span className="text-neutral-700 text-xs">—</span>
+                    )}
                  </TableCell>
                  <TableCell className="text-center">
                     <div className="flex items-center justify-center gap-1.5 text-xs text-neutral-500 font-mono">
@@ -101,7 +120,8 @@ export default function ExecutionsPage({ params }: { params: Promise<{ id: strin
                     </div>
                  </TableCell>
                </TableRow>
-            ))}
+               );
+            })}
           </TableBody>
         </Table>
         
