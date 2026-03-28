@@ -10,7 +10,7 @@ type ApiPending = { id: string; email: string; role: string; created_at: string 
 
 const ROLES: { value: TeamRole; label: string; desc: string }[] = [
   { value: "owner",    label: "Owner",    desc: "Full access, billing, delete" },
-  { value: "engineer", label: "Engineer", desc: "Can view and act on incidents" },
+  { value: "member",   label: "Member",    desc: "Can view and act on incidents" },
   { value: "viewer",   label: "Viewer",   desc: "Read-only access" },
 ];
 
@@ -29,12 +29,12 @@ function InviteModal({ orgId, api, onClose, onSuccess }: {
   onSuccess: () => void;
 }) {
   const [email, setEmail]     = useState("");
-  const [role, setRole]       = useState<TeamRole>("engineer");
+  const [role, setRole]       = useState<TeamRole>("member");
   const [sending, setSending] = useState(false);
   const [sent, setSent]       = useState(false);
   const [error, setError]     = useState<string | null>(null);
 
-  const backendRole = role === "owner" ? "admin" : role === "engineer" ? "member" : "viewer";
+  const backendRole = role === "owner" ? "admin" : role === "member" ? "member" : "viewer";
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();

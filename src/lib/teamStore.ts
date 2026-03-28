@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 
-export type TeamRole = "owner" | "engineer" | "viewer";
+export type TeamRole = "owner" | "member" | "viewer";
 export type TeamStatus = "active" | "invited";
 
 export type TeamUser = {
