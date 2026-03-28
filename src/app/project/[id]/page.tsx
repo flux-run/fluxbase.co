@@ -178,6 +178,16 @@ export default function ProjectPage({
     const causalityScore = top.incidents.reduce((m, i) => Math.max(m, i.causalityScore ?? 0), 0);
     // Recurring = any incident in this group was seen in prev deploy
     const isRecurring = top.incidents.some(i => i.isRecurring);
+    // Deploy mode — what relationship does this incident have with the latest deploy?
+    //   introduced : 0 errors before, errors after  → new bug from this deploy
+    //   amplified  : errors after ≥ 2× errors before → pre-existing but made worse
+    //   persistent : errors before > 0, roughly same after → not fixed by deploy
+    const deployMode: 'introduced' | 'amplified' | 'persistent' | null =
+      !topInc.deployId ? null
+      : errorsAfterDeploy === 0 && errorsBeforeDeploy === 0 ? null  // no evidence either way
+      : errorsBeforeDeploy === 0 ? 'introduced'
+      : errorsAfterDeploy >= errorsBeforeDeploy * 2 ? 'amplified'
+      : 'persistent';
     return {
       title: topInc.title,
       cls: top.cls,
@@ -204,6 +214,7 @@ export default function ProjectPage({
       allOnlyAfterDeploy,
       causalityScore,
       isRecurring,
+      deployMode,
     };
   }, [incidentGroups, isBroken, overview]);
 
@@ -414,15 +425,28 @@ export default function ProjectPage({
                         )}
                         <p className="text-[9px] text-neutral-600 font-mono">
                           <span className="text-red-500/50 mr-1.5 select-none">·</span>
-                          all failures began after this deploy
+                          {suggestedFocus.deployMode === 'introduced'
+                            ? 'no failures before this deploy'
+                            : suggestedFocus.deployMode === 'amplified'
+                            ? 'failures increased significantly after deploy'
+                            : suggestedFocus.deployMode === 'persistent'
+                            ? 'seen before this deploy — continues after'
+                            : 'active around this deployment'}
                         </p>
                         <p className="text-[9px] font-mono">
                           <span className="text-red-500/50 mr-1.5 select-none">·</span>
-                          <span className="text-orange-500/70 font-black">
-                            → {suggestedFocus.causalityScore >= 0.85
-                               ? "caused by this deployment"
-                               : "likely caused by this deployment"}
-                          </span>
+                          {suggestedFocus.deployMode === 'introduced' && (
+                            <span className="text-orange-500/70 font-black">→ caused by this deployment</span>
+                          )}
+                          {suggestedFocus.deployMode === 'amplified' && (
+                            <span className="text-orange-400/70 font-black">→ amplified by this deployment</span>
+                          )}
+                          {suggestedFocus.deployMode === 'persistent' && (
+                            <span className="text-amber-500/70 font-black">→ not fixed by this deployment</span>
+                          )}
+                          {!suggestedFocus.deployMode && (
+                            <span className="text-orange-500/70 font-black">→ likely caused by this deployment</span>
+                          )}
                         </p>
                       </>
                     ) : (
@@ -454,19 +478,24 @@ export default function ProjectPage({
                           "text-neutral-500"
                         }`}>{suggestedFocus.confidenceLabel}</span>
                       </div>
-                      {suggestedFocus.deployId && suggestedFocus.errorsAfterDeploy > 0 && (
-                        <p className="text-[8px] text-neutral-700 font-mono pl-0.5">
-                          · {suggestedFocus.errorsBeforeDeploy === 0 ? "0" : suggestedFocus.errorsBeforeDeploy} before deploy · {suggestedFocus.errorsAfterDeploy}/{suggestedFocus.totalExecs} after
-                        </p>
-                      )}
                       {suggestedFocus.affectedFns.length > 1 && (
                         <p className="text-[8px] text-neutral-700 font-mono pl-0.5">
                           · consistent across {suggestedFocus.affectedFns.length} functions
                         </p>
                       )}
-                      {suggestedFocus.deployId && suggestedFocus.errorsBeforeDeploy === 0 && suggestedFocus.errorsAfterDeploy > 0 && (
+                      {suggestedFocus.deployMode === 'introduced' && (
                         <p className="text-[8px] text-neutral-700 font-mono pl-0.5">
                           · no prior occurrence
+                        </p>
+                      )}
+                      {suggestedFocus.deployMode === 'amplified' && (
+                        <p className="text-[8px] text-neutral-700 font-mono pl-0.5">
+                          · observed before and after deploy — rate increased
+                        </p>
+                      )}
+                      {suggestedFocus.deployMode === 'persistent' && (
+                        <p className="text-[8px] text-neutral-700 font-mono pl-0.5">
+                          · observed before and after deploy
                         </p>
                       )}
                     </div>
