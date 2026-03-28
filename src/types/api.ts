@@ -56,6 +56,9 @@ export interface FunctionStatsResult {
     first_seen: string;
     last_seen: string;
     sample_stack?: string | null;
+    /** Backend-computed: true if this fingerprint has appeared in executions
+     *  whose code_sha matches the current (latest) deployment's artifact_id. */
+    active_in_current_deploy?: boolean;
   }[];
   timeseries: {
     hour: string;

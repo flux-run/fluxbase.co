@@ -326,11 +326,11 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
   const VERIFIED_EXEC_HIGH = 50;
   type VerifyState = 'active' | 'unverified' | 'verified_resolved';
   const verifyClusterState = (cluster: ReturnType<typeof buildFailureClusters>[number]): { state: VerifyState; confidence: 'high' | 'medium' | 'low'; execCount: number } => {
-    const domIssue = cluster.issues.slice().sort((a, b) => b.count - a.count)[0];
-    const ver = domIssue ? resolveIssueVersion(domIssue) : null;
+    // Primary signal: backend confirms whether fingerprint appeared in current deploy's executions
+    const activeInCurrentDeploy = cluster.issues.some(i => (i as any).active_in_current_deploy === true);
     const execCount = latestSlice?.total ?? 0;
-    if (!ver || ver.isCurrent) return { state: 'active', confidence: 'high', execCount };
-    // Historical — check if current deploy has enough traffic to trust absence
+    if (activeInCurrentDeploy) return { state: 'active', confidence: 'high', execCount };
+    // Not seen in current deploy — use exec count as evidence-of-absence confidence
     if (execCount >= VERIFIED_EXEC_HIGH) return { state: 'verified_resolved', confidence: 'high', execCount };
     if (execCount >= VERIFIED_EXEC_MIN) return { state: 'verified_resolved', confidence: 'medium', execCount };
     return { state: 'unverified', confidence: 'low', execCount };
@@ -1095,7 +1095,8 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                     <th className="px-4 py-3">TYPE</th>
                     <th className="px-4 py-3">SOURCE</th>
                     <th className="px-4 py-3">CALLER</th>
-                    <th className="px-4 py-3 text-right">TIME</th>
+                    <th className="px-4 py-3">CODE</th>
+                    <th className="px-4 py-3 pr-6 text-right">TIME</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1157,7 +1158,24 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                              {exec.client_ip?.slice(0, 7) || 'system'}
                           </div>
                        </td>
-                       <td className="px-4 py-3 text-right text-neutral-600">{new Date(exec.started_at ?? new Date().toISOString()).toLocaleTimeString()}</td>
+                       <td className="px-4 py-3 align-top">
+                          {exec.code_sha ? (() => {
+                            const sha7 = exec.code_sha.slice(0, 7);
+                            const ver = deployVersionMap[exec.code_sha];
+                            return (
+                              <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded border ${
+                                ver?.isCurrent
+                                  ? 'text-emerald-400 border-emerald-900/50 bg-emerald-950/20'
+                                  : ver?.isPrev
+                                  ? 'text-neutral-400 border-neutral-700 bg-neutral-900/40'
+                                  : 'text-neutral-600 border-neutral-800 bg-transparent'
+                              }`}>
+                                {sha7}
+                              </span>
+                            );
+                          })() : <span className="text-neutral-700 text-[10px]">—</span>}
+                        </td>
+                        <td className="px-4 py-3 pr-6 text-right text-neutral-600">{new Date(exec.started_at ?? new Date().toISOString()).toLocaleTimeString()}</td>
                     </tr>
                   ))}
                   {executions.length === 0 && (
