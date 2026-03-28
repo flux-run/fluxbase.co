@@ -430,6 +430,37 @@ export default function IncidentDetailPage({
   const addComment = useCallback((text: string, currentActivity: ActivityEvent[]) => {
     const trimmed = text.trim();
     if (!trimmed) return;
+
+    // --- Slash commands ---
+    const slashAssign = trimmed.match(/^\/assign\s+@?(.+)/i);
+    const slashResolve = /^\/resolve\b/i.test(trimmed);
+    const slashNote    = trimmed.match(/^\/note\s+(.+)/i);
+
+    if (slashAssign) {
+      const assignee = slashAssign[1].trim();
+      assignOwner(assignee, currentActivity);
+      setCommentDraft('');
+      return;
+    }
+    if (slashResolve) {
+      updateStatus('resolved', currentActivity);
+      setCommentDraft('');
+      return;
+    }
+    if (slashNote) {
+      const noteText = slashNote[1].trim();
+      const ev: ActivityEvent = {
+        id: `note-${Date.now()}`,
+        type: 'system',
+        text: `📌 Note: ${noteText}`,
+        ts: new Date().toISOString(),
+      };
+      persistActivity([...currentActivity, ev]);
+      setCommentDraft('');
+      return;
+    }
+
+    // --- Regular comment + AI reply ---
     const commentEv: ActivityEvent = {
       id: `comment-${Date.now()}`,
       type: 'comment',
@@ -458,7 +489,7 @@ export default function IncidentDetailPage({
     persistActivity([...currentActivity, commentEv, aiEv]);
     setCommentDraft('');
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [owner, persistActivity, group, title]);
+  }, [owner, persistActivity, group, title, assignOwner, updateStatus]);
 
   const toggleAction = useCallback((i: number) => {
     setCheckedActions(prev => {
@@ -468,6 +499,16 @@ export default function IncidentDetailPage({
       return next;
     });
   }, [title]);
+
+  const pinToTimeline = useCallback((text: string, currentActivity: ActivityEvent[]) => {
+    const ev: ActivityEvent = {
+      id: `pin-${Date.now()}`,
+      type: 'system',
+      text: `📌 ${text}`,
+      ts: new Date().toISOString(),
+    };
+    persistActivity([...currentActivity, ev]);
+  }, [persistActivity]);
 
   useEffect(() => {
     if (!api.ready) return;
@@ -845,11 +886,20 @@ export default function IncidentDetailPage({
                   <Zap className="w-3 h-3 text-cyan-400" />
                   <span className="text-[9px] font-black uppercase tracking-widest text-cyan-500">Suggested Actions</span>
                 </div>
-                {checkedActions.size > 0 && (
-                  <span className="text-[8px] font-black text-cyan-600">
-                    {checkedActions.size}/{suggestedFix.actions.length} done
-                  </span>
-                )}
+                <div className="flex items-center gap-3">
+                  {checkedActions.size > 0 && (
+                    <span className="text-[8px] font-black text-cyan-600">
+                      {checkedActions.size}/{suggestedFix.actions.length} done
+                    </span>
+                  )}
+                  <button
+                    onClick={() => pinToTimeline(`Suggested fix pinned — ${suggestedFix.summary.slice(0, 80)}`, activity)}
+                    className="flex items-center gap-1 text-[8px] font-black text-neutral-600 hover:text-cyan-400 transition-colors"
+                    title="Pin to timeline"
+                  >
+                    📌 Pin
+                  </button>
+                </div>
               </div>
               <div className="px-4 py-3 space-y-3">
                 <p className="text-[10px] text-neutral-400 font-mono leading-relaxed">{suggestedFix.summary}</p>
@@ -902,8 +952,15 @@ export default function IncidentDetailPage({
           {/* Deploy Analysis — compressed signal table */}
           {deployId && (
             <div className="rounded-xl border border-neutral-800/60 bg-neutral-950/60 overflow-hidden">
-              <div className="px-4 py-2.5 border-b border-neutral-800/40">
+              <div className="px-4 py-2.5 border-b border-neutral-800/40 flex items-center justify-between">
                 <span className="text-[9px] font-black uppercase tracking-widest text-neutral-500">Deploy Signal</span>
+                <button
+                  onClick={() => pinToTimeline(`Deploy ${deployId} — ${deployMode === 'introduced' ? 'introduced failures' : deployMode === 'regressed' ? `rate ${rateBeforePct}% → ${rateAfterPct}%` : deployMode === 'improved' ? 'improvement' : 'unchanged'} (pinned)`, activity)}
+                  className="flex items-center gap-1 text-[8px] font-black text-neutral-600 hover:text-orange-400 transition-colors"
+                  title="Pin to timeline"
+                >
+                  📌 Pin
+                </button>
               </div>
               <div className="px-4 py-3 space-y-3">
                 {/* Before / After table */}
@@ -1025,7 +1082,10 @@ export default function IncidentDetailPage({
                   </div>
                 </div>
                 <button
-                  onClick={() => router.push(`/project/${id}/executions/${executions[0].id}`)}
+                  onClick={() => {
+                    pinToTimeline(`Reproduction started — tracing execution ${executions[0].id.slice(0, 8)}`, activity);
+                    router.push(`/project/${id}/executions/${executions[0].id}`);
+                  }}
                   className="flex items-center gap-1.5 text-[9px] font-black text-neutral-400 hover:text-white border border-neutral-800 hover:border-neutral-600 rounded-lg px-3 py-1.5 transition-all shrink-0"
                 >
                   View trace <ArrowRight className="w-3 h-3" />
@@ -1289,7 +1349,7 @@ export default function IncidentDetailPage({
                     addComment(commentDraft, activity);
                   }
                 }}
-                placeholder={`Add a comment${owner ? ` as ${owner}` : ''}… (Enter to send)`}
+                placeholder={`Add a comment${owner ? ` as ${owner}` : ''}… (Enter to send, /assign @user, /resolve, /note ...)`}
                 rows={2}
                 className="w-full text-[10px] font-mono bg-neutral-900/60 border border-neutral-800 hover:border-neutral-700 focus:border-neutral-600 rounded-lg px-3 py-2 text-neutral-300 placeholder-neutral-700 outline-none transition-colors resize-none"
               />
