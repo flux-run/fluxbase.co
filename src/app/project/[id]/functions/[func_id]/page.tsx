@@ -549,8 +549,8 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                      {meta.icon} {meta.label}
                                    </span>
                                    {isMostImpactful && (
-                                     <span className="text-[8px] font-black uppercase text-neutral-500 border border-neutral-700 px-1 py-0.5 rounded leading-none">
-                                       Most Impactful
+                                     <span className={`text-[8px] font-black uppercase border px-1 py-0.5 rounded leading-none ${meta.color} ${meta.border}`}>
+                                       ▲ Fix first
                                      </span>
                                    )}
                                    <span className={`text-[9px] font-bold ml-auto ${meta.dimColor}`}>
@@ -587,11 +587,11 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                      <div className="text-orange-400/70 pt-0.5">Fix: run <span className="font-bold">flux deploy</span> to upload a build artifact</div>
                                    </div>
                                  )}
-                                 {/* External: full consequence chain when user errors also present */}
-                                 {cluster.cls === 'external' && hasUserErrors && (
+                                 {/* External: consequence chain — always shown */}
+                                 {cluster.cls === 'external' && (
                                    <div className="mt-2 pt-2 border-t border-blue-800/30 font-mono text-[10px] space-y-1">
                                      <div className="text-blue-400/60">→ not handled in user code</div>
-                                     <div className="text-blue-400/40">→ execution aborted</div>
+                                     <div className="text-blue-400/40">→ request failed</div>
                                    </div>
                                  )}
                                  {/* User: explicit throw hint */}
@@ -600,6 +600,29 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                      → explicitly thrown in user code
                                    </div>
                                  )}
+                                 {/* Runtime: intent clarity */}
+                                 {cluster.cls === 'runtime' && (
+                                   <div className="mt-2 pt-2 border-t border-red-800/30 font-mono text-[10px] text-neutral-600">
+                                     → thrown or unhandled in user code
+                                   </div>
+                                 )}
+                                 {/* Fix impact preview */}
+                                 {(() => {
+                                   const te = Number(st?.total_execs ?? 0);
+                                   if (te <= 0) return null;
+                                   const currentRate = Math.round((totalFails / te) * 100);
+                                   const afterRate = Math.round(Math.max(0, (totalFails - cluster.totalHits) / te) * 100);
+                                   if (currentRate === afterRate || currentRate === 0) return null;
+                                   return (
+                                     <div className="mt-2 pt-2 border-t border-neutral-800/40 font-mono text-[9px] flex items-center gap-1.5 flex-wrap">
+                                       <span className="text-emerald-500/60">↓ fix this:</span>
+                                       <span className="text-neutral-600">failure rate</span>
+                                       <span className="text-neutral-500 font-bold">{currentRate}%</span>
+                                       <span className="text-neutral-700">→</span>
+                                       <span className="text-emerald-500 font-bold">{afterRate}%</span>
+                                     </div>
+                                   );
+                                 })()}
                                </div>
                              );
                            })}
@@ -1000,7 +1023,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                       {clusters.length} independent failure mode{clusters.length > 1 ? 's' : ''} detected
                     </span>
                     {clusters.length > 1 && (
-                      <span className="text-[9px] font-bold text-neutral-700 border border-neutral-800 px-1.5 py-0.5 rounded">⚠ not related</span>
+                      <span className="text-[9px] font-bold text-neutral-700 border border-neutral-800 px-1.5 py-0.5 rounded">⚠ Independent failures (no shared root cause)</span>
                     )}
                   </div>
                   {clusters.map((cluster, ci) => {
@@ -1015,8 +1038,8 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                             {meta.icon} {meta.label}
                           </span>
                           {isMostImpactful && (
-                            <span className="text-[8px] font-black uppercase text-neutral-500 border border-neutral-700 px-1 py-0.5 rounded leading-none">
-                              Most Impactful
+                            <span className={`text-[8px] font-black uppercase border px-1 py-0.5 rounded leading-none ${meta.color} ${meta.border}`}>
+                              ▲ Fix first
                             </span>
                           )}
                           <span className="text-[9px] text-neutral-600 ml-auto">
@@ -1025,7 +1048,14 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                         </div>
                         {/* Issues in this cluster */}
                         {cluster.issues.map((issue, i) => {
-                          const fixForIssue = errorTypeToFix(issue.title);
+                          const fixForIssue = cluster.cls === 'external' ? (() => {
+                            const t = issue.title.toLowerCase();
+                            if (t.includes('dns') || t.includes('resolve')) return 'DNS lookup failed → not caught → request crashes';
+                            if (t.includes('timeout')) return 'request timed out → not caught → request crashes';
+                            if (t.includes('refused') || t.includes('econnrefused')) return 'connection refused → not caught → request crashes';
+                            if (t.includes('tls') || t.includes('certificate') || t.includes('ssl')) return 'TLS error → not caught → request crashes';
+                            return 'external call failed → not caught → request crashes';
+                          })() : errorTypeToFix(issue.title);
                           const issueFrame = topUserFrame(issue.sample_stack);
                           const issueLoc = frameLabel(issueFrame);
                           return (
@@ -1060,7 +1090,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                           );
                         })}
                         {/* Consequence footer — infra and external get extra context */}
-                        {(cluster.cls === 'infra' || (cluster.cls === 'external' && hasUserErrors)) && (
+                        {(cluster.cls === 'infra' || cluster.cls === 'external') && (
                           <div className={`border-x border-b ${meta.border} px-4 py-2 font-mono text-[10px] text-neutral-600 space-y-0.5 ${meta.bg} rounded-b-lg`}>
                             {cluster.cls === 'infra' ? (
                               <>
@@ -1068,12 +1098,15 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                 <div>→ no user code executed</div>
                               </>
                             ) : (
-                              <div>→ unhandled in user code</div>
+                              <>
+                                <div>→ not handled in user code</div>
+                                <div>→ request failed</div>
+                              </>
                             )}
                           </div>
                         )}
                         {/* Close rounded bottom when no consequence footer */}
-                        {!(cluster.cls === 'infra' || (cluster.cls === 'external' && hasUserErrors)) && (
+                        {!(cluster.cls === 'infra' || cluster.cls === 'external') && (
                           <div className={`border-x border-b ${meta.border} h-1 rounded-b-lg`} />
                         )}
                       </div>
