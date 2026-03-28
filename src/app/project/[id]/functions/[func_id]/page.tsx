@@ -373,6 +373,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
     confidenceScore: number;
     verifyMode: 'deterministic' | 'probabilistic';
     requiredToVerify: number;
+    pathCoveredCount: number;
   } => {
     const fp               = extractClusterFingerprint(cluster);
     const pathsTracked     = fp.paths.size > 0;
@@ -448,7 +449,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
         : isDeterministic
         ? `Deterministic — fails ${failureRate}% across ${execCount} exec${execCount !== 1 ? 's' : ''}`
         : `Reproducible · ${execCount} exec${execCount !== 1 ? 's' : ''}, ${failureRate}% failure rate`;
-      return { state: isRegressed ? 'regressed' : 'active', confidence, execCount, errorCount: currentErrors, failureRate, matchedTotal, matchedSuccess, matchedFail, reason, isDeterministic, isRegressed, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode, requiredToVerify };
+      return { state: isRegressed ? 'regressed' : 'active', confidence, execCount, errorCount: currentErrors, failureRate, matchedTotal, matchedSuccess, matchedFail, reason, isDeterministic, isRegressed, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode, requiredToVerify, pathCoveredCount: pathCoveredExecs.length };
     }
 
     // No active failures — determine if the same scenario was exercised successfully
@@ -456,20 +457,20 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
     if (effectiveDeterministic ? matchedSuccess >= 1 : matchedTotal >= 3) {
       const confidence: 'high' | 'medium' | 'low' = effectiveDeterministic ? 'high' : matchedTotal >= 15 ? 'high' : matchedTotal >= 5 ? 'medium' : 'low';
       const reason = `Verified — ${matchedSuccess} exec${matchedSuccess !== 1 ? 's' : ''} on same path, no recurrence`;
-      return { state: 'verified_fixed', confidence, execCount, errorCount: 0, failureRate: 0, matchedTotal, matchedSuccess, matchedFail: 0, reason, isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode, requiredToVerify };
+      return { state: 'verified_fixed', confidence, execCount, errorCount: 0, failureRate: 0, matchedTotal, matchedSuccess, matchedFail: 0, reason, isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode, requiredToVerify, pathCoveredCount: pathCoveredExecs.length };
     }
     if (execCount >= VERIFIED_EXEC_HIGH)
       return { state: 'verified_fixed', confidence: 'medium', execCount, errorCount: 0, failureRate: 0, matchedTotal, matchedSuccess, matchedFail: 0,
-        reason: `Not reproduced across ${execCount} execs — path not yet exercised`, isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode, requiredToVerify };
+        reason: `Not reproduced across ${execCount} execs — path not yet exercised`, isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode, requiredToVerify, pathCoveredCount: pathCoveredExecs.length };
     if (execCount >= VERIFIED_EXEC_MIN)
       return { state: 'verified_fixed', confidence: 'low', execCount, errorCount: 0, failureRate: 0, matchedTotal, matchedSuccess, matchedFail: 0,
-        reason: `Not reproduced across ${execCount} execs — insufficient path coverage`, isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode, requiredToVerify };
+        reason: `Not reproduced across ${execCount} execs — insufficient path coverage`, isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode, requiredToVerify, pathCoveredCount: pathCoveredExecs.length };
 
     return { state: 'unverified', confidence: 'low', execCount, errorCount: 0, failureRate: 0, matchedTotal, matchedSuccess, matchedFail: 0,
       reason: pathsTracked
         ? `Failure path not yet exercised in current deploy (${execCount}/${VERIFIED_EXEC_MIN} execs)`
         : `Only ${execCount} of ${VERIFIED_EXEC_MIN} executions needed to verify`,
-      isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode, requiredToVerify };
+      isDeterministic: false, isRegressed: false, pathsTracked, observationState, lastMatchedAt, matchingCriteria, confidenceScore, verifyMode, requiredToVerify, pathCoveredCount: pathCoveredExecs.length };
   };
 
   const st = statsData?.stats;
@@ -875,7 +876,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                  {(() => {
                                    const obsLabel = (() => {
                                      if (verify.observationState === 'not_observed')
-                                       return { text: 'NOT OBSERVED', color: 'text-neutral-500' };
+                                       return { text: 'WAITING FOR TRAFFIC', color: 'text-neutral-500' };
                                      if (verify.observationState === 'verified')
                                        return { text: 'VERIFIED', color: verify.confidence === 'high' ? 'text-emerald-400' : 'text-emerald-600/70' };
                                      if (verify.state === 'regressed') return { text: 'REGRESSION', color: 'text-orange-400' };
@@ -886,13 +887,18 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                    const coveragePct = verify.requiredToVerify > 0
                                      ? Math.round((Math.min(verify.matchedTotal, verify.requiredToVerify) / verify.requiredToVerify) * 100)
                                      : 0;
-                                   const neededText = verify.observationState === 'verified'
-                                     ? ( verify.verifyMode === 'deterministic'
-                                         ? `1 matching success (deterministic)`
-                                         : `${verify.matchedTotal} matching exec${verify.matchedTotal !== 1 ? 's' : ''}`)
-                                     : verify.verifyMode === 'deterministic'
-                                     ? `1 successful execution on same path`
-                                     : `${verify.matchedTotal} of ${verify.requiredToVerify} matching executions`;
+                                   // Fix coverage: % of execs after deploy that touched the failure path
+                                   const fixCoveragePct = verify.execCount > 0 && verify.pathsTracked
+                                     ? Math.round((verify.pathCoveredCount / verify.execCount) * 100)
+                                     : null;
+                                   // Criteria rows: ordered, labeled, explicit
+                                   const criteriaRows: { label: string; value: string }[] = [];
+                                   if (callSites[0]) criteriaRows.push({ label: 'call site', value: callSites[0] });
+                                   if (externalDep)  criteriaRows.push({ label: 'operation', value: `fetch(${externalDep})` });
+                                   if (errorType)    criteriaRows.push({ label: 'error type', value: errorType });
+                                   if (errorSource)  criteriaRows.push({ label: 'source', value: errorSource.replace(/_/g, ' ') });
+                                   if (codeSha)      criteriaRows.push({ label: 'version', value: codeSha });
+                                   if (criteriaRows.length === 0) criteriaRows.push({ label: 'match', value: 'fingerprint' });
                                    return (
                                      <div className="mt-2 pt-2 border-t border-white/5 font-mono text-[9px] space-y-0.5">
                                        {/* Label + confidence score */}
@@ -905,14 +911,21 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                            )}
                                          </div>
                                        </div>
-                                       {/* Adaptive threshold — what's needed or what was used */}
-                                       <div className="flex items-center justify-between gap-2">
-                                         <span className="text-neutral-700 shrink-0">
-                                           {verify.observationState === 'verified' ? 'Verified by' : verify.verifyMode === 'deterministic' ? 'Needed to verify' : 'Needed to verify'}
-                                         </span>
-                                         <span className="text-neutral-500 text-right">{neededText}</span>
+                                       {/* Verification strategy + what it drives */}
+                                       <div className="flex items-start justify-between gap-2">
+                                         <span className="text-neutral-700 shrink-0">Strategy</span>
+                                         <div className="flex flex-col items-end gap-px">
+                                           <span className={`font-bold ${verify.verifyMode === 'deterministic' ? 'text-red-400/80' : 'text-amber-500/70'}`}>
+                                             {verify.verifyMode === 'deterministic' ? 'Deterministic' : 'Probabilistic'}
+                                           </span>
+                                           <span className="text-neutral-700">
+                                             {verify.verifyMode === 'deterministic'
+                                               ? '→ 1 matching success proves fix'
+                                               : `→ ${verify.requiredToVerify} matching execs for confidence`}
+                                           </span>
+                                         </div>
                                        </div>
-                                       {/* Coverage progress — only when not yet verified */}
+                                       {/* Adaptive threshold — coverage bar */}
                                        {verify.observationState !== 'verified' && (
                                          <div className="flex items-center justify-between gap-2">
                                            <span className="text-neutral-700 shrink-0">Coverage</span>
@@ -927,26 +940,40 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                            </div>
                                          </div>
                                        )}
-                                       {/* Matching executions observed (honest zero) */}
+                                       {/* Observed counts (honest zero) */}
                                        <div className="flex items-center justify-between gap-2">
                                          <span className="text-neutral-700">Observed</span>
                                          {verify.matchedTotal === 0
-                                           ? <span className="text-neutral-700">0 matching executions observed</span>
+                                           ? <span className="text-neutral-700">no matching executions yet</span>
                                            : <span className="text-neutral-500">{verify.matchedFail} failure{verify.matchedFail !== 1 ? 's' : ''} · {verify.matchedSuccess} success{verify.matchedSuccess !== 1 ? 'es' : ''}</span>
                                          }
                                        </div>
-                                       {/* Explicit matching criteria */}
+                                       {/* Fix path coverage insight */}
+                                       {fixCoveragePct !== null && verify.observationState !== 'verified' && (
+                                         <div className="flex items-start justify-between gap-2">
+                                           <span className="text-neutral-700 shrink-0">Fix path hit</span>
+                                           <div className="flex flex-col items-end gap-px">
+                                             <span className={`font-bold ${
+                                               fixCoveragePct === 0 ? 'text-neutral-600'
+                                               : fixCoveragePct < 10 ? 'text-amber-600/80'
+                                               : 'text-amber-400'
+                                             }`}>{fixCoveragePct}% of executions</span>
+                                             {fixCoveragePct === 0 && (
+                                               <span className="text-neutral-700">fix not yet exercised in production</span>
+                                             )}
+                                           </div>
+                                         </div>
+                                       )}
+                                       {/* Explicit matching criteria — labeled rows */}
                                        <div className="flex items-start justify-between gap-2 pt-0.5 mt-0.5 border-t border-white/[0.04]">
                                          <span className="text-neutral-700 shrink-0">Match criteria</span>
                                          <div className="flex flex-col items-end gap-px">
-                                           {codeSha     && <span className="text-neutral-600">version {codeSha}</span>}
-                                           {callSites[0] && <span className="text-neutral-600 truncate max-w-[120px]" title={callSites[0]}>{callSites[0]}</span>}
-                                           {externalDep  && <span className="text-neutral-600">{externalDep}</span>}
-                                           {errorType    && <span className="text-neutral-600">{errorType}</span>}
-                                           {errorSource  && <span className="text-neutral-600">{errorSource.replace(/_/g, ' ')}</span>}
-                                           {!codeSha && !callSites[0] && !externalDep && !errorType && !errorSource && (
-                                             <span className="text-neutral-700">fingerprint match</span>
-                                           )}
+                                           {criteriaRows.map(({ label, value }) => (
+                                             <div key={label} className="flex items-center gap-1">
+                                               <span className="text-neutral-800">{label}:</span>
+                                               <span className="text-neutral-600 truncate max-w-[100px]" title={value}>{value}</span>
+                                             </div>
+                                           ))}
                                          </div>
                                        </div>
                                        {/* Last matching execution */}
