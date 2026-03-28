@@ -462,6 +462,11 @@ export default function ProjectPage({
                           · consistent across {suggestedFocus.affectedFns.length} functions
                         </p>
                       )}
+                      {suggestedFocus.deployId && suggestedFocus.errorsBeforeDeploy === 0 && suggestedFocus.errorsAfterDeploy > 0 && (
+                        <p className="text-[8px] text-neutral-700 font-mono pl-0.5">
+                          · no prior occurrence
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center justify-end pt-1">
