@@ -170,31 +170,21 @@ function classifyError(title: string, errorSource?: string | null, errorType?: s
   return 'runtime';
 }
 
-// Group top_issues by code_sha into independent failure clusters, each with
-// a cause-chain ordered by CLASS_ORDER. Clusters with no causal dependency
-// are kept separate — no cross-cluster arrows are ever drawn.
+// Each error class is an independent failure pattern. Two errors are independent
+// unless they appear in the SAME execution's stack — and since top_issues are
+// already per-fingerprint, we treat each class as its own failure mode.
+// Sort by total hits so the most impactful pattern comes first.
 function buildFailureClusters(issues: FunctionStatsResult['top_issues']): Array<{
-  codeSha: string;
+  cls: ErrorClass;
   totalHits: number;
-  layers: Array<{ cls: ErrorClass; issues: FunctionStatsResult['top_issues'] }>;
+  issues: FunctionStatsResult['top_issues'];
 }> {
-  const bySha = issues.reduce<Record<string, FunctionStatsResult['top_issues']>>((acc, iss) => {
-    const key = iss.code_sha ?? '__unknown__';
-    (acc[key] ??= []).push(iss);
-    return acc;
-  }, {});
-
-  return Object.entries(bySha)
-    .map(([sha, shaIssues]) => {
-      const totalHits = shaIssues.reduce((s, i) => s + i.count, 0);
-      const layers = CLASS_ORDER
-        .map(cls => ({
-          cls,
-          issues: shaIssues.filter(iss => classifyError(iss.title, iss.error_source, iss.error_type) === cls),
-        }))
-        .filter(l => l.issues.length > 0);
-      return { codeSha: sha, totalHits, layers };
+  return CLASS_ORDER
+    .map(cls => {
+      const clsIssues = issues.filter(iss => classifyError(iss.title, iss.error_source, iss.error_type) === cls);
+      return { cls, totalHits: clsIssues.reduce((s, i) => s + i.count, 0), issues: clsIssues };
     })
+    .filter(g => g.issues.length > 0)
     .sort((a, b) => b.totalHits - a.totalHits);
 }
 
@@ -478,37 +468,28 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
               {/* Semantic headline derived from root cluster */}
               {(() => {
                 const clusters = buildFailureClusters(statsData.top_issues ?? []);
-                const rootLayer = clusters[0]?.layers[0];
-                if (!rootLayer) {
-                  const frame = topUserFrame(statsData.root_cause.sample_stack);
-                  const loc = frameLabel(frame);
-                  return (
-                    <>
-                      <span className="text-base font-bold text-red-100 font-mono truncate">{activeIssue}</span>
-                      {loc && <span className="text-red-400/70 text-[11px] font-mono shrink-0">↳ {loc}</span>}
-                    </>
-                  );
+                const top = clusters[0];
+                if (!top) {
+                  return <span className="text-base font-bold text-red-100 font-mono truncate">{activeIssue}</span>;
                 }
-                const rootMeta = ERROR_CLASS_META[rootLayer.cls];
-                const topIss = rootLayer.issues[0];
-                const label = compactIssueLabel(topIss.title, topIss.error_source);
+                const topMeta = ERROR_CLASS_META[top.cls];
+                const topLabel = compactIssueLabel(top.issues[0].title, top.issues[0].error_source);
                 const totalFails = (statsData.top_issues ?? []).reduce((s, i) => s + i.count, 0);
                 const errorPct = (st?.total_execs ?? 0) > 0
                   ? `${Math.round((totalFails / (st?.total_execs ?? 1)) * 100)}%`
                   : null;
-                const clusterCount = clusters.length;
                 return (
                   <>
-                    <span className={`text-[10px] font-black uppercase tracking-wider ${rootMeta.color} shrink-0`}>
-                      {rootMeta.label}
+                    <span className={`text-[10px] font-black uppercase tracking-wider ${topMeta.color} shrink-0`}>
+                      {topMeta.label}
                     </span>
                     <span className="text-sm font-bold text-red-100 font-mono truncate">
-                      {label}
+                      {topLabel}
                       {errorPct && <span className="text-red-400/70 font-normal"> · affecting {errorPct}</span>}
                     </span>
-                    {clusterCount > 1 && (
+                    {clusters.length > 1 && (
                       <span className="text-[9px] font-bold text-neutral-600 shrink-0 border border-neutral-800 px-1.5 py-0.5 rounded">
-                        {clusterCount} groups
+                        {clusters.length} failure types
                       </span>
                     )}
                   </>
@@ -537,147 +518,64 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                        </span>
                      )}
 
-                     {/* Failure Clusters — independent chains, no cross-cluster arrows */}
+                     {/* Failure Patterns — independent, one card per error class, no causal arrows */}
                      {(() => {
                        const clusters = buildFailureClusters(statsData.top_issues ?? []);
                        if (clusters.length === 0) return null;
-                       const multiCluster = clusters.length > 1;
+                       const totalFails = clusters.reduce((s, c) => s + c.totalHits, 0);
 
                        return (
-                         <div className="space-y-4">
+                         <div className="space-y-3">
                            <div className="flex items-center gap-2">
-                             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500">
-                               {multiCluster ? 'Independent Failure Groups' : 'Cause Chain'}
+                             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500">Failure Patterns</span>
+                             <span className="text-[9px] font-bold text-neutral-700 border border-neutral-800 px-1.5 py-0.5 rounded">
+                               {clusters.length} independent type{clusters.length > 1 ? 's' : ''}
                              </span>
-                             {multiCluster && (
-                               <span className="text-[9px] font-bold text-neutral-600 border border-neutral-800 px-1.5 py-0.5 rounded">
-                                 {clusters.length} separate roots
-                               </span>
-                             )}
                            </div>
-                           {clusters.map((cluster, ci) => (
-                             <div key={cluster.codeSha} className={multiCluster ? 'border border-neutral-800/60 rounded-xl p-3 bg-neutral-950/40' : ''}>
-                               {multiCluster && (
-                                 <div className="flex items-center gap-2 mb-3">
-                                   <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
-                                     Group {ci + 1}
+                           {clusters.map((cluster, ci) => {
+                             const meta = ERROR_CLASS_META[cluster.cls];
+                             const pct = totalFails > 0 ? Math.round((cluster.totalHits / totalFails) * 100) : 0;
+                             const isMostImpactful = ci === 0 && clusters.length > 1;
+                             return (
+                               <div key={cluster.cls} className={`rounded-lg border px-4 py-3 ${meta.bg} ${meta.border}`}>
+                                 <div className="flex items-center gap-2 mb-2">
+                                   <span className={`text-[10px] font-black uppercase tracking-wider ${meta.color}`}>
+                                     {meta.icon} {meta.label}
                                    </span>
-                                   <span className="text-[9px] font-mono text-neutral-700">{cluster.codeSha.slice(0, 7)}</span>
-                                   <span className="text-[9px] font-bold text-neutral-600 ml-auto">{cluster.totalHits} hits</span>
+                                   {isMostImpactful && (
+                                     <span className="text-[8px] font-black uppercase text-neutral-500 border border-neutral-700 px-1 py-0.5 rounded leading-none">
+                                       Most Impactful
+                                     </span>
+                                   )}
+                                   <span className={`text-[9px] font-bold ml-auto ${meta.dimColor}`}>
+                                     {cluster.totalHits} hit{cluster.totalHits > 1 ? 's' : ''} · {pct}%
+                                   </span>
                                  </div>
-                               )}
-                               {cluster.layers.map((layer, li) => {
-                                 const meta = ERROR_CLASS_META[layer.cls];
-                                 const isRoot = li === 0;
-                                 const isLast = li === cluster.layers.length - 1;
-                                 const hasMultipleLayers = cluster.layers.length > 1;
-                                 return (
-                                   <div key={layer.cls}>
-                                     <div className={`rounded-lg border px-4 py-3 ${meta.bg} ${meta.border}`}>
-                                       <div className="flex items-center gap-2 mb-2">
-                                         <span className={`text-[10px] font-black uppercase tracking-wider ${meta.color}`}>
-                                           {isRoot ? '🔴 Root Cause' : isLast ? '💥 User Impact' : '⚡ Propagated'}
-                                         </span>
-                                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${meta.bg} ${meta.border} ${meta.color}`}>
-                                           {meta.label}
-                                         </span>
-                                         {!isRoot && hasMultipleLayers && (
-                                           <span className="text-[9px] text-neutral-700 italic ml-auto">secondary effect</span>
-                                         )}
-                                       </div>
-                                       {layer.issues.map((iss, ii) => {
-                                         const issFrame = topUserFrame(iss.sample_stack);
-                                         const issLoc = frameLabel(issFrame);
-                                         const issLabel = compactIssueLabel(iss.title, iss.error_source);
-                                         const isPrimary = isRoot && ii === 0;
-                                         return (
-                                           <div
-                                             key={ii}
-                                             onClick={() => setFilter(filter === iss.title ? null : iss.title)}
-                                             className="flex items-center justify-between gap-3 cursor-pointer group/issue py-1"
-                                           >
-                                             <div className="flex items-center gap-2 min-w-0">
-                                               {isPrimary && hasMultipleLayers && (
-                                                 <span className="text-[8px] font-black uppercase text-red-500 shrink-0 border border-red-900/50 bg-red-950/30 px-1 py-0.5 rounded leading-none">
-                                                   PRIMARY
-                                                 </span>
-                                               )}
-                                               <span
-                                                 className={`font-mono text-[12px] truncate group-hover/issue:underline ${isPrimary ? 'text-neutral-100 font-semibold' : 'text-neutral-400'}`}
-                                                 title={issLoc ? `${iss.title} → ${issLoc}` : iss.title}
-                                               >
-                                                 {issLabel}
-                                                 {issLoc && <span className={`${meta.dimColor} font-normal`}> → {issLoc}</span>}
-                                               </span>
-                                             </div>
-                                             <span className="text-[10px] font-bold text-neutral-600 shrink-0">{iss.count}×</span>
-                                           </div>
-                                         );
-                                       })}
+                                 <div className="text-[10px] text-neutral-600 mb-2 italic">{meta.description}</div>
+                                 {cluster.issues.map((iss, ii) => {
+                                   const issFrame = topUserFrame(iss.sample_stack);
+                                   const issLoc = frameLabel(issFrame);
+                                   const issLabel = compactIssueLabel(iss.title, iss.error_source);
+                                   return (
+                                     <div
+                                       key={ii}
+                                       onClick={() => setFilter(filter === iss.title ? null : iss.title)}
+                                       className="flex items-center justify-between gap-3 cursor-pointer group/issue py-0.5"
+                                     >
+                                       <span
+                                         className={`font-mono text-[12px] truncate group-hover/issue:underline text-neutral-200`}
+                                         title={issLoc ? `${iss.title} → ${issLoc}` : iss.title}
+                                       >
+                                         {issLabel}
+                                         {issLoc && <span className={`${meta.dimColor} font-normal`}> → {issLoc}</span>}
+                                       </span>
+                                       <span className="text-[10px] font-bold text-neutral-600 shrink-0">{iss.count}×</span>
                                      </div>
-                                     {/* Causal connector — only within the same cluster */}
-                                     {!isLast && (
-                                       <div className="flex items-center gap-2 py-1 pl-4">
-                                         <div className="w-px h-4 bg-neutral-700" />
-                                         <span className="text-[10px] text-neutral-600 font-mono italic">caused within same execution</span>
-                                       </div>
-                                     )}
-                                   </div>
-                                 );
-                               })}
-                             </div>
-                           ))}
-                         </div>
-                       );
-                     })()}
-
-                     {/* Flux Analysis — structured primary/secondary breakdown */}
-                     {(() => {
-                       const clusters = buildFailureClusters(statsData.top_issues ?? []);
-                       const primaryCluster = clusters[0];
-                       const rootLayer = primaryCluster?.layers[0];
-                       const userIssues = primaryCluster?.layers.filter(l => l.cls === 'user').flatMap(l => l.issues) ?? [];
-                       const externalIssues = primaryCluster?.layers.filter(l => l.cls === 'external').flatMap(l => l.issues) ?? [];
-                       return (
-                         <div className="border-l-2 border-red-500/20 pl-3 py-1 space-y-3">
-                           <span className="block font-bold text-red-400/80 text-xs">Flux Analysis</span>
-                           {rootLayer && (
-                             <div>
-                               <div className="text-[9px] text-neutral-600 uppercase font-bold tracking-wider mb-0.5">Primary Failure</div>
-                               <div className={`font-mono text-xs ${ERROR_CLASS_META[rootLayer.cls].color}`}>
-                                 {compactIssueLabel(rootLayer.issues[0].title, rootLayer.issues[0].error_source)}
+                                   );
+                                 })}
                                </div>
-                             </div>
-                           )}
-                           {(externalIssues.length > 0 || userIssues.length > 0) && (
-                             <div>
-                               <div className="text-[9px] text-neutral-600 uppercase font-bold tracking-wider mb-0.5">What your code did</div>
-                               {externalIssues.map((iss, i) => (
-                                 <div key={i} className="font-mono text-xs text-neutral-500">
-                                   did not handle → {compactIssueLabel(iss.title, iss.error_source)}
-                                 </div>
-                               ))}
-                               {userIssues.map((iss, i) => (
-                                 <div key={i} className="font-mono text-xs text-yellow-400/80">
-                                   threw → {compactIssueLabel(iss.title, iss.error_source)}
-                                 </div>
-                               ))}
-                             </div>
-                           )}
-                           <div>
-                             <div className="text-[9px] text-neutral-600 uppercase font-bold tracking-wider mb-0.5">Result</div>
-                             <div className="font-mono text-xs text-neutral-400">
-                               {statsData.root_cause?.impact || 'Execution aborted before response'}
-                             </div>
-                           </div>
-                           {clusters.length > 1 && (
-                             <div className="text-[10px] text-neutral-600 italic pt-1 border-t border-neutral-800">
-                               + {clusters.length - 1} additional independent failure group{clusters.length > 2 ? 's' : ''}
-                             </div>
-                           )}
-                           {statsData.root_cause.phase && (
-                             <div className="text-[10px] text-red-200/40">Phase: {statsData.root_cause.phase}</div>
-                           )}
+                             );
+                           })}
                          </div>
                        );
                      })()}
@@ -965,101 +863,69 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
             </div>
             {statsData?.top_issues && statsData.top_issues.length > 0 ? (() => {
               const clusters = buildFailureClusters(statsData.top_issues);
-              const multiCluster = clusters.length > 1;
+              const totalFails = clusters.reduce((s, c) => s + c.totalHits, 0);
 
               return (
-                <div className="space-y-6">
-                  {clusters.map((cluster, ci) => (
-                    <div key={cluster.codeSha}>
-                      {multiCluster && (
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">
-                            Failure Group {ci + 1}
+                <div className="space-y-3">
+                  {clusters.map((cluster, ci) => {
+                    const meta = ERROR_CLASS_META[cluster.cls];
+                    const pct = totalFails > 0 ? Math.round((cluster.totalHits / totalFails) * 100) : 0;
+                    const isMostImpactful = ci === 0 && clusters.length > 1;
+                    return (
+                      <div key={cluster.cls}>
+                        {/* Cluster header */}
+                        <div className={`flex items-center gap-2 px-3 py-2 rounded-t-lg border-x border-t ${meta.bg} ${meta.border}`}>
+                          <span className={`text-[10px] font-black uppercase tracking-wider ${meta.color}`}>
+                            {meta.icon} {meta.label}
                           </span>
-                          <span className="text-[9px] font-mono text-neutral-700">{cluster.codeSha.slice(0, 7)}</span>
-                          <span className="text-[9px] font-bold text-neutral-600 ml-auto">{cluster.totalHits} hits</span>
+                          {isMostImpactful && (
+                            <span className="text-[8px] font-black uppercase text-neutral-500 border border-neutral-700 px-1 py-0.5 rounded leading-none">
+                              Most Impactful
+                            </span>
+                          )}
+                          <span className="text-[9px] text-neutral-600 ml-auto">
+                            {cluster.totalHits} hit{cluster.totalHits > 1 ? 's' : ''} · {pct}%
+                          </span>
                         </div>
-                      )}
-                      <div className="space-y-2">
-                        {cluster.layers.map((layer, li) => {
-                          const meta = ERROR_CLASS_META[layer.cls];
-                          const isRoot = li === 0;
-                          const isLast = li === cluster.layers.length - 1;
-                          const hasMultipleLayers = cluster.layers.length > 1;
+                        {/* Issues in this cluster */}
+                        {cluster.issues.map((issue, i) => {
+                          const fixForIssue = errorTypeToFix(issue.title);
+                          const issueFrame = topUserFrame(issue.sample_stack);
+                          const issueLoc = frameLabel(issueFrame);
                           return (
-                            <div key={layer.cls}>
-                              {/* Layer header */}
-                              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-t-lg border-x border-t ${meta.bg} ${meta.border}`}>
-                                <span className={`text-[10px] font-black uppercase tracking-wider ${meta.color}`}>
-                                  {isRoot ? '🔴 Root Cause' : isLast ? '💥 User Impact' : '⚡ Propagated'}
-                                </span>
-                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${meta.bg} ${meta.border} ${meta.color}`}>
-                                  {meta.label}
-                                </span>
-                                {!isRoot && hasMultipleLayers && (
-                                  <span className="text-[9px] text-neutral-700 italic ml-1">(secondary effect)</span>
-                                )}
-                                <span className="text-[9px] text-neutral-600 ml-auto">
-                                  {layer.issues.length} issue{layer.issues.length > 1 ? 's' : ''}
-                                </span>
-                              </div>
-                              {/* Issues in this layer */}
-                              {layer.issues.map((issue, i) => {
-                                const fixForIssue = errorTypeToFix(issue.title);
-                                const issueFrame = topUserFrame(issue.sample_stack);
-                                const issueLoc = frameLabel(issueFrame);
-                                const isPrimary = isRoot && i === 0 && hasMultipleLayers;
-                                return (
-                                  <div
-                                    key={i}
-                                    onClick={() => setFilter(filter === issue.title ? null : issue.title)}
-                                    className={`bg-[#111] border-x border-b ${meta.border} ${filter === issue.title ? 'ring-1 ring-inset ' + meta.border : ''} px-4 py-3 flex items-center justify-between font-mono text-sm transition hover:bg-neutral-900/30 cursor-pointer group last:rounded-b-lg`}
-                                  >
-                                    <div className="flex items-center gap-4 overflow-hidden">
-                                      <div className={`flex flex-col items-center justify-center shrink-0 w-10 h-10 rounded border ${meta.bg} ${meta.border}`}>
-                                        <span className={`text-xs font-bold ${meta.color}`}>{issue.count}</span>
-                                        <span className="text-[8px] uppercase text-neutral-600">Hits</span>
-                                      </div>
-                                      <div className="flex flex-col overflow-hidden">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                          {isPrimary && (
-                                            <span className="text-[8px] font-black uppercase text-red-500 shrink-0 border border-red-900/50 bg-red-950/30 px-1 py-0.5 rounded leading-none">
-                                              PRIMARY
-                                            </span>
-                                          )}
-                                          <span className="text-neutral-200 truncate font-semibold" title={issueLoc ? `${issue.title} → ${issueLoc}` : issue.title}>
-                                            {compactIssueLabel(issue.title, issue.error_source)}
-                                            {issueLoc && <span className={`${meta.dimColor} font-normal`}> → {issueLoc}</span>}
-                                          </span>
-                                        </div>
-                                        <div className="flex items-center gap-2 mt-0.5 overflow-hidden">
-                                          <span className="text-[10px] text-neutral-600 uppercase tracking-wider shrink-0">{issue.fingerprint.slice(0, 8)}</span>
-                                          {fixForIssue && (
-                                            <span className="text-[10px] text-blue-400/70 truncate">→ {fixForIssue}</span>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <div className="shrink-0 text-right ml-4 hidden sm:block">
-                                      <div className="text-xs text-neutral-400 font-medium">{new Date(issue.last_seen).toLocaleTimeString()}</div>
-                                      <div className="text-[10px] text-neutral-600 mt-1">Last seen</div>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                              {/* Causal connector within cluster — only between adjacent layers */}
-                              {!isLast && (
-                                <div className="flex items-center gap-2 py-1.5 pl-5">
-                                  <div className="w-px h-5 bg-neutral-700" />
-                                  <span className="text-[10px] text-neutral-600 font-mono italic">caused within same execution ↓</span>
+                            <div
+                              key={i}
+                              onClick={() => setFilter(filter === issue.title ? null : issue.title)}
+                              className={`bg-[#111] border-x border-b ${meta.border} ${filter === issue.title ? 'ring-1 ring-inset ' + meta.border : ''} px-4 py-3 flex items-center justify-between font-mono text-sm transition hover:bg-neutral-900/30 cursor-pointer group last:rounded-b-lg`}
+                            >
+                              <div className="flex items-center gap-4 overflow-hidden">
+                                <div className={`flex flex-col items-center justify-center shrink-0 w-10 h-10 rounded border ${meta.bg} ${meta.border}`}>
+                                  <span className={`text-xs font-bold ${meta.color}`}>{issue.count}</span>
+                                  <span className="text-[8px] uppercase text-neutral-600">Hits</span>
                                 </div>
-                              )}
+                                <div className="flex flex-col overflow-hidden">
+                                  <span className="text-neutral-200 truncate font-semibold" title={issueLoc ? `${issue.title} → ${issueLoc}` : issue.title}>
+                                    {compactIssueLabel(issue.title, issue.error_source)}
+                                    {issueLoc && <span className={`${meta.dimColor} font-normal`}> → {issueLoc}</span>}
+                                  </span>
+                                  <div className="flex items-center gap-2 mt-0.5 overflow-hidden">
+                                    <span className="text-[10px] text-neutral-600 uppercase tracking-wider shrink-0">{issue.fingerprint.slice(0, 8)}</span>
+                                    {fixForIssue && (
+                                      <span className="text-[10px] text-blue-400/70 truncate">→ {fixForIssue}</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="shrink-0 text-right ml-4 hidden sm:block">
+                                <div className="text-xs text-neutral-400 font-medium">{new Date(issue.last_seen).toLocaleTimeString()}</div>
+                                <div className="text-[10px] text-neutral-600 mt-1">Last seen</div>
+                              </div>
                             </div>
                           );
                         })}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               );
             })() : (
