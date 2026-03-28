@@ -9,6 +9,8 @@ import { LayoutDashboard, Plus, ArrowRight, Box, Clock, Activity, Mail } from "l
 import { Project, Org } from "@/types/api";
 import { CreateDialog } from "@/components/dashboard/CreateDialog";
 
+type DashboardOrg = Org & { role?: string };
+
 type PendingInvite = {
   id: string;
   token: string;
@@ -26,7 +28,7 @@ function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const api = useFluxApi();
-  const [orgs, setOrgs] = useState<Org[]>([]);
+  const [orgs, setOrgs] = useState<DashboardOrg[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [redirecting, setRedirecting] = useState(false);
@@ -164,14 +166,18 @@ function DashboardContent() {
                       </div>
                       <h2 className="text-xl font-bold tracking-tight text-white uppercase tracking-widest">{org.name}</h2>
                     </div>
-                    <Button 
-                      onClick={() => handleOpenCreate(org.id!)}
-                      variant="ghost"
-                      className="text-[10px] uppercase font-black tracking-widest text-neutral-400 hover:text-white hover:bg-white/5 gap-2"
-                    >
-                      <Plus className="w-3 h-3" />
-                      New Project
-                    </Button>
+                    {(org.role === "owner" || org.role === "admin") ? (
+                      <Button 
+                        onClick={() => handleOpenCreate(org.id!)}
+                        variant="ghost"
+                        className="text-[10px] uppercase font-black tracking-widest text-neutral-400 hover:text-white hover:bg-white/5 gap-2"
+                      >
+                        <Plus className="w-3 h-3" />
+                        New Project
+                      </Button>
+                    ) : (
+                      <span className="text-[10px] uppercase font-black tracking-widest text-neutral-600">Member</span>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -224,7 +230,14 @@ function DashboardContent() {
                        <div className="col-span-full py-16 border border-dashed border-white/[0.05] rounded-xl flex flex-col items-center justify-center text-center space-y-4 bg-neutral-900/5">
                           <Box className="w-10 h-10 text-neutral-800" />
                           <div className="space-y-1">
-                             <p className="text-white text-xs font-bold tracking-tight opacity-50">No projects in this organization</p>
+                            <p className="text-white text-xs font-bold tracking-tight opacity-50">
+                             {(org.role === "owner" || org.role === "admin")
+                              ? "No projects in this organization"
+                              : "No project access in this organization"}
+                            </p>
+                            {(org.role !== "owner" && org.role !== "admin") && (
+                             <p className="text-neutral-600 text-[10px] font-mono">Ask an org owner to assign project access.</p>
+                            )}
                           </div>
                        </div>
                     )}
