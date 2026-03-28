@@ -3,7 +3,7 @@ import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { useFluxApi } from "@/lib/api";
 import { toast } from "sonner";
-import { Zap, Activity, AlertCircle, Clock, Globe, Terminal, Save, Play, ArrowUpRight, BarChart3, AlertOctagon, LucideIcon, Lightbulb, User, AlertTriangle, ChevronDown, ChevronUp, GitCommit } from "lucide-react";
+import { Zap, Activity, AlertCircle, Clock, Globe, Terminal, Save, Play, ArrowUpRight, BarChart3, AlertOctagon, LucideIcon, Lightbulb, AlertTriangle, ChevronDown, ChevronUp, GitCommit } from "lucide-react";
 import { Function, Execution, Route, FunctionStatsResult } from "@/types/api";
 import { ExecutionDetailDrawer } from "@/components/dashboard/ExecutionDetailDrawer";
 
@@ -1028,17 +1028,15 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                <div className="text-[10px] bg-green-900/20 text-green-500 border border-green-900/50 px-2 py-0.5 rounded-full font-bold animate-pulse">LIVE POLLING</div>
             </div>
             <div className="border border-neutral-900 rounded-xl overflow-hidden bg-[#0c0c0c] shadow-inner">
-              <table className="w-full text-left text-[13px] font-mono">
-                <thead className="bg-[#111] border-b border-neutral-800 text-neutral-600 text-[10px]">
+              <table className="w-full text-left text-[12px] font-mono">
+                <thead className="bg-[#111] border-b border-neutral-800 text-neutral-600 text-[9px] uppercase tracking-wider">
                   <tr>
-                    <th className="px-4 py-3">ID</th>
-                    <th className="px-4 py-3">STATUS</th>
-                    <th className="px-4 py-3">DURATION</th>
-                    <th className="px-4 py-3">TYPE</th>
-                    <th className="px-4 py-3">SOURCE</th>
-                    <th className="px-4 py-3">CALLER</th>
-                    <th className="px-4 py-3">CODE</th>
-                    <th className="px-4 py-3 pr-6 text-right">TIME</th>
+                    <th className="px-3 py-2">ID</th>
+                    <th className="px-3 py-2">Status</th>
+                    <th className="px-3 py-2">Duration</th>
+                    <th className="px-3 py-2">Type · Source</th>
+                    <th className="px-3 py-2">Code</th>
+                    <th className="px-3 py-2 pr-5 text-right">Time</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1053,75 +1051,78 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                       return !filter || headline.includes(filter) || exec.status.includes(filter);
                     })
                     .map((exec) => (
-                    <tr 
-                      key={exec.id} 
+                    <tr
+                      key={exec.id}
                       onClick={() => { setSelectedExecId(exec.id); setIsDrawerOpen(true); }}
                       className="border-b border-neutral-900 last:border-0 hover:bg-neutral-900/40 transition-colors cursor-pointer group"
                     >
-                      <td className="px-4 py-3">
-                          <span className="text-blue-500 group-hover:underline text-left font-bold">
-                            {exec.id.slice(0, 8)}
-                          </span>
+                      {/* ID + caller as tooltip */}
+                      <td className="px-3 py-1.5 whitespace-nowrap">
+                        <span
+                          className="text-blue-500 group-hover:underline font-bold"
+                          title={exec.client_ip || undefined}
+                        >
+                          {exec.id.slice(0, 8)}
+                        </span>
                       </td>
-                      <td className="px-4 py-3 align-top">
-                        <span className={`font-bold ${exec.status === 'ok' ? 'text-green-500' : 'text-red-500'}`}>{exec.status.toUpperCase()}</span>
+                      {/* Status + error headline */}
+                      <td className="px-3 py-1.5 max-w-[260px]">
+                        <span className={`font-bold text-[11px] ${exec.status === 'ok' ? 'text-green-500' : 'text-red-500'}`}>{exec.status.toUpperCase()}</span>
                         {exec.status === 'error' && (() => {
                            const headline = formatErrorHeadline(exec.error_name, exec.error_message, exec.error, exec.error_stack);
                            const frame = topUserFrame(exec.error_stack);
                            const loc = frameLabel(frame);
                            return (
                              <div
-                               className="text-[10px] text-red-400/80 mt-1 truncate max-w-[240px] font-mono"
+                               className="text-[9px] text-red-400/70 mt-0.5 truncate"
                                title={loc ? `${headline} (${loc})` : headline}
                              >
-                               {headline}{loc ? <span className="text-red-400/60 font-bold"> ({loc})</span> : null}
+                               {headline}{loc ? <span className="text-red-400/50 font-bold"> ({loc})</span> : null}
                              </div>
                            );
                         })()}
                       </td>
-                       <td className="px-4 py-3 text-neutral-500">{exec.duration_ms}ms</td>
-                       <td className="px-4 py-3">
-                          <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider bg-neutral-900 border border-neutral-800 px-1.5 py-0.5 rounded">
-                             {exec.error_type || 'default'}
+                      {/* Duration */}
+                      <td className="px-3 py-1.5 text-neutral-500 whitespace-nowrap">{exec.duration_ms}ms</td>
+                      {/* Type + Source merged */}
+                      <td className="px-3 py-1.5">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider bg-neutral-900 border border-neutral-800 px-1 py-px rounded">
+                            {exec.error_type || 'default'}
                           </span>
-                       </td>
-                       <td className="px-4 py-3">
-                          <span className={`text-[10px] font-bold uppercase tracking-wider border px-1.5 py-0.5 rounded ${
-                             exec.error_source === 'user_code' ? 'text-blue-400 border-blue-900/50 bg-blue-950/20' : 
-                             exec.error_source?.startsWith('platform') ? 'text-orange-400 border-orange-900/50 bg-orange-950/20' : 
-                             'text-neutral-500 border-neutral-800 bg-neutral-900/50'
-                          }`}>
-                             {exec.error_source ? exec.error_source.replace('_', ' ') : 'N/A'}
-                          </span>
-                       </td>
-                       <td className="px-4 py-3 text-neutral-600 truncate max-w-[100px]" title={exec.client_ip || 'Internal'}>
-                          <div className="flex items-center gap-1.5 grayscale opacity-50">
-                             <User className="w-3 h-3" />
-                             {exec.client_ip?.slice(0, 7) || 'system'}
-                          </div>
-                       </td>
-                       <td className="px-4 py-3 align-top">
-                          {exec.code_sha ? (() => {
-                            const sha7 = exec.code_sha.slice(0, 7);
-                            const ver = deployVersionMap[exec.code_sha];
-                            return (
-                              <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded border ${
-                                ver?.isCurrent
-                                  ? 'text-emerald-400 border-emerald-900/50 bg-emerald-950/20'
-                                  : ver?.isPrev
-                                  ? 'text-neutral-400 border-neutral-700 bg-neutral-900/40'
-                                  : 'text-neutral-600 border-neutral-800 bg-transparent'
-                              }`}>
-                                {sha7}
-                              </span>
-                            );
-                          })() : <span className="text-neutral-700 text-[10px]">—</span>}
-                        </td>
-                        <td className="px-4 py-3 pr-6 text-right text-neutral-600">{new Date(exec.started_at ?? new Date().toISOString()).toLocaleTimeString()}</td>
+                          {exec.error_source && (
+                            <span className={`text-[9px] font-bold uppercase tracking-wider border px-1 py-px rounded ${
+                              exec.error_source === 'user_code' ? 'text-blue-400 border-blue-900/50 bg-blue-950/20' :
+                              exec.error_source?.startsWith('platform') ? 'text-orange-400 border-orange-900/50 bg-orange-950/20' :
+                              'text-neutral-500 border-neutral-800 bg-neutral-900/50'
+                            }`}>
+                              {exec.error_source.replace(/_/g, ' ')}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      {/* Code SHA */}
+                      <td className="px-3 py-1.5">
+                        {exec.code_sha ? (() => {
+                          const sha7 = exec.code_sha.slice(0, 7);
+                          const ver = deployVersionMap[exec.code_sha];
+                          return (
+                            <span className={`text-[9px] px-1 py-px rounded border ${
+                              ver?.isCurrent ? 'text-emerald-400 border-emerald-900/50 bg-emerald-950/20'
+                              : ver?.isPrev ? 'text-neutral-400 border-neutral-700 bg-neutral-900/40'
+                              : 'text-neutral-600 border-neutral-800 bg-transparent'
+                            }`}>{sha7}</span>
+                          );
+                        })() : <span className="text-neutral-700 text-[9px]">—</span>}
+                      </td>
+                      {/* Time */}
+                      <td className="px-3 py-1.5 pr-5 text-right text-neutral-600 whitespace-nowrap text-[11px]">
+                        {new Date(exec.started_at ?? new Date().toISOString()).toLocaleTimeString()}
+                      </td>
                     </tr>
                   ))}
                   {executions.length === 0 && (
-                    <tr><td colSpan={4} className="px-4 py-8 text-center text-neutral-700 italic underline-offset-4 decoration-neutral-800 decoration-dashed underline">Waiting for live data surge...</td></tr>
+                    <tr><td colSpan={6} className="px-4 py-6 text-center text-neutral-700 italic underline-offset-4 decoration-neutral-800 decoration-dashed underline">Waiting for live data surge...</td></tr>
                   )}
                 </tbody>
               </table>
