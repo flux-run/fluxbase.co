@@ -169,7 +169,9 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
           !data.narrative.suggestion.includes("Unknown runtime error") &&
           !data.narrative.suggestion.includes("Unhandled exception detected: Unhandled exception")
         ? data.narrative.suggestion
-        : `Unhandled exception detected: ${thrownExpression}. Remove or handle this throw to allow execution to complete.`;
+        : isGenericErrorHeadline(thrownExpression)
+          ? "An unhandled exception was detected. Wrap the offending code in a try-catch to handle the error gracefully."
+          : `Unhandled exception detected: ${thrownExpression}. Remove or handle this throw to allow execution to complete.`;
   const isPlatformFailure =
     exec.is_user_code === false ||
     exec.error_source === "platform_runtime" ||
@@ -179,7 +181,9 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
   const haltReason =
     exec.status === "ok"
       ? null
-      : `Execution interrupted by unhandled exception: ${errorHeadline}`;
+      : isGenericErrorHeadline(errorHeadline)
+        ? "Execution was halted by an unhandled exception"
+        : `Execution interrupted by unhandled exception: ${errorHeadline}`;
 
   return (
     <div className="space-y-12 pb-24 max-w-5xl mx-auto">
@@ -269,9 +273,18 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                               <span className="text-[9px] font-black text-blue-400">{(data.narrative?.confidence ?? 0.85) * 100}%</span>
                            </div>
                         </div>
-                        <h3 className="text-3xl font-black text-white tracking-tight leading-tight">
-                          {displayIssue}
-                        </h3>
+                        {exec.status !== 'ok' && !isGenericErrorHeadline(errorHeadline) && isGenericErrorHeadline(data.narrative?.issue ?? null) ? (
+                          <>
+                            <h3 className="text-3xl font-black text-white tracking-tight leading-tight">
+                              {data.narrative?.issue || "Unhandled exception"}
+                            </h3>
+                            <p className="text-red-300 text-lg font-mono mt-1">{errorHeadline}</p>
+                          </>
+                        ) : (
+                          <h3 className="text-3xl font-black text-white tracking-tight leading-tight">
+                            {displayIssue}
+                          </h3>
+                        )}
                         <div className="flex flex-wrap items-center gap-3">
                            <Badge variant="outline" className={`${exec.status === 'ok' ? 'border-emerald-500/30 text-emerald-500' : 'border-red-500/30 text-red-500'} text-[10px] uppercase font-black px-2 py-0.5`}>
                               {exec.status === 'ok' ? 'Success' : 'Aborted'}

@@ -140,12 +140,18 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
         statsData.root_cause.latest_failure?.error,
       )
     : null;
+  const isGenericIssue = !activeIssue ||
+    activeIssue.trim().toLowerCase() === "unhandled exception" ||
+    activeIssue.trim().toLowerCase() === "unknown runtime error" ||
+    activeIssue.trim().toLowerCase() === "unknown error";
   const anomalySuggestion = statsData?.root_cause?.suggestion &&
       !statsData.root_cause.suggestion.includes("Unknown runtime error") &&
       !statsData.root_cause.suggestion.includes("Unhandled exception detected: Unhandled exception")
     ? statsData.root_cause.suggestion
     : statsData?.root_cause
-      ? `Unhandled exception detected: ${activeIssue}. Remove or handle this throw to allow execution to complete.`
+      ? isGenericIssue
+        ? "An unhandled exception was detected. Wrap the offending code in a try-catch to handle the error gracefully."
+        : `Unhandled exception detected: ${activeIssue}. Remove or handle this throw to allow execution to complete.`
       : null;
   const confidenceText = confidenceLabel(statsData?.root_cause?.confidence);
 
