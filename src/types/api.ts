@@ -243,6 +243,8 @@ export interface ProjectOverviewResult {
     // causality evidence fields
     errorsAfterDeploy: number;
     errorsBeforeDeploy: number;
+    execsAfterDeploy: number;   // total executions after latest deploy (for rate computation)
+    execsBeforeDeploy: number;  // total executions before latest deploy (for rate computation)
     allOnlyAfterDeploy: boolean;
     causalityScore: number;   // 0–1 computed from time proximity + before/after evidence
     isRecurring: boolean;     // true = fingerprint also seen in previous deploy (not fixed)

@@ -173,21 +173,27 @@ export default function ProjectPage({
     // Aggregate causality evidence from all incidents in this group
     const errorsAfterDeploy  = top.incidents.reduce((s, i) => s + (i.errorsAfterDeploy ?? 0), 0);
     const errorsBeforeDeploy = top.incidents.reduce((s, i) => s + (i.errorsBeforeDeploy ?? 0), 0);
+    const execsAfterDeploy   = top.incidents.reduce((s, i) => s + (i.execsAfterDeploy  ?? 0), 0);
+    const execsBeforeDeploy  = top.incidents.reduce((s, i) => s + (i.execsBeforeDeploy ?? 0), 0);
     const allOnlyAfterDeploy = top.incidents.length > 0 && top.incidents.every(i => i.allOnlyAfterDeploy);
     // Use max causality score across group (most impactful incident drives the call)
     const causalityScore = top.incidents.reduce((m, i) => Math.max(m, i.causalityScore ?? 0), 0);
     // Recurring = any incident in this group was seen in prev deploy
     const isRecurring = top.incidents.some(i => i.isRecurring);
-    // Deploy mode — what relationship does this incident have with the latest deploy?
+    // Deploy mode — rate-based classification of what this deploy did to the incident
     //   introduced : 0 errors before, errors after  → new bug from this deploy
-    //   amplified  : errors after ≥ 2× errors before → pre-existing but made worse
-    //   persistent : errors before > 0, roughly same after → not fixed by deploy
-    const deployMode: 'introduced' | 'amplified' | 'persistent' | null =
+    //   regressed  : after-rate ≥ 2× before-rate    → deploy made it worse
+    //   improved   : after-rate ≤ 0.5× before-rate  → deploy improved it
+    //   unchanged  : similar rates before and after  → persistent, deploy had no effect
+    const rateAfter  = execsAfterDeploy  > 0 ? errorsAfterDeploy  / execsAfterDeploy  : null;
+    const rateBefore = execsBeforeDeploy > 0 ? errorsBeforeDeploy / execsBeforeDeploy : null;
+    const deployMode: 'introduced' | 'regressed' | 'improved' | 'unchanged' | null =
       !topInc.deployId ? null
-      : errorsAfterDeploy === 0 && errorsBeforeDeploy === 0 ? null  // no evidence either way
+      : errorsAfterDeploy === 0 && errorsBeforeDeploy === 0 ? null
       : errorsBeforeDeploy === 0 ? 'introduced'
-      : errorsAfterDeploy >= errorsBeforeDeploy * 2 ? 'amplified'
-      : 'persistent';
+      : rateAfter !== null && rateBefore !== null && rateAfter >= rateBefore * 2 ? 'regressed'
+      : rateAfter !== null && rateBefore !== null && rateAfter <= rateBefore * 0.5 ? 'improved'
+      : 'unchanged';
     return {
       title: topInc.title,
       cls: top.cls,
@@ -215,6 +221,8 @@ export default function ProjectPage({
       causalityScore,
       isRecurring,
       deployMode,
+      execsAfterDeploy,
+      execsBeforeDeploy,
     };
   }, [incidentGroups, isBroken, overview]);
 
@@ -420,17 +428,31 @@ export default function ProjectPage({
                         {suggestedFocus.errorsAfterDeploy > 0 && (
                           <p className="text-[9px] text-neutral-600 font-mono">
                             <span className="text-red-500/50 mr-1.5 select-none">·</span>
-                            {suggestedFocus.errorsBeforeDeploy === 0 ? "0" : suggestedFocus.errorsBeforeDeploy} failures before deploy · {suggestedFocus.errorsAfterDeploy}/{suggestedFocus.totalExecs} after
+                            before deploy: {suggestedFocus.errorsBeforeDeploy} failures
+                            {suggestedFocus.execsBeforeDeploy > 0 && (
+                              <span className="text-neutral-700"> / {suggestedFocus.execsBeforeDeploy} execs ({Math.round(suggestedFocus.errorsBeforeDeploy / suggestedFocus.execsBeforeDeploy * 100)}%)</span>
+                            )}
+                          </p>
+                        )}
+                        {suggestedFocus.errorsAfterDeploy > 0 && (
+                          <p className="text-[9px] text-neutral-600 font-mono">
+                            <span className="text-red-500/50 mr-1.5 select-none">·</span>
+                            after deploy: {suggestedFocus.errorsAfterDeploy} failures
+                            {suggestedFocus.execsAfterDeploy > 0 && (
+                              <span className="text-neutral-700"> / {suggestedFocus.execsAfterDeploy} execs ({Math.round(suggestedFocus.errorsAfterDeploy / suggestedFocus.execsAfterDeploy * 100)}%)</span>
+                            )}
                           </p>
                         )}
                         <p className="text-[9px] text-neutral-600 font-mono">
                           <span className="text-red-500/50 mr-1.5 select-none">·</span>
                           {suggestedFocus.deployMode === 'introduced'
                             ? 'no failures before this deploy'
-                            : suggestedFocus.deployMode === 'amplified'
-                            ? 'failures increased significantly after deploy'
-                            : suggestedFocus.deployMode === 'persistent'
-                            ? 'seen before this deploy — continues after'
+                            : suggestedFocus.deployMode === 'regressed'
+                            ? 'failure rate increased after deploy'
+                            : suggestedFocus.deployMode === 'improved'
+                            ? 'failure rate decreased after deploy'
+                            : suggestedFocus.deployMode === 'unchanged'
+                            ? 'failure rate unchanged by deploy'
                             : 'active around this deployment'}
                         </p>
                         <p className="text-[9px] font-mono">
@@ -438,11 +460,14 @@ export default function ProjectPage({
                           {suggestedFocus.deployMode === 'introduced' && (
                             <span className="text-orange-500/70 font-black">→ caused by this deployment</span>
                           )}
-                          {suggestedFocus.deployMode === 'amplified' && (
-                            <span className="text-orange-400/70 font-black">→ amplified by this deployment</span>
+                          {suggestedFocus.deployMode === 'regressed' && (
+                            <span className="text-orange-400/70 font-black">→ worsened by this deployment</span>
                           )}
-                          {suggestedFocus.deployMode === 'persistent' && (
-                            <span className="text-amber-500/70 font-black">→ not fixed by this deployment</span>
+                          {suggestedFocus.deployMode === 'improved' && (
+                            <span className="text-emerald-500/70 font-black">→ improved by this deployment</span>
+                          )}
+                          {suggestedFocus.deployMode === 'unchanged' && (
+                            <span className="text-amber-500/70 font-black">→ persistent failure — unchanged by deployment</span>
                           )}
                           {!suggestedFocus.deployMode && (
                             <span className="text-orange-500/70 font-black">→ likely caused by this deployment</span>
@@ -488,14 +513,9 @@ export default function ProjectPage({
                           · no prior occurrence
                         </p>
                       )}
-                      {suggestedFocus.deployMode === 'amplified' && (
+                      {(suggestedFocus.deployMode === 'unchanged' || suggestedFocus.deployMode === 'regressed' || suggestedFocus.deployMode === 'improved') && (
                         <p className="text-[8px] text-neutral-700 font-mono pl-0.5">
-                          · observed before and after deploy — rate increased
-                        </p>
-                      )}
-                      {suggestedFocus.deployMode === 'persistent' && (
-                        <p className="text-[8px] text-neutral-700 font-mono pl-0.5">
-                          · observed before and after deploy
+                          · {suggestedFocus.deployMode === 'improved' ? 'failure rate improved after deploy' : suggestedFocus.deployMode === 'regressed' ? 'failure rate increased after deploy' : 'stable failure rate before and after deploy'}
                         </p>
                       )}
                     </div>
