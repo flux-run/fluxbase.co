@@ -302,7 +302,7 @@ export default function ProjectPage({
                   <div className="flex items-center gap-2">
                     <Flame className="w-3.5 h-3.5 text-red-400 shrink-0" />
                     <span className="text-[9px] font-black uppercase tracking-widest text-red-400">Fix This First</span>
-                    {suggestedFocus.isRegression && suggestedFocus.deployId && (
+                    {suggestedFocus.deployId && (
                       <span className="text-[8px] font-mono px-1.5 py-0.5 rounded border text-orange-300 border-orange-800/50 bg-orange-950/50">
                         ↑ after deploy {suggestedFocus.deployId}
                       </span>
@@ -358,11 +358,13 @@ export default function ProjectPage({
                         <span className="text-neutral-600"> — ~{suggestedFocus.usersPer10} in 10 users affected</span>
                       )}
                     </p>
-                    {/* 3. relative comparison — always show, wording adapts */}
+                    {/* 3. relative comparison — always show, wording is precise about groups vs raw counts */}
                     <p className="text-[9px] text-neutral-500 font-mono">
                       <span className="text-red-500/50 mr-1.5 select-none">·</span>
                       {incidentGroups.length === 1
-                        ? "only active incident"
+                        ? overview!.incidents.length > 1
+                          ? `only incident type — all ${overview!.incidents.length} events are the same issue`
+                          : "only active incident"
                         : suggestedFocus.impactMultiple !== null && suggestedFocus.impactMultiple > 1.2
                         ? `${suggestedFocus.impactMultiple}× larger than next issue`
                         : `highest-impact of ${incidentGroups.length} active incidents`}
@@ -370,15 +372,19 @@ export default function ProjectPage({
                         <span className="text-neutral-600"> — next: {suggestedFocus.secondTrafficPct}% traffic</span>
                       )}
                     </p>
-                    {/* 4. timing + deploy causality with +Xm offset */}
+                    {/* 4. timing + deploy causality — show whenever deployId exists, not gated by isRegression */}
                     <p className="text-[9px] text-neutral-500 font-mono">
                       <span className="text-red-500/50 mr-1.5 select-none">·</span>
-                      {suggestedFocus.isRegression && suggestedFocus.deployId
-                        ? `started ${timeAgo(suggestedFocus.firstSeen)} · after deploy ${suggestedFocus.deployId}${
-                            suggestedFocus.deployDeltaMin !== null && suggestedFocus.deployDeltaMin > 0
-                              ? ` (+${suggestedFocus.deployDeltaMin}m)`
-                              : ""
-                          }`
+                      {suggestedFocus.deployId
+                        ? (
+                          <>
+                            started {timeAgo(suggestedFocus.firstSeen)} · after deploy {suggestedFocus.deployId}
+                            {suggestedFocus.deployDeltaMin !== null && suggestedFocus.deployDeltaMin > 0 && (
+                              <span> (+{suggestedFocus.deployDeltaMin}m)</span>
+                            )}
+                            <span className="text-neutral-700"> — likely caused by deployment</span>
+                          </>
+                        )
                         : `first seen ${timeAgo(suggestedFocus.firstSeen)}`}
                     </p>
                     {suggestedFocus.affectedFns.length > 1 && (
@@ -566,7 +572,11 @@ export default function ProjectPage({
                         <div className="flex-1 h-1 bg-neutral-900 rounded-full overflow-hidden">
                           <div className="h-full bg-amber-500/60 rounded-full transition-all duration-500" style={{ width: `${item.progressPct}%` }} />
                         </div>
-                        <span className="text-[7px] font-bold text-neutral-600 tabular-nums shrink-0 whitespace-nowrap">{item.progress} of {item.required}</span>
+                        <span className="text-[7px] font-bold text-neutral-600 tabular-nums shrink-0 whitespace-nowrap">
+                          {item.progress >= item.required
+                            ? `${item.progress} samples`
+                            : `${item.progress}/${item.required}`}
+                        </span>
                       </div>
                     </div>
                   ))}
