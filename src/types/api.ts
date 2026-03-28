@@ -95,6 +95,47 @@ export interface FunctionStatsResult {
     severity: "critical" | "warning" | "info" | "healthy";
     message: string;
   };
+  /** Per-deployment execution stats, computed server-side. */
+  deploy_slices?: {
+    artifact_id: string;
+    total: number;
+    errors: number;
+    rate: number;
+  }[];
+  /** Verification state per failure cluster, computed server-side. */
+  cluster_verification?: {
+    cls: 'infra' | 'external' | 'runtime' | 'user';
+    state: 'active' | 'unverified' | 'verified_fixed' | 'regressed';
+    confidence: 'high' | 'medium' | 'low';
+    execCount: number;
+    errorCount: number;
+    failureRate: number;
+    matchedTotal: number;
+    matchedSuccess: number;
+    matchedFail: number;
+    reason: string;
+    isDeterministic: boolean;
+    isRegressed: boolean;
+    pathsTracked: boolean;
+    observationState: 'not_observed' | 'partially_observed' | 'likely_fixed' | 'verified';
+    lastMatchedAt: string | null;
+    matchingCriteria: {
+      codeSha: string | null;
+      callSites: string[];
+      externalDep: string | null;
+      errorType: string | null;
+      errorSource: string | null;
+      errorSignature: string | null;
+    };
+    confidenceScore: number;
+    verifyMode: 'deterministic' | 'probabilistic' | 'deployment';
+    requiredToVerify: number;
+    pathCoveredCount: number;
+    deployElapsedSec: number | null;
+    expectedByNow: number | null;
+    isSuspiciouslyLow: boolean;
+    lastFailedExecId: string | null;
+  }[];
 }
 
 export interface Function extends BaseFunction {

@@ -13,10 +13,8 @@ import {
 import {
   ErrorClass, ERROR_CLASS_META, CLASS_ORDER,
   classifyError, buildFailureClusters, FailureCluster,
-  computeDeploySlices, DeploySlice,
   VERIFIED_EXEC_MIN, VERIFIED_EXEC_HIGH,
-  VerifyState, VerifyResult, VerifyContext,
-  extractClusterFingerprint, execMatchesFingerprint, verifyClusterState,
+  extractClusterFingerprint, execMatchesFingerprint,
 } from "@/lib/verification-engine";
 
 export default function FunctionDetail({ params }: { params: Promise<{ id: string, func_id: string }> }) {
@@ -75,33 +73,22 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
   const prevDeployment = deploymentList[1] ?? null;
   const bootFailed = latestDeployment?.status === 'boot_failed';
 
-  // Deployment diff — compare fail rates across the two most recent deploys
-  const { latestSlice, prevSlice } = computeDeploySlices(
-    executions, latestDeployment?.artifact_id, prevDeployment?.artifact_id,
-  );
+  // Deployment diff — stats computed server-side in the overview response
+  const latestSlice = statsData?.deploy_slices?.find((s: any) => s.artifact_id === latestDeployment?.artifact_id) ?? null;
+  const prevSlice   = statsData?.deploy_slices?.find((s: any) => s.artifact_id === prevDeployment?.artifact_id) ?? null;
   const isRegression = !!(latestSlice && prevSlice && latestSlice.rate > 0.1 && prevSlice.rate < 0.1);
   const deployVersionLabel = deploymentList.length > 0 ? `v${deploymentList.length}` : null;
-  // First failure after latest deploy
-  const firstFailAfterDeploy = latestSlice
-    ? [...latestSlice.execs]
-        .filter(e => e.status !== 'ok' && e.started_at)
-        .sort((a, b) => new Date(a.started_at!).getTime() - new Date(b.started_at!).getTime())[0] ?? null
-    : null;
+  // First failure + top fail path derived from raw executions (still fetched for the table)
+  const latestDeployExecs = executions.filter(e => e.code_sha === latestDeployment?.artifact_id);
+  const firstFailAfterDeploy = latestDeployExecs
+    .filter(e => e.status !== 'ok' && e.started_at)
+    .sort((a, b) => new Date(a.started_at!).getTime() - new Date(b.started_at!).getTime())[0] ?? null;
   const deployedAt = latestDeployment ? new Date(latestDeployment.created_at).getTime() : null;
-  const verifyCtx: VerifyContext = {
-    latestSlice,
-    prevSlice,
-    deployedAt,
-    prevDeployCreatedAt: prevDeployment?.created_at ?? null,
-    functionName: data.name ?? null,
-    functionPath: data.path ?? null,
-    functionMethod: data.method ?? null,
-  };
   const firstFailDelaySec = (firstFailAfterDeploy?.started_at && deployedAt)
     ? Math.max(0, Math.floor((new Date(firstFailAfterDeploy.started_at).getTime() - deployedAt) / 1000))
     : null;
   // Most-hit failing path in latest deploy
-  const latestFailPaths = (latestSlice?.execs ?? []).filter(e => e.status !== 'ok').map(e => e.path);
+  const latestFailPaths = latestDeployExecs.filter(e => e.status !== 'ok').map(e => e.path);
   const pathCounts = latestFailPaths.reduce<Record<string, number>>((acc, p) => { acc[p] = (acc[p] ?? 0) + 1; return acc; }, {});
   const topFailPath = Object.entries(pathCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
   // Map artifact_id → version metadata for version-aware cluster display
@@ -288,8 +275,10 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
 
       {statsData?.root_cause && (() => {
         const _clusters = buildFailureClusters(statsData.top_issues ?? []);
-        // Compute verification state per cluster
-        const _clusterVerify = _clusters.map(c => verifyClusterState(c, verifyCtx));
+        // Verification states computed server-side in the overview response
+        const _clusterVerify = _clusters.map(c =>
+          (statsData?.cluster_verification as any[])?.find(v => v.cls === c.cls) ?? null
+        );
         const hasActive    = _clusterVerify.some(v => v.state === 'active');
         const hasRegressed  = _clusterVerify.some(v => v.state === 'regressed');
         const allHistorical = _clusters.length > 0 && latestDeployment?.artifact_id != null && !hasActive && !hasRegressed;
@@ -1051,8 +1040,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                     const activeClusterFps = (() => {
                       if (!statsData?.top_issues) return [];
                       const clusters = buildFailureClusters(statsData.top_issues);
-                      const allExecs = [...(latestSlice?.execs ?? []), ...(prevSlice?.execs ?? [])];
-                      return clusters.map(c => extractClusterFingerprint(c, allExecs));
+                      return clusters.map(c => extractClusterFingerprint(c, executions));
                     })();
                     const execMatchesAnyCluster = (exec: Execution) =>
                       activeClusterFps.some(fp => execMatchesFingerprint(exec, fp));
@@ -1452,7 +1440,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                 <div className="text-neutral-700 text-xs italic">No deployments yet.</div>
               )}
               {deploymentList.map((dep, i) => {
-                const slice = computeDeploySlices(executions, dep.artifact_id, undefined).latestSlice;
+                const slice = (statsData?.deploy_slices as any[])?.find(s => s.artifact_id === dep.artifact_id) ?? null;
                 // Only the first (most recent) row whose artifact_id matches latest_artifact_id is "active"
                 const isActive = dep.artifact_id === data.latest_artifact_id &&
                   deploymentList.findIndex(d => d.artifact_id === data.latest_artifact_id) === i;
