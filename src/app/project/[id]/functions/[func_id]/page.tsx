@@ -461,10 +461,25 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
     }
     const clusterErrorType   = cluster.issues[0]?.error_type ?? null;
     const clusterErrorSource = cluster.issues[0]?.error_source ?? null;
-    // Error signature: human-readable description of what went wrong (for criteria display)
-    const clusterErrorSignature = cluster.issues[0]?.title
-      ? cluster.issues[0].title.slice(0, 50)
-      : clusterErrorType ?? null;
+    // Error signature: normalize to "ErrorType: short-message (context)" for stable display
+    const normalizeErrorSig = (raw: string | null | undefined): string | null => {
+      if (!raw) return null;
+      // Already has structured form — just truncate
+      const colonIdx = raw.indexOf(':');
+      if (colonIdx !== -1) {
+        const type = raw.slice(0, colonIdx).trim();
+        let msg    = raw.slice(colonIdx + 1).trim();
+        // Strip stack-like suffixes (" at ...", "\n", long hex addresses)
+        msg = msg.replace(/\s+at\s+\S+.*$/i, '').replace(/\n.*$/, '').trim();
+        // Try to extract a parenthetical context hint from the message
+        const ctxMatch = msg.match(/\(([^)]{4,40})\)/);
+        const ctx      = ctxMatch ? ` (${ctxMatch[1]})` : '';
+        const short    = msg.replace(/\s*\(.*\)\s*$/, '').slice(0, 40).trim();
+        return `${type}: ${short}${ctx}`;
+      }
+      return raw.slice(0, 55);
+    };
+    const clusterErrorSignature = normalizeErrorSig(cluster.issues[0]?.title) ?? clusterErrorType ?? null;
     const matchingCriteria = { codeSha: matchingCodeSha, callSites: matchingCallSites, externalDep: matchingExternalDep, errorType: clusterErrorType, errorSource: clusterErrorSource, errorSignature: clusterErrorSignature };
     // Infra failures (boot issues, no artifact) cannot be traffic-verified
     const isInfra = cluster.cls === 'infra';
@@ -1056,6 +1071,18 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                          <div className="flex items-center justify-between gap-2">
                                            <span className="text-neutral-700">Transition</span>
                                            <span className={`font-bold ${verify.observationState === 'verified' ? 'text-emerald-400' : 'text-emerald-500/70'}`}>failure → success ✓</span>
+                                         </div>
+                                       )}
+                                       {/* Nudge: prompt dev to trigger verification when path hasn't been hit */}
+                                       {!isInfraCluster && verify.observationState === 'not_observed' && (
+                                         <div className="mt-1 pt-1.5 border-t border-white/[0.04] flex items-start gap-1.5">
+                                           <span className="text-blue-400/60 shrink-0">💡</span>
+                                           <span className="text-neutral-600 leading-tight">
+                                             {verify.isSuspiciouslyLow
+                                               ? 'Traffic expected but not seen — send a test request to trigger verification'
+                                               : 'No traffic yet — send a test request to verify fix'
+                                             }
+                                           </span>
                                          </div>
                                        )}
                                      </div>
