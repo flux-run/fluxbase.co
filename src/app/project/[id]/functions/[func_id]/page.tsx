@@ -747,9 +747,9 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                      })()}
                                    </span>
                                  ) : unverifiedCount > 0 ? (
-                                   <span className="ml-auto text-amber-500/70">○ {unverifiedCount} unverified — awaiting traffic</span>
+                                   <span className="ml-auto text-amber-500/70">○ {unverifiedCount} unverified — failure path not yet exercised</span>
                                  ) : (
-                                   <span className="ml-auto">✓ no failures detected</span>
+                                   <span className="ml-auto text-amber-400/60">○ no failures observed — not yet verified under same conditions</span>
                                  )}
                                </div>
                              );
@@ -822,6 +822,90 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                    );
                                  })}
                                  {/* ── Footer: consequence hint + verify state on one strip */}
+                                 {/* ── Verification block — explicit state for this failure mode */}
+                                 {(() => {
+                                   const execBasis = verify.matchedTotal > 0
+                                     ? `based on ${verify.matchedTotal} matching execution${verify.matchedTotal !== 1 ? 's' : ''}`
+                                     : verify.execCount > 0
+                                     ? `observed across ${verify.execCount} execution${verify.execCount !== 1 ? 's' : ''}`
+                                     : null;
+                                   if (verify.state === 'active' || verify.state === 'regressed') {
+                                     const detLabel = verify.isDeterministic
+                                       ? `Deterministic (${execBasis ?? `${verify.execCount} exec${verify.execCount !== 1 ? 's' : ''}`})`
+                                       : `Reproducible · ${verify.failureRate}% failure rate`;
+                                     return (
+                                       <div className="mt-2 pt-2 border-t border-white/5 font-mono text-[9px] space-y-0.5">
+                                         <div className="flex items-center justify-between gap-2">
+                                           <span className="text-neutral-600 uppercase tracking-wider">Verification</span>
+                                           <span className="font-black text-red-500 uppercase tracking-wider">NOT VERIFIED</span>
+                                         </div>
+                                         <div className="flex items-center justify-between gap-2">
+                                           <span className="text-neutral-700">Failure pattern</span>
+                                           <span className={`font-bold ${verify.isDeterministic ? 'text-red-400' : 'text-red-400/70'}`}>{detLabel}</span>
+                                         </div>
+                                         <div className="flex items-center justify-between gap-2">
+                                           <span className="text-neutral-700">Matched executions</span>
+                                           <span className="text-neutral-500">{verify.matchedFail} failure{verify.matchedFail !== 1 ? 's' : ''} · {verify.matchedSuccess} success{verify.matchedSuccess !== 1 ? 'es' : ''}</span>
+                                         </div>
+                                         {verify.isRegressed && (
+                                           <div className="flex items-center justify-between gap-2">
+                                             <span className="text-neutral-700">Regression</span>
+                                             <span className="font-bold text-orange-400">Previously fixed, re-emerged</span>
+                                           </div>
+                                         )}
+                                       </div>
+                                     );
+                                   }
+                                   if (verify.state === 'unverified') {
+                                     return (
+                                       <div className="mt-2 pt-2 border-t border-white/5 font-mono text-[9px] space-y-0.5">
+                                         <div className="flex items-center justify-between gap-2">
+                                           <span className="text-neutral-600 uppercase tracking-wider">Verification</span>
+                                           <span className="font-black text-amber-500 uppercase tracking-wider">UNKNOWN</span>
+                                         </div>
+                                         <div className="flex items-center justify-between gap-2">
+                                           <span className="text-neutral-700">Reason</span>
+                                           <span className="text-neutral-500">
+                                             {verify.pathsTracked
+                                               ? 'failure path not yet exercised in current deploy'
+                                               : `only ${verify.execCount} of ${VERIFIED_EXEC_MIN} execs needed`}
+                                           </span>
+                                         </div>
+                                         <div className="flex items-center justify-between gap-2">
+                                           <span className="text-neutral-700">Matched executions</span>
+                                           <span className="text-neutral-500">{verify.matchedTotal} of scenario seen</span>
+                                         </div>
+                                       </div>
+                                     );
+                                   }
+                                   // verified_fixed
+                                   const signal = verify.matchedSuccess > 0
+                                     ? `${verify.matchedSuccess} success on same path`
+                                     : `${verify.execCount} execs, no recurrence`;
+                                   return (
+                                     <div className="mt-2 pt-2 border-t border-white/5 font-mono text-[9px] space-y-0.5">
+                                       <div className="flex items-center justify-between gap-2">
+                                         <span className="text-neutral-600 uppercase tracking-wider">Verification</span>
+                                         <span className={`font-black uppercase tracking-wider ${verify.confidence === 'high' ? 'text-emerald-400' : 'text-emerald-600/70'}`}>VERIFIED FIXED</span>
+                                       </div>
+                                       <div className="flex items-center justify-between gap-2">
+                                         <span className="text-neutral-700">Matched executions</span>
+                                         <span className="text-emerald-500/80 font-bold">{signal}</span>
+                                       </div>
+                                       <div className="flex items-center justify-between gap-2">
+                                         <span className="text-neutral-700">Confidence</span>
+                                         <span className={`font-bold uppercase ${verify.confidence === 'high' ? 'text-emerald-500' : verify.confidence === 'medium' ? 'text-yellow-600' : 'text-neutral-500'}`}>{verify.confidence}</span>
+                                       </div>
+                                       {verify.matchedSuccess > 0 && (
+                                         <div className="flex items-center justify-between gap-2">
+                                           <span className="text-neutral-700">Transition observed</span>
+                                           <span className="text-emerald-400 font-bold">failure → success ✓</span>
+                                         </div>
+                                       )}
+                                     </div>
+                                   );
+                                 })()}
+                                 {/* ── Footer: consequence hint + old-style verify badge on one strip */}
                                  {(() => {
                                    const consequenceText =
                                      cluster.cls === 'infra' ? '→ no user code executed'
@@ -1152,6 +1236,17 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                 <tbody>
                   {(() => {
                     const PAGE_SIZE = 20;
+                    // Build a union of all active-cluster fingerprints for matching in the table
+                    const activeClusterFps = (() => {
+                      if (!statsData?.top_issues) return [];
+                      const clusters = buildFailureClusters(statsData.top_issues);
+                      return clusters.map(c => extractClusterFingerprint(c));
+                    })();
+                    const execMatchesAnyCluster = (exec: Execution) =>
+                      activeClusterFps.some(fp => execMatchesFingerprint(exec, fp));
+                    const allFailurePaths = new Set<string | null>(
+                      activeClusterFps.flatMap(fp => [...fp.paths])
+                    );
                     const filteredExecs = (executions ?? []).filter((exec) => {
                       const headline = formatErrorHeadline(
                         exec.error_name,
@@ -1181,7 +1276,18 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                           </td>
                           {/* Status + error headline */}
                           <td className="px-3 py-1.5 max-w-[260px]">
-                            <span className={`font-bold text-[11px] ${exec.status === 'ok' ? 'text-green-500' : 'text-red-500'}`}>{exec.status.toUpperCase()}</span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className={`font-bold text-[11px] ${exec.status === 'ok' ? 'text-green-500' : 'text-red-500'}`}>{exec.status.toUpperCase()}</span>
+                              {execMatchesAnyCluster(exec) ? (
+                                <span className="text-[8px] font-black uppercase tracking-wider text-red-500 border border-red-900/50 bg-red-950/20 px-1 py-px rounded">
+                                  matches failure
+                                </span>
+                              ) : exec.status === 'ok' && exec.path != null && allFailurePaths.has(exec.path) ? (
+                                <span className="text-[8px] font-black uppercase tracking-wider text-emerald-500 border border-emerald-900/50 bg-emerald-950/20 px-1 py-px rounded">
+                                  ✓ same path · ok
+                                </span>
+                              ) : null}
+                            </div>
                             {exec.status === 'error' && (() => {
                               const headline = formatErrorHeadline(exec.error_name, exec.error_message, exec.error, exec.error_stack);
                               const frame = topUserFrame(exec.error_stack);
