@@ -350,12 +350,17 @@ export default function ProjectPage({
                       <span className="text-red-500/50 mr-1.5 select-none">·</span>
                       {suggestedFocus.failureRatePct}% failure rate — {suggestedFocus.totalErrors.toLocaleString()}/{suggestedFocus.totalExecs.toLocaleString()} executions failing
                     </p>
-                    {/* 2. user-impact first, traffic as supporting context */}
+                    {/* 2. user-impact first, traffic as secondary context */}
                     <p className="text-[9px] text-neutral-500 font-mono">
                       <span className="text-red-500/50 mr-1.5 select-none">·</span>
-                      {suggestedFocus.usersPer10 > 0
-                        ? `impacts ~${suggestedFocus.usersPer10} in 10 users (${suggestedFocus.trafficPct}% of traffic)`
-                        : `${suggestedFocus.trafficPct}% of impacted traffic`}
+                      {suggestedFocus.usersPer10 > 0 ? (
+                        <>
+                          impacts ~{suggestedFocus.usersPer10} in 10 users
+                          <span className="text-neutral-700"> ({suggestedFocus.trafficPct}% of traffic)</span>
+                        </>
+                      ) : (
+                        `${suggestedFocus.trafficPct}% of impacted traffic`
+                      )}
                     </p>
                     {/* 3. relative comparison + dominance */}
                     <p className="text-[9px] text-neutral-500 font-mono">
@@ -535,12 +540,18 @@ export default function ProjectPage({
                             <span className="text-[7px] font-black uppercase px-1 py-0.5 rounded border text-orange-400 border-orange-800/50 bg-orange-950/50">High</span>
                           )}
                           {tier === 'medium' && (
-                            <span className="text-[7px] font-black uppercase px-1 py-0.5 rounded border text-neutral-500 border-neutral-700/40 bg-neutral-900/60">Low</span>
+                            <span className="text-[7px] font-black uppercase px-1 py-0.5 rounded border text-neutral-500 border-neutral-700/40 bg-neutral-900/60">
+                              {group.trafficContributionPct <= 5 ? "Negligible" : "Low"}
+                            </span>
                           )}
                           <div className={`ml-auto font-black tabular-nums shrink-0 ${
-                            tier === 'critical' ? "text-sm text-red-400" : tier === 'high' ? "text-[11px] text-orange-400" : "text-[11px] text-neutral-500"
+                            tier === 'critical' ? "text-sm text-red-400" : tier === 'high' ? "text-[11px] text-orange-400" : "text-[11px] text-neutral-600"
                           }`}>
-                            {group.trafficContributionPct > 0 ? `${group.trafficContributionPct}%` : `${topInc.failureRatePct}%`}
+                            {group.trafficContributionPct > 0
+                              ? group.trafficContributionPct <= 5
+                                ? "<5%"
+                                : `${group.trafficContributionPct}%`
+                              : `${topInc.failureRatePct}%`}
                           </div>
                         </div>
                         <p className={`font-bold leading-tight truncate text-[11px] ${
