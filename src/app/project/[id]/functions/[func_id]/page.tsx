@@ -227,6 +227,9 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [filter, setFilter] = useState<string | null>(null);
   const [anomalyExpanded, setAnomalyExpanded] = useState(false);
+  const [execPage, setExecPage] = useState(0);
+
+  useEffect(() => { setExecPage(0); }, [filter]);
 
   const loadData = async () => {
     if (!api.ready) return;
@@ -1040,8 +1043,9 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                   </tr>
                 </thead>
                 <tbody>
-                  {(executions ?? [])
-                    .filter((exec) => {
+                  {(() => {
+                    const PAGE_SIZE = 20;
+                    const filteredExecs = (executions ?? []).filter((exec) => {
                       const headline = formatErrorHeadline(
                         exec.error_name,
                         exec.error_message,
@@ -1049,81 +1053,108 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                         exec.error_stack,
                       );
                       return !filter || headline.includes(filter) || exec.status.includes(filter);
-                    })
-                    .map((exec) => (
-                    <tr
-                      key={exec.id}
-                      onClick={() => { setSelectedExecId(exec.id); setIsDrawerOpen(true); }}
-                      className="border-b border-neutral-900 last:border-0 hover:bg-neutral-900/40 transition-colors cursor-pointer group"
-                    >
-                      {/* ID + caller as tooltip */}
-                      <td className="px-3 py-1.5 whitespace-nowrap">
-                        <span
-                          className="text-blue-500 group-hover:underline font-bold"
-                          title={exec.client_ip || undefined}
+                    });
+                    const totalExecPages = Math.ceil(filteredExecs.length / PAGE_SIZE);
+                    const pagedExecs = filteredExecs.slice(execPage * PAGE_SIZE, (execPage + 1) * PAGE_SIZE);
+                    return (<>
+                      {pagedExecs.map((exec) => (
+                        <tr
+                          key={exec.id}
+                          onClick={() => { setSelectedExecId(exec.id); setIsDrawerOpen(true); }}
+                          className="border-b border-neutral-900 last:border-0 hover:bg-neutral-900/40 transition-colors cursor-pointer group"
                         >
-                          {exec.id.slice(0, 8)}
-                        </span>
-                      </td>
-                      {/* Status + error headline */}
-                      <td className="px-3 py-1.5 max-w-[260px]">
-                        <span className={`font-bold text-[11px] ${exec.status === 'ok' ? 'text-green-500' : 'text-red-500'}`}>{exec.status.toUpperCase()}</span>
-                        {exec.status === 'error' && (() => {
-                           const headline = formatErrorHeadline(exec.error_name, exec.error_message, exec.error, exec.error_stack);
-                           const frame = topUserFrame(exec.error_stack);
-                           const loc = frameLabel(frame);
-                           return (
-                             <div
-                               className="text-[9px] text-red-400/70 mt-0.5 truncate"
-                               title={loc ? `${headline} (${loc})` : headline}
-                             >
-                               {headline}{loc ? <span className="text-red-400/50 font-bold"> ({loc})</span> : null}
-                             </div>
-                           );
-                        })()}
-                      </td>
-                      {/* Duration */}
-                      <td className="px-3 py-1.5 text-neutral-500 whitespace-nowrap">{exec.duration_ms}ms</td>
-                      {/* Type + Source merged */}
-                      <td className="px-3 py-1.5">
-                        <div className="flex items-center gap-1 flex-wrap">
-                          <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider bg-neutral-900 border border-neutral-800 px-1 py-px rounded">
-                            {exec.error_type || 'default'}
-                          </span>
-                          {exec.error_source && (
-                            <span className={`text-[9px] font-bold uppercase tracking-wider border px-1 py-px rounded ${
-                              exec.error_source === 'user_code' ? 'text-blue-400 border-blue-900/50 bg-blue-950/20' :
-                              exec.error_source?.startsWith('platform') ? 'text-orange-400 border-orange-900/50 bg-orange-950/20' :
-                              'text-neutral-500 border-neutral-800 bg-neutral-900/50'
-                            }`}>
-                              {exec.error_source.replace(/_/g, ' ')}
+                          {/* ID + caller as tooltip */}
+                          <td className="px-3 py-1.5 whitespace-nowrap">
+                            <span
+                              className="text-blue-500 group-hover:underline font-bold"
+                              title={exec.client_ip || undefined}
+                            >
+                              {exec.id.slice(0, 8)}
                             </span>
-                          )}
-                        </div>
-                      </td>
-                      {/* Code SHA */}
-                      <td className="px-3 py-1.5">
-                        {exec.code_sha ? (() => {
-                          const sha7 = exec.code_sha.slice(0, 7);
-                          const ver = deployVersionMap[exec.code_sha];
-                          return (
-                            <span className={`text-[9px] px-1 py-px rounded border ${
-                              ver?.isCurrent ? 'text-emerald-400 border-emerald-900/50 bg-emerald-950/20'
-                              : ver?.isPrev ? 'text-neutral-400 border-neutral-700 bg-neutral-900/40'
-                              : 'text-neutral-600 border-neutral-800 bg-transparent'
-                            }`}>{sha7}</span>
-                          );
-                        })() : <span className="text-neutral-700 text-[9px]">—</span>}
-                      </td>
-                      {/* Time */}
-                      <td className="px-3 py-1.5 pr-5 text-right text-neutral-600 whitespace-nowrap text-[11px]">
-                        {new Date(exec.started_at ?? new Date().toISOString()).toLocaleTimeString()}
-                      </td>
-                    </tr>
-                  ))}
-                  {executions.length === 0 && (
-                    <tr><td colSpan={6} className="px-4 py-6 text-center text-neutral-700 italic underline-offset-4 decoration-neutral-800 decoration-dashed underline">Waiting for live data surge...</td></tr>
-                  )}
+                          </td>
+                          {/* Status + error headline */}
+                          <td className="px-3 py-1.5 max-w-[260px]">
+                            <span className={`font-bold text-[11px] ${exec.status === 'ok' ? 'text-green-500' : 'text-red-500'}`}>{exec.status.toUpperCase()}</span>
+                            {exec.status === 'error' && (() => {
+                              const headline = formatErrorHeadline(exec.error_name, exec.error_message, exec.error, exec.error_stack);
+                              const frame = topUserFrame(exec.error_stack);
+                              const loc = frameLabel(frame);
+                              return (
+                                <div
+                                  className="text-[9px] text-red-400/70 mt-0.5 truncate"
+                                  title={loc ? `${headline} (${loc})` : headline}
+                                >
+                                  {headline}{loc ? <span className="text-red-400/50 font-bold"> ({loc})</span> : null}
+                                </div>
+                              );
+                            })()}
+                          </td>
+                          {/* Duration */}
+                          <td className="px-3 py-1.5 text-neutral-500 whitespace-nowrap">{exec.duration_ms}ms</td>
+                          {/* Type + Source merged */}
+                          <td className="px-3 py-1.5">
+                            <div className="flex items-center gap-1 flex-wrap">
+                              <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider bg-neutral-900 border border-neutral-800 px-1 py-px rounded">
+                                {exec.error_type || 'default'}
+                              </span>
+                              {exec.error_source && (
+                                <span className={`text-[9px] font-bold uppercase tracking-wider border px-1 py-px rounded ${
+                                  exec.error_source === 'user_code' ? 'text-blue-400 border-blue-900/50 bg-blue-950/20' :
+                                  exec.error_source?.startsWith('platform') ? 'text-orange-400 border-orange-900/50 bg-orange-950/20' :
+                                  'text-neutral-500 border-neutral-800 bg-neutral-900/50'
+                                }`}>
+                                  {exec.error_source.replace(/_/g, ' ')}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          {/* Code SHA */}
+                          <td className="px-3 py-1.5">
+                            {exec.code_sha ? (() => {
+                              const sha7 = exec.code_sha.slice(0, 7);
+                              const ver = deployVersionMap[exec.code_sha];
+                              return (
+                                <span className={`text-[9px] px-1 py-px rounded border ${
+                                  ver?.isCurrent ? 'text-emerald-400 border-emerald-900/50 bg-emerald-950/20'
+                                  : ver?.isPrev ? 'text-neutral-400 border-neutral-700 bg-neutral-900/40'
+                                  : 'text-neutral-600 border-neutral-800 bg-transparent'
+                                }`}>{sha7}</span>
+                              );
+                            })() : <span className="text-neutral-700 text-[9px]">—</span>}
+                          </td>
+                          {/* Time */}
+                          <td className="px-3 py-1.5 pr-5 text-right text-neutral-600 whitespace-nowrap text-[11px]">
+                            {new Date(exec.started_at ?? new Date().toISOString()).toLocaleTimeString()}
+                          </td>
+                        </tr>
+                      ))}
+                      {executions.length === 0 && (
+                        <tr><td colSpan={6} className="px-4 py-6 text-center text-neutral-700 italic underline-offset-4 decoration-neutral-800 decoration-dashed underline">Waiting for live data surge...</td></tr>
+                      )}
+                      {totalExecPages > 1 && (
+                        <tr>
+                          <td colSpan={6} className="border-t border-neutral-900 px-3 py-2">
+                            <div className="flex items-center justify-between text-[10px] font-mono text-neutral-600">
+                              <span>{filteredExecs.length} execution{filteredExecs.length !== 1 ? 's' : ''}{filter ? ' (filtered)' : ''}</span>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  disabled={execPage === 0}
+                                  onClick={(e) => { e.stopPropagation(); setExecPage(p => p - 1); }}
+                                  className="px-1.5 py-0.5 rounded border border-neutral-800 disabled:opacity-30 hover:border-neutral-700 hover:text-neutral-400 transition-colors"
+                                >←</button>
+                                <span className="tabular-nums">{execPage + 1} / {totalExecPages}</span>
+                                <button
+                                  disabled={execPage >= totalExecPages - 1}
+                                  onClick={(e) => { e.stopPropagation(); setExecPage(p => p + 1); }}
+                                  className="px-1.5 py-0.5 rounded border border-neutral-800 disabled:opacity-30 hover:border-neutral-700 hover:text-neutral-400 transition-colors"
+                                >→</button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>);
+                  })()}
                 </tbody>
               </table>
             </div>
