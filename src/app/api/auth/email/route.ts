@@ -25,10 +25,19 @@ export async function POST(request: NextRequest) {
       if (!regRes.ok) {
         const err = await regRes.json().catch(() => ({}));
         return NextResponse.json(
-          { error: (err as { error?: string }).error || "Registration failed" },
+          {
+            error: (err as { error?: string }).error || "Registration failed",
+            code: (err as { code?: string }).code,
+          },
           { status: regRes.status },
         );
       }
+
+      return NextResponse.json({
+        ok: true,
+        verification_sent: true,
+        redirect: "/login?verify=sent",
+      });
     }
 
     const loginRes = await fetch(`${apiUrl}/auth/login`, {
@@ -40,7 +49,10 @@ export async function POST(request: NextRequest) {
     if (!loginRes.ok) {
       const err = await loginRes.json().catch(() => ({}));
       return NextResponse.json(
-        { error: (err as { error?: string }).error || "Login failed" },
+        {
+          error: (err as { error?: string }).error || "Login failed",
+          code: (err as { code?: string }).code,
+        },
         { status: loginRes.status },
       );
     }

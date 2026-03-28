@@ -25,9 +25,12 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
 
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect") || "";
+  const verifySent = searchParams.get("verify") === "sent";
   const router = useRouter();
 
   const handleOAuth = (provider: string) => {
@@ -43,6 +46,7 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setNeedsVerification(false);
 
     try {
       const res = await fetch("/api/auth/email", {
@@ -54,6 +58,9 @@ export default function LoginPage() {
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "Something went wrong");
+        if (data.code === "EMAIL_NOT_VERIFIED") {
+          setNeedsVerification(true);
+        }
         return;
       }
 
@@ -62,6 +69,26 @@ export default function LoginPage() {
       setError("Network error, please try again");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const resendVerification = async () => {
+    if (!email || resendState === "sending") return;
+    setResendState("sending");
+    try {
+      const res = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Could not resend verification email");
+      }
+      setResendState("sent");
+    } catch (err: any) {
+      setError(err.message || "Could not resend verification email");
+      setResendState("idle");
     }
   };
 
@@ -88,6 +115,12 @@ export default function LoginPage() {
           </CardHeader>
 
           <CardContent className="space-y-6 px-10 pb-12">
+            {verifySent && (
+              <p className="text-[10px] text-emerald-300 font-mono bg-emerald-950/30 border border-emerald-900/40 rounded-lg px-3 py-2 text-center">
+                Verification email sent. Check your inbox to activate login.
+              </p>
+            )}
+
             <div className="space-y-3">
               <Button
                 onClick={() => handleOAuth("github")}
@@ -145,6 +178,20 @@ export default function LoginPage() {
 
               {error && (
                 <p className="text-[10px] text-red-400 font-mono bg-red-950/30 border border-red-900/40 rounded-lg px-3 py-2">{error}</p>
+              )}
+
+              {needsVerification && (
+                <div className="text-[10px] font-mono bg-amber-950/30 border border-amber-900/40 rounded-lg px-3 py-2 text-amber-300">
+                  <p>Please verify your email before signing in.</p>
+                  <button
+                    type="button"
+                    onClick={resendVerification}
+                    className="mt-2 underline underline-offset-2 hover:text-amber-200"
+                    disabled={resendState === "sending"}
+                  >
+                    {resendState === "sending" ? "Sending..." : resendState === "sent" ? "Verification email sent" : "Resend verification email"}
+                  </button>
+                </div>
               )}
 
               <button
