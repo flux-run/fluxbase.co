@@ -348,7 +348,7 @@ export function ExecutionTimeline({ execution, checkpoints = [], logs = [] }: Ex
   // console logs are recorded before/during IO boundaries, so emit them
   // in seq order, interleaved with checkpoints by approximating position.
 
-  // Build log events
+  // Build log events — seq IS the call_index (same shared counter as IO ops)
   const logEvents: TimelineEvent[] = logs.map((log) => ({
     key: `log-${log.seq}`,
     kind: "log" as const,
@@ -364,21 +364,10 @@ export function ExecutionTimeline({ execution, checkpoints = [], logs = [] }: Ex
     .filter((cp) => cp.boundary !== "performance.now") // hide perf.now noise by default
     .map(checkpointToEvent);
 
-  // Simple merge: interleave logs and checkpoints.
-  // We use a heuristic: log seq N falls before checkpoint call_index N.
-  let li = 0;
-  let ci = 0;
-  while (li < logEvents.length || ci < cpEvents.length) {
-    const log = logEvents[li];
-    const cp = cpEvents[ci];
-    if (!cp || (log && log.index <= (cp?.index ?? Infinity))) {
-      events.push(log);
-      li++;
-    } else {
-      events.push(cp);
-      ci++;
-    }
-  }
+  // Exact merge: logs and IO checkpoints share the same call_index counter,
+  // so sorting by index gives the precise order events occurred in execution.
+  const merged = [...logEvents, ...cpEvents].sort((a, b) => a.index - b.index);
+  events.push(...merged);
 
   // Response / error at the end
   if (execution.status === "error") {
