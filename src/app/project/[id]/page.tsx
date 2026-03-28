@@ -170,6 +170,14 @@ export default function ProjectPage({
     // Compute failure rate from actual aggregated counts — prevents 100% rate with 29/42 counts mismatch
     const computedFailureRatePct = totalExecs > 0 ? Math.round((totalErrors / totalExecs) * 100) : topInc.failureRatePct;
     const confidenceLabel = totalExecs >= 20 ? "High" : totalExecs >= 5 ? "Medium" : "Low";
+    // Aggregate causality evidence from all incidents in this group
+    const errorsAfterDeploy  = top.incidents.reduce((s, i) => s + (i.errorsAfterDeploy ?? 0), 0);
+    const errorsBeforeDeploy = top.incidents.reduce((s, i) => s + (i.errorsBeforeDeploy ?? 0), 0);
+    const allOnlyAfterDeploy = top.incidents.length > 0 && top.incidents.every(i => i.allOnlyAfterDeploy);
+    // Use max causality score across group (most impactful incident drives the call)
+    const causalityScore = top.incidents.reduce((m, i) => Math.max(m, i.causalityScore ?? 0), 0);
+    // Recurring = any incident in this group was seen in prev deploy
+    const isRecurring = top.incidents.some(i => i.isRecurring);
     return {
       title: topInc.title,
       cls: top.cls,
@@ -191,6 +199,11 @@ export default function ProjectPage({
       trafficPct,
       usersPer10,
       confidenceLabel,
+      errorsAfterDeploy,
+      errorsBeforeDeploy,
+      allOnlyAfterDeploy,
+      causalityScore,
+      isRecurring,
     };
   }, [incidentGroups, isBroken, overview]);
 
@@ -395,11 +408,19 @@ export default function ProjectPage({
                         </p>
                         <p className="text-[9px] text-neutral-600 font-mono">
                           <span className="text-red-500/50 mr-1.5 select-none">·</span>
-                          all failures began after this deploy
+                          {suggestedFocus.errorsBeforeDeploy === 0 && suggestedFocus.errorsAfterDeploy > 0
+                            ? `0 failures before deploy · ${suggestedFocus.errorsAfterDeploy} after`
+                            : suggestedFocus.errorsAfterDeploy > 0
+                              ? `${suggestedFocus.errorsBeforeDeploy} before deploy · ${suggestedFocus.errorsAfterDeploy} after`
+                              : "all failures began after this deploy"}
                         </p>
                         <p className="text-[9px] font-mono">
                           <span className="text-red-500/50 mr-1.5 select-none">·</span>
-                          <span className="text-orange-500/70 font-black">→ likely caused by this deployment</span>
+                          <span className="text-orange-500/70 font-black">
+                            → {suggestedFocus.causalityScore >= 0.85
+                               ? "caused by this deployment"
+                               : "likely caused by this deployment"}
+                          </span>
                         </p>
                       </>
                     ) : (
@@ -414,15 +435,29 @@ export default function ProjectPage({
                         cross-function — {suggestedFocus.affectedFns.length} services affected
                       </p>
                     )}
+                    {suggestedFocus.isRecurring && (
+                      <p className="text-[9px] font-mono">
+                        <span className="text-amber-500/50 mr-1.5 select-none">·</span>
+                        <span className="text-amber-400/80">⚠ recurring — also seen in previous deployment</span>
+                        <span className="text-neutral-700"> · fix may be incomplete</span>
+                      </p>
+                    )}
                     {/* confidence footer */}
-                    <div className="flex items-center gap-1.5 pt-1.5 mt-0.5 border-t border-red-900/20">
-                      <span className="text-[8px] font-black text-neutral-700 uppercase tracking-widest">Confidence:</span>
-                      <span className={`text-[8px] font-black ${
-                        suggestedFocus.confidenceLabel === "High" ? "text-emerald-500" :
-                        suggestedFocus.confidenceLabel === "Medium" ? "text-amber-400" :
-                        "text-neutral-500"
-                      }`}>{suggestedFocus.confidenceLabel}</span>
-                      <span className="text-[8px] text-neutral-700 font-mono">({suggestedFocus.totalExecs} samples)</span>
+                    <div className="pt-1.5 mt-0.5 border-t border-red-900/20 space-y-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[8px] font-black text-neutral-700 uppercase tracking-widest">Confidence:</span>
+                        <span className={`text-[8px] font-black ${
+                          suggestedFocus.confidenceLabel === "High" ? "text-emerald-500" :
+                          suggestedFocus.confidenceLabel === "Medium" ? "text-amber-400" :
+                          "text-neutral-500"
+                        }`}>{suggestedFocus.confidenceLabel}</span>
+                        <span className="text-[8px] text-neutral-700 font-mono">({suggestedFocus.totalExecs} samples)</span>
+                      </div>
+                      {suggestedFocus.errorsAfterDeploy > 0 && (
+                        <p className="text-[8px] text-neutral-700 font-mono pl-0.5">
+                          {suggestedFocus.totalErrors}/{suggestedFocus.totalExecs} executions failing · {suggestedFocus.errorsBeforeDeploy === 0 ? "none" : suggestedFocus.errorsBeforeDeploy} before deploy
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center justify-end pt-1">

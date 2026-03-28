@@ -240,6 +240,12 @@ export interface ProjectOverviewResult {
     lastSeen: string;
     deployId: string | null;
     deployedAt: string | null;
+    // causality evidence fields
+    errorsAfterDeploy: number;
+    errorsBeforeDeploy: number;
+    allOnlyAfterDeploy: boolean;
+    causalityScore: number;   // 0–1 computed from time proximity + before/after evidence
+    isRecurring: boolean;     // true = fingerprint also seen in previous deploy (not fixed)
   }[];
   brokenAfterDeploy: {
     functionId: string;
