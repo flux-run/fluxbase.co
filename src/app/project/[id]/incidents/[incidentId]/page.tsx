@@ -1,7 +1,7 @@
 "use client";
 import { use, useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, CheckCircle2, AlertTriangle, Info, Zap, Terminal, MessageSquare, User, Clock } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, AlertTriangle, Info, Zap, Terminal, MessageSquare, User, Clock, Bot } from "lucide-react";
 import { useFluxApi } from "@/lib/api";
 import { ProjectOverviewResult, Execution } from "@/types/api";
 
@@ -44,7 +44,7 @@ type IncidentStatus = 'active' | 'investigating' | 'resolved';
 
 type ActivityEvent = {
   id: string;
-  type: 'system' | 'comment';
+  type: 'system' | 'comment' | 'ai';
   text: string;
   author?: string;
   ts: string;
@@ -57,6 +57,72 @@ function initActivity(title: string, firstSeen: string): ActivityEvent[] {
     text: 'Incident detected',
     ts: firstSeen,
   }];
+}
+
+/** Generate an AI reply to a user comment based on incident context */
+function generateAiReply(
+  comment: string,
+  errorClass: string,
+  deployMode: string | null,
+  deployId: string | null,
+  title: string,
+  rateBeforePct: number | null,
+  rateAfterPct: number | null,
+  affectedFns: string[],
+): string {
+  const q = comment.toLowerCase();
+  const fn = affectedFns[0] ?? 'the function';
+
+  if (q.includes('why') || q.includes('cause') || q.includes('what happened') || q.includes('root cause')) {
+    if (deployMode === 'introduced')
+      return `This error first appeared after deploy ${deployId} with no prior failures. It was introduced by that deployment — check what changed in ${fn}.`;
+    if (deployMode === 'regressed') {
+      const rates = rateBeforePct !== null && rateAfterPct !== null
+        ? ` (failure rate went from ${rateBeforePct}% to ${rateAfterPct}%)`
+        : '';
+      return `Failure rate worsened noticeably after deploy ${deployId}${rates}. The regression is likely related to that deployment. Check the diff in ${fn}.`;
+    }
+    if (deployMode === 'unchanged')
+      return `This appears to be a pre-existing issue — failure rate was already elevated before deploy ${deployId}. Not caused by this deployment.`;
+    if (errorClass === 'external')
+      return `This is an external dependency failure in ${fn}. The upstream service is likely unavailable or returning errors. Check network egress and the service\'s status page.`;
+    if (errorClass === 'infra')
+      return `This looks like an infrastructure issue — the function artifact may not have loaded correctly in ${fn}. A re-deploy usually resolves this.`;
+    if (errorClass === 'user')
+      return `User-thrown error in ${fn} — this is intentional logic-level rejection. Review input validation and business rules to confirm if it\'s expected.`;
+    if (errorClass === 'runtime')
+      return `Unhandled exception in ${fn}. Review the error stack trace in the execution trace to find where the throw originates.`;
+    return `Error class is "${errorClass}" in ${fn}. Check the execution trace for the full stack and confirm whether recent code or config changes introduced this.`;
+  }
+
+  if (q.includes('fix') || q.includes('how') || q.includes('resolve') || q.includes('solve')) {
+    if (errorClass === 'external')
+      return `To fix: add retry with exponential backoff, verify the upstream endpoint is reachable, and consider a fallback path if the service is non-critical.`;
+    if (errorClass === 'infra')
+      return `To fix: re-deploy ${fn} to force a clean artifact upload. If it persists, check storage bucket permissions and CI/CD artifact integrity.`;
+    if (errorClass === 'user')
+      return `If this error is unexpected, review the input validation logic and confirm callers are sending the right payload. Add structured error codes to help distinguish cases.`;
+    if (errorClass === 'runtime')
+      return `Add try/catch around the failing operation, then null-guard any properties you\'re accessing. View the execution trace for the exact throw site.`;
+    return `Open the latest execution trace to find the exact throw site, then apply the suggested actions above. Mark the fix deployed once confirmed.`;
+  }
+
+  if (q.includes('deploy') || q.includes('rollback') || q.includes('revert')) {
+    if (deployMode === 'introduced' || deployMode === 'regressed')
+      return `Rollback to the previous version before deploy ${deployId} should stop the regression. After rollback, verify failure rate drops back to baseline before marking resolved.`;
+    return `Deploy ${deployId} was analyzed — failure rate ${deployMode === 'unchanged' ? 'did not change' : 'details above'}. A rollback is ${deployMode === 'improved' ? 'not recommended — this deploy improved things' : 'worth considering if the issue is confirmed'}.`;
+  }
+
+  if (q.includes('assign') || q.includes('who') || q.includes('owner')) {
+    return `Use the "Assign" field in the Incident Status card to set an owner. Once assigned, the assignment is logged in this timeline.`;
+  }
+
+  if (q.includes('slack') || q.includes('notify') || q.includes('alert')) {
+    return `Slack integration is not yet connected. Once added, you\'ll be able to push incident alerts and resolution summaries directly to your team channel.`;
+  }
+
+  // Generic fallback
+  return `I\'m tracking this incident in ${fn}. Error class: ${errorClass}${deployId ? `, related deploy: ${deployId}` : ''}. Check the Suggested Actions above for next steps, or ask a more specific question.`;
 }
 
 function formatTs(ts: string) {
@@ -222,114 +288,7 @@ export default function IncidentDetailPage({
   const [ownerDraft, setOwnerDraft] = useState('');
   const [editingOwner, setEditingOwner] = useState(false);
 
-  // Load all persisted state once title is ready
-  useEffect(() => {
-    const savedStatus = localStorage.getItem(`incident-status:${title}`);
-    if (savedStatus === 'active' || savedStatus === 'investigating' || savedStatus === 'resolved') {
-      setIncidentStatus(savedStatus);
-    }
-    const savedChecks = localStorage.getItem(`incident-checks:${title}`);
-    if (savedChecks) {
-      try { setCheckedActions(new Set(JSON.parse(savedChecks))); } catch {}
-    }
-    const savedOwner = localStorage.getItem(`incident-owner:${title}`) ?? '';
-    setOwnerState(savedOwner);
-    setOwnerDraft(savedOwner);
-    const savedActivity = localStorage.getItem(`incident-activity:${title}`);
-    if (savedActivity) {
-      try { setActivity(JSON.parse(savedActivity)); } catch {}
-    }
-  }, [title]);
-
-  const persistActivity = useCallback((events: ActivityEvent[]) => {
-    setActivity(events);
-    localStorage.setItem(`incident-activity:${title}`, JSON.stringify(events));
-  }, [title]);
-
-  // Seed the "incident started" event once data arrives (deduped by id)
-  const seedActivity = useCallback((firstSeen: string) => {
-    setActivity(prev => {
-      if (prev.some(e => e.id === 'system-started')) return prev;
-      const seeded = [initActivity(title, firstSeen)[0], ...prev];
-      localStorage.setItem(`incident-activity:${title}`, JSON.stringify(seeded));
-      return seeded;
-    });
-  }, [title]);
-
-  const updateStatus = useCallback((s: IncidentStatus, currentActivity: ActivityEvent[]) => {
-    setIncidentStatus(s);
-    localStorage.setItem(`incident-status:${title}`, s);
-    const label = s === 'investigating' ? 'Marked as Investigating'
-      : s === 'resolved' ? 'Marked as Resolved'
-      : 'Reopened as Active';
-    const ev: ActivityEvent = {
-      id: `system-status-${Date.now()}`,
-      type: 'system',
-      text: label,
-      ts: new Date().toISOString(),
-    };
-    persistActivity([...currentActivity, ev]);
-  }, [title, persistActivity]);
-
-  const assignOwner = useCallback((name: string, currentActivity: ActivityEvent[]) => {
-    const trimmed = name.trim();
-    setOwnerState(trimmed);
-    localStorage.setItem(`incident-owner:${title}`, trimmed);
-    setEditingOwner(false);
-    if (!trimmed) return;
-    const ev: ActivityEvent = {
-      id: `system-owner-${Date.now()}`,
-      type: 'system',
-      text: `Assigned to ${trimmed}`,
-      ts: new Date().toISOString(),
-    };
-    persistActivity([...currentActivity, ev]);
-  }, [title, persistActivity]);
-
-  const addComment = useCallback((text: string, currentActivity: ActivityEvent[]) => {
-    const trimmed = text.trim();
-    if (!trimmed) return;
-    const ev: ActivityEvent = {
-      id: `comment-${Date.now()}`,
-      type: 'comment',
-      text: trimmed,
-      author: owner || 'You',
-      ts: new Date().toISOString(),
-    };
-    persistActivity([...currentActivity, ev]);
-    setCommentDraft('');
-  }, [owner, persistActivity]);
-
-  const toggleAction = useCallback((i: number) => {
-    setCheckedActions(prev => {
-      const next = new Set(prev);
-      next.has(i) ? next.delete(i) : next.add(i);
-      localStorage.setItem(`incident-checks:${title}`, JSON.stringify([...next]));
-      return next;
-    });
-  }, [title]);
-
-  useEffect(() => {
-    if (!api.ready) return;
-    api.getProjectOverview(id).then(async d => {
-      if (!d) { setLoading(false); return; }
-      setOverview(d);
-      const matching = d.incidents.filter(i => i.title === title);
-      if (!matching.length) { setNotFound(true); setLoading(false); return; }
-      const topFnId = matching.reduce((t, i) => i.trafficImpactPct > t.trafficImpactPct ? i : t, matching[0]).functionId;
-      const [stats, execs] = await Promise.all([
-        api.getFunctionStats(topFnId).catch(() => null),
-        api.getFunctionExecutions(topFnId).catch(() => []),
-      ]);
-      if (stats) setFunctionStats(stats);
-      const failing = ((execs as Execution[]) || [])
-        .filter(e => e.status !== 'ok')
-        .sort((a, b) => new Date(b.started_at ?? '').getTime() - new Date(a.started_at ?? '').getTime())
-        .slice(0, 8);
-      setExecutions(failing);
-      setLoading(false);
-    });  }, [api.ready, id, title]);
-
+  // Compute incident group early so callbacks can reference it
   const group = useMemo(() => {
     if (!overview?.incidents) return null;
     const incs = overview.incidents.filter(i => i.title === title);
@@ -385,10 +344,199 @@ export default function IncidentDetailPage({
     };
   }, [overview, title]);
 
-  // Seed activity once first-seen is known (after group is computed)
+  // Load all persisted state once title is ready
   useEffect(() => {
-    if (group?.firstSeen) seedActivity(group.firstSeen);
-  }, [group?.firstSeen, seedActivity]);
+    const savedStatus = localStorage.getItem(`incident-status:${title}`);
+    if (savedStatus === 'active' || savedStatus === 'investigating' || savedStatus === 'resolved') {
+      setIncidentStatus(savedStatus);
+    }
+    const savedChecks = localStorage.getItem(`incident-checks:${title}`);
+    if (savedChecks) {
+      try { setCheckedActions(new Set(JSON.parse(savedChecks))); } catch {}
+    }
+    const savedOwner = localStorage.getItem(`incident-owner:${title}`) ?? '';
+    setOwnerState(savedOwner);
+    setOwnerDraft(savedOwner);
+    const savedActivity = localStorage.getItem(`incident-activity:${title}`);
+    if (savedActivity) {
+      try { setActivity(JSON.parse(savedActivity)); } catch {}
+    }
+  }, [title]);
+
+  const persistActivity = useCallback((events: ActivityEvent[]) => {
+    setActivity(events);
+    localStorage.setItem(`incident-activity:${title}`, JSON.stringify(events));
+  }, [title]);
+
+  // Seed the "incident started" event once data arrives (deduped by id)
+  const seedActivity = useCallback((firstSeen: string) => {
+    setActivity(prev => {
+      if (prev.some(e => e.id === 'system-started')) return prev;
+      const seeded = [initActivity(title, firstSeen)[0], ...prev];
+      localStorage.setItem(`incident-activity:${title}`, JSON.stringify(seeded));
+      return seeded;
+    });
+  }, [title]);
+
+  const updateStatus = useCallback((s: IncidentStatus, currentActivity: ActivityEvent[]) => {
+    setIncidentStatus(s);
+    localStorage.setItem(`incident-status:${title}`, s);
+    const label = s === 'investigating' ? 'Marked as Investigating'
+      : s === 'resolved' ? 'Marked as Resolved'
+      : 'Reopened as Active';
+    const evs: ActivityEvent[] = [{
+      id: `system-status-${Date.now()}`,
+      type: 'system',
+      text: label,
+      ts: new Date().toISOString(),
+    }];
+    // If resolving, auto-post a resolution summary
+    if (s === 'resolved' && group) {
+      const { failureRatePct, totalErrors, totalExecs, firstSeen, rateBeforePct } = group;
+      const durationMin = Math.round(
+        (Date.now() - new Date(firstSeen).getTime()) / 60000
+      );
+      const summary = [
+        `Failure rate: ${failureRatePct}%${totalErrors === 0 ? ' → 0% ✓' : ' (still elevated — monitor)'}`,
+        `Total errors: ${totalErrors} over ${totalExecs} executions`,
+        `Duration: ${durationMin >= 60 ? `${Math.floor(durationMin / 60)}h ${durationMin % 60}m` : `${durationMin}m`}`,
+        rateBeforePct !== null ? `Baseline (before deploy): ${rateBeforePct}%` : null,
+      ].filter(Boolean).join(' · ');
+      evs.push({
+        id: `system-resolve-summary-${Date.now()}`,
+        type: 'system',
+        text: `Resolution summary — ${summary}`,
+        ts: new Date(Date.now() + 100).toISOString(),
+      });
+    }
+    persistActivity([...currentActivity, ...evs]);
+  }, [title, persistActivity, group]);
+
+  const assignOwner = useCallback((name: string, currentActivity: ActivityEvent[]) => {
+    const trimmed = name.trim();
+    setOwnerState(trimmed);
+    localStorage.setItem(`incident-owner:${title}`, trimmed);
+    setEditingOwner(false);
+    if (!trimmed) return;
+    const ev: ActivityEvent = {
+      id: `system-owner-${Date.now()}`,
+      type: 'system',
+      text: `Assigned to ${trimmed}`,
+      ts: new Date().toISOString(),
+    };
+    persistActivity([...currentActivity, ev]);
+  }, [title, persistActivity]);
+
+  const addComment = useCallback((text: string, currentActivity: ActivityEvent[]) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    const commentEv: ActivityEvent = {
+      id: `comment-${Date.now()}`,
+      type: 'comment',
+      text: trimmed,
+      author: owner || 'You',
+      ts: new Date().toISOString(),
+    };
+    // Generate AI reply inline
+    const aiText = generateAiReply(
+      trimmed,
+      group?.cls ?? '',
+      group?.deployMode ?? null,
+      group?.deployId ?? null,
+      title,
+      group?.rateBeforePct ?? null,
+      group?.rateAfterPct ?? null,
+      group?.affectedFns ?? [],
+    );
+    const aiEv: ActivityEvent = {
+      id: `ai-${Date.now() + 1}`,
+      type: 'ai',
+      text: aiText,
+      author: 'Flux AI',
+      ts: new Date(Date.now() + 500).toISOString(),
+    };
+    persistActivity([...currentActivity, commentEv, aiEv]);
+    setCommentDraft('');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [owner, persistActivity, group, title]);
+
+  const toggleAction = useCallback((i: number) => {
+    setCheckedActions(prev => {
+      const next = new Set(prev);
+      next.has(i) ? next.delete(i) : next.add(i);
+      localStorage.setItem(`incident-checks:${title}`, JSON.stringify([...next]));
+      return next;
+    });
+  }, [title]);
+
+  useEffect(() => {
+    if (!api.ready) return;
+    api.getProjectOverview(id).then(async d => {
+      if (!d) { setLoading(false); return; }
+      setOverview(d);
+      const matching = d.incidents.filter(i => i.title === title);
+      if (!matching.length) { setNotFound(true); setLoading(false); return; }
+      const topFnId = matching.reduce((t, i) => i.trafficImpactPct > t.trafficImpactPct ? i : t, matching[0]).functionId;
+      const [stats, execs] = await Promise.all([
+        api.getFunctionStats(topFnId).catch(() => null),
+        api.getFunctionExecutions(topFnId).catch(() => []),
+      ]);
+      if (stats) setFunctionStats(stats);
+      const failing = ((execs as Execution[]) || [])
+        .filter(e => e.status !== 'ok')
+        .sort((a, b) => new Date(b.started_at ?? '').getTime() - new Date(a.started_at ?? '').getTime())
+        .slice(0, 8);
+      setExecutions(failing);
+      setLoading(false);
+    });
+  }, [api.ready, id, title]);
+
+  // Seed activity once first-seen is known (after group is computed)
+  // Also seed system intelligence events deduped by id
+  useEffect(() => {
+    if (!group) return;
+    const { firstSeen, deployId, deployMode, rateBeforePct, rateAfterPct, postDeploySampleLow } = group;
+    setActivity(prev => {
+      const ids = new Set(prev.map(e => e.id));
+      const toAdd: ActivityEvent[] = [];
+
+      if (!ids.has('system-started')) {
+        toAdd.push({ id: 'system-started', type: 'system', text: 'Incident detected', ts: firstSeen });
+      }
+
+      if (deployId && !ids.has('system-deploy-verdict')) {
+        const text =
+          deployMode === 'introduced' ? `Regression introduced by deploy ${deployId}`
+          : deployMode === 'regressed'
+            ? `Regression detected after deploy ${deployId}${
+                rateBeforePct !== null && rateAfterPct !== null
+                  ? ` — failure rate ${rateBeforePct}% → ${rateAfterPct}%`
+                  : ''
+              }${postDeploySampleLow ? ' (low sample)' : ''}`
+          : deployMode === 'improved'  ? `Failure rate improved after deploy ${deployId}`
+          : deployMode === 'unchanged' ? `Pre-existing failure — not caused by deploy ${deployId}`
+          : `Active around deploy ${deployId}`;
+        toAdd.push({ id: 'system-deploy-verdict', type: 'system', text, ts: firstSeen });
+      }
+
+      const sugFix = generateSuggestedFix(group.cls, title);
+      if (sugFix && !ids.has('system-suggested-fix')) {
+        toAdd.push({
+          id: 'system-suggested-fix',
+          type: 'system',
+          text: `Suggested fix generated · ${sugFix.actions.length} recommended actions`,
+          ts: firstSeen,
+        });
+      }
+
+      if (!toAdd.length) return prev;
+      const merged = [...toAdd, ...prev].sort(
+        (a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime()
+      );
+      localStorage.setItem(`incident-activity:${title}`, JSON.stringify(merged));
+      return merged;
+    });
+  }, [group, title]);
 
   if (loading) {
     return (
@@ -1096,21 +1244,30 @@ export default function IncidentDetailPage({
               <div className={`mt-1 shrink-0 w-[22px] h-[22px] rounded-full border flex items-center justify-center z-10 ${
                 event.type === 'comment'
                   ? 'bg-neutral-800 border-neutral-700'
+                  : event.type === 'ai'
+                  ? 'bg-cyan-950/60 border-cyan-900/50'
                   : 'bg-neutral-900 border-neutral-800'
               }`}>
                 {event.type === 'comment' ? (
                   <User className="w-2.5 h-2.5 text-neutral-500" />
+                ) : event.type === 'ai' ? (
+                  <Bot className="w-2.5 h-2.5 text-cyan-500" />
                 ) : (
                   <Clock className="w-2.5 h-2.5 text-neutral-600" />
                 )}
               </div>
-              <div className="flex-1 pb-4 min-w-0">
+              <div className={`flex-1 pb-4 min-w-0 ${event.type === 'ai' ? 'bg-cyan-950/10 border border-cyan-900/20 rounded-lg px-3 py-2 -ml-1' : ''}`}>
                 <div className="flex items-baseline gap-2 flex-wrap">
                   {event.type === 'comment' && event.author && (
                     <span className="text-[10px] font-black text-neutral-300">{event.author}</span>
                   )}
+                  {event.type === 'ai' && (
+                    <span className="text-[10px] font-black text-cyan-400">Flux AI</span>
+                  )}
                   <span className={`text-[10px] font-mono ${
-                    event.type === 'system' ? 'text-neutral-500' : 'text-neutral-300'
+                    event.type === 'system' ? 'text-neutral-500'
+                    : event.type === 'ai' ? 'text-neutral-300'
+                    : 'text-neutral-300'
                   }`}>{event.text}</span>
                   <span className="text-[9px] text-neutral-700 font-mono shrink-0">{formatTs(event.ts)}</span>
                 </div>
