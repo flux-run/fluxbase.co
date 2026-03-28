@@ -300,7 +300,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
   // Map artifact_id → version metadata for version-aware cluster display
   const deployVersionMap = deploymentList.reduce<Record<string, { label: string; isCurrent: boolean; isPrev: boolean; createdAt: string }>>((acc, dep, i) => {
     if (dep.artifact_id) {
-      acc[dep.artifact_id] = { label: `v${deploymentList.length - i}`, isCurrent: i === 0, isPrev: i === 1, createdAt: dep.created_at };
+      acc[dep.artifact_id] = { label: dep.artifact_id.slice(0, 7), isCurrent: i === 0, isPrev: i === 1, createdAt: dep.created_at };
     }
     return acc;
   }, {});
@@ -312,15 +312,13 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
     for (let i = 0; i < deploymentList.length; i++) {
       const dep = deploymentList[i];
       const depAt = new Date(dep.created_at).getTime();
-      // deploymentList is newest-first; next boundary is the previous entry
       const nextAt = i > 0 ? new Date(deploymentList[i - 1].created_at).getTime() : Infinity;
       if (t >= depAt && t < nextAt) {
-        return { label: `v${deploymentList.length - i}`, isCurrent: i === 0, isPrev: i === 1, createdAt: dep.created_at };
+        return { label: dep.artifact_id?.slice(0, 7) ?? dep.artifact_id, isCurrent: i === 0, isPrev: i === 1, createdAt: dep.created_at };
       }
     }
-    // issue predates all deployments — assign to oldest
     const oldest = deploymentList[deploymentList.length - 1];
-    return oldest ? { label: `v1`, isCurrent: false, isPrev: deploymentList.length === 2, createdAt: oldest.created_at } : null;
+    return oldest ? { label: oldest.artifact_id?.slice(0, 7) ?? oldest.artifact_id, isCurrent: false, isPrev: deploymentList.length === 2, createdAt: oldest.created_at } : null;
   };
 
   const st = statsData?.stats;
@@ -375,7 +373,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                  : 'text-neutral-500 border-neutral-800 bg-neutral-900'
                }`} title={`Artifact: ${latestDeployment.artifact_id}`}>
                  <GitCommit className="w-3 h-3" />
-                 {deployVersionLabel} • {latestDeployment.artifact_id.slice(0, 7)}
+                 {latestDeployment.artifact_id.slice(0, 7)}
                  {bootFailed && <span className="text-red-500 font-bold ml-0.5">!</span>}
                </span>
              )}
@@ -558,7 +556,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                          <div className="space-y-3">
                            {/* Current version status strip */}
                            {(() => {
-                             const currentLabel = deployVersionMap[latestDeployment?.artifact_id ?? '']?.label ?? (deploymentList.length > 0 ? `v${deploymentList.length}` : null);
+                             const currentLabel = deployVersionMap[latestDeployment?.artifact_id ?? '']?.label ?? latestDeployment?.artifact_id?.slice(0, 7) ?? null;
                              if (!currentLabel) return null;
                              const currentCluster = clusters.find(c => {
                                const domIssue = c.issues.slice().sort((a, b) => b.count - a.count)[0];
