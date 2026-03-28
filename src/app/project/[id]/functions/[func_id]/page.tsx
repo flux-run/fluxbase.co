@@ -325,20 +325,37 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
   const VERIFIED_EXEC_MIN = 20;
   const VERIFIED_EXEC_HIGH = 50;
   type VerifyState = 'active' | 'unverified' | 'verified_resolved';
-  const verifyClusterState = (cluster: ReturnType<typeof buildFailureClusters>[number]): { state: VerifyState; confidence: 'high' | 'medium' | 'low'; execCount: number } => {
-    // Primary signal: backend confirmed this fingerprint appeared in current deploy's executions
+  const verifyClusterState = (cluster: ReturnType<typeof buildFailureClusters>[number]): {
+    state: VerifyState; confidence: 'high' | 'medium' | 'low';
+    execCount: number; errorCount: number; failureRate: number;
+    reason: string; isDeterministic: boolean;
+  } => {
     const activeInCurrentDeploy = cluster.issues.some(i => (i as any).active_in_current_deploy === true);
     const execCount = latestSlice?.total ?? 0;
     const currentErrors = latestSlice?.errors ?? 0;
-    if (activeInCurrentDeploy) return { state: 'active', confidence: 'high', execCount };
-    // Fallback: if ANY errors exist in the current deploy, treat cluster as active.
-    // This covers the case where error_fingerprint isn't populated on executions,
-    // making the backend subquery return false even though failures are happening now.
-    if (currentErrors > 0) return { state: 'active', confidence: 'medium', execCount };
-    // No errors in current deploy — check if enough executions have run to trust the absence
-    if (execCount >= VERIFIED_EXEC_HIGH) return { state: 'verified_resolved', confidence: 'high', execCount };
-    if (execCount >= VERIFIED_EXEC_MIN) return { state: 'verified_resolved', confidence: 'medium', execCount };
-    return { state: 'unverified', confidence: 'low', execCount };
+    const failureRate = execCount > 0 ? Math.round((currentErrors / execCount) * 100) : 0;
+    // Deterministic: consistent high failure rate (≥80%) with enough executions to trust
+    const isDeterministic = execCount >= 5 && failureRate >= 80;
+    if (activeInCurrentDeploy) {
+      const reason = isDeterministic
+        ? `Deterministic — fails ${failureRate}% of the time across ${execCount} exec${execCount !== 1 ? 's' : ''}`
+        : `Reproducible in current deploy · ${execCount} exec${execCount !== 1 ? 's' : ''}, ${failureRate}% failure rate`;
+      return { state: 'active', confidence: 'high', execCount, errorCount: currentErrors, failureRate, reason, isDeterministic };
+    }
+    if (currentErrors > 0) {
+      const reason = isDeterministic
+        ? `Deterministic — fails ${failureRate}% of the time across ${execCount} exec${execCount !== 1 ? 's' : ''}`
+        : `Reproducible in current deploy · ${execCount} exec${execCount !== 1 ? 's' : ''}, ${failureRate}% failure rate`;
+      return { state: 'active', confidence: 'medium', execCount, errorCount: currentErrors, failureRate, reason, isDeterministic };
+    }
+    if (execCount >= VERIFIED_EXEC_HIGH)
+      return { state: 'verified_resolved', confidence: 'high', execCount, errorCount: 0, failureRate: 0,
+        reason: `Not reproduced across ${execCount} executions in current deploy`, isDeterministic: false };
+    if (execCount >= VERIFIED_EXEC_MIN)
+      return { state: 'verified_resolved', confidence: 'medium', execCount, errorCount: 0, failureRate: 0,
+        reason: `Not reproduced across ${execCount} executions — approaching confidence threshold`, isDeterministic: false };
+    return { state: 'unverified', confidence: 'low', execCount, errorCount: 0, failureRate: 0,
+      reason: `Only ${execCount} of ${VERIFIED_EXEC_MIN} executions needed to verify`, isDeterministic: false };
   };
 
   const st = statsData?.stats;
@@ -627,9 +644,15 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                  <span className="font-black uppercase tracking-wider">{currentLabel}</span>
                                  <span className="text-neutral-700">· current deploy</span>
                                  {currentCluster ? (
-                                   <span className="ml-auto flex items-center gap-1">
-                                     <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
-                                     {ERROR_CLASS_META[currentCluster.cls].icon} {ERROR_CLASS_META[currentCluster.cls].label.toLowerCase()} still active
+                                   <span className="ml-auto flex items-center gap-2 font-mono">
+                                     <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse shrink-0" />
+                                     {(() => {
+                                       const ci = clusters.indexOf(currentCluster);
+                                       const v = _clusterVerify[ci];
+                                       return v?.isDeterministic
+                                         ? <span className="text-red-400 font-bold">Deterministic failure · {v.failureRate}%</span>
+                                         : <span>Reproducible · {v?.failureRate ?? 0}% · {v?.execCount ?? 0} exec{(v?.execCount ?? 0) !== 1 ? 's' : ''}</span>;
+                                     })()}
                                    </span>
                                  ) : unverifiedCount > 0 ? (
                                    <span className="ml-auto text-amber-500/70">○ {unverifiedCount} unverified — awaiting traffic</span>
@@ -772,7 +795,7 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                    if (te <= 0) return null;
                                    if (verify.state === 'verified_resolved') {
                                      return (
-                                       <div className="mt-2 pt-2 border-t border-neutral-800/40 font-mono text-[9px] space-y-0.5">
+                                       <div className="mt-2 pt-2 border-t border-neutral-800/40 font-mono text-[9px] space-y-1">
                                          <div className="flex items-center gap-1.5 flex-wrap">
                                            <span className={`font-bold ${
                                              verify.confidence === 'high' ? 'text-emerald-500' : 'text-emerald-600/70'
@@ -781,36 +804,48 @@ export default function FunctionDetail({ params }: { params: Promise<{ id: strin
                                              verify.confidence === 'high' ? 'text-emerald-600 border-emerald-900/60 bg-emerald-950/20'
                                              : 'text-neutral-600 border-neutral-800 bg-neutral-900/20'
                                            }`}>{verify.confidence} confidence</span>
-                                           <span className="text-neutral-700">· {verify.execCount} exec{verify.execCount !== 1 ? 's' : ''} in current deploy</span>
                                          </div>
+                                         <div className="text-neutral-600">{verify.reason}</div>
                                        </div>
                                      );
                                    }
                                    if (verify.state === 'unverified') {
                                      return (
-                                       <div className="mt-2 pt-2 border-t border-amber-900/30 font-mono text-[9px] space-y-0.5">
+                                       <div className="mt-2 pt-2 border-t border-amber-900/30 font-mono text-[9px] space-y-1">
                                          <div className="flex items-center gap-1.5 flex-wrap">
                                            <span className="text-amber-500/80 font-bold">○ Unverified</span>
-                                           <span className="text-neutral-700">— not reproduced yet</span>
-                                           <span className="text-neutral-600">· {verify.execCount}/{20} executions</span>
+                                           <span className="px-1 py-px rounded border text-amber-700/80 border-amber-900/40 bg-amber-950/10">low confidence</span>
                                          </div>
-                                         <div className="text-neutral-700">need {Math.max(0, 20 - verify.execCount)} more exec{20 - verify.execCount !== 1 ? 's' : ''} to confirm</div>
+                                         <div className="text-neutral-600">{verify.reason}</div>
                                        </div>
                                      );
                                    }
-                                   // active — show fix-impact
+                                   // active — show reproducibility + confidence + determinism
                                    const currentRate = Math.round((totalFails / te) * 100);
                                    const afterRate = Math.round(Math.max(0, (totalFails - cluster.totalHits) / te) * 100);
-                                   if (currentRate === afterRate || currentRate === 0) return null;
                                    return (
-                                     <div className="mt-2 pt-2 border-t border-neutral-800/40 font-mono text-[9px] space-y-0.5">
+                                     <div className="mt-2 pt-2 border-t border-red-900/30 font-mono text-[9px] space-y-1">
                                        <div className="flex items-center gap-1.5 flex-wrap">
-                                         <span className="text-emerald-500/60">↓ fix this now:</span>
-                                         <span className="text-neutral-600">failure rate</span>
-                                         <span className="text-neutral-500 font-bold">{currentRate}%</span>
-                                         <span className="text-neutral-700">→</span>
-                                         <span className="text-emerald-500 font-bold">{afterRate}%</span>
+                                         {verify.isDeterministic ? (
+                                           <span className="text-red-400 font-bold">Deterministic failure</span>
+                                         ) : (
+                                           <span className="text-red-400/80 font-bold">Reproducible</span>
+                                         )}
+                                         <span className={`px-1 py-px rounded border ${
+                                           verify.confidence === 'high'
+                                             ? 'text-red-500 border-red-900/60 bg-red-950/20'
+                                             : 'text-neutral-500 border-neutral-800 bg-neutral-900/20'
+                                         }`}>{verify.confidence} confidence</span>
                                        </div>
+                                       <div className="text-neutral-600">{verify.reason}</div>
+                                       {currentRate !== afterRate && currentRate > 0 && (
+                                         <div className="flex items-center gap-1.5 pt-0.5">
+                                           <span className="text-emerald-600/60">↓ fix this:</span>
+                                           <span className="text-neutral-600">{currentRate}%</span>
+                                           <span className="text-neutral-700">→</span>
+                                           <span className="text-emerald-500 font-bold">{afterRate}%</span>
+                                         </div>
+                                       )}
                                      </div>
                                    );
                                  })()}
