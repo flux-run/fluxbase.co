@@ -183,19 +183,19 @@ export default function TeamPage({ params }: { params: Promise<{ id: string }> }
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Users className="w-4 h-4 text-neutral-400" />
-            <h1 className="text-base font-black text-white">Team</h1>
+            <h1 className="text-base font-black text-white">Project Access</h1>
             <span className="text-[9px] font-black text-neutral-600 bg-neutral-900 border border-neutral-800 rounded-full px-2 py-0.5">
               {members.length + pending.length}
             </span>
           </div>
-          <p className="text-[11px] text-neutral-600 font-mono">Manage who has access to this project.</p>
+          <p className="text-[11px] text-neutral-600 font-mono">Manage project roles and pending org invitations.</p>
         </div>
         <button
           onClick={() => setShowInvite(true)}
           className="flex items-center gap-2 text-[10px] font-black text-white bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 hover:border-neutral-500 rounded-xl px-4 py-2 transition-all shrink-0"
         >
           <UserPlus className="w-3.5 h-3.5" />
-          Invite member
+          Invite to org
         </button>
       </div>
 
