@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, CheckCircle2, AlertTriangle, Info, Zap, Terminal, MessageSquare, Clock, Bot, ChevronDown } from "lucide-react";
 import { useFluxApi } from "@/lib/api";
 import { ProjectOverviewResult, Execution, IncidentStatus, IncidentActivityEvent } from "@/types/api";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { useTeam, avatarColor } from "@/lib/teamStore";
 
 function timeAgo(d: string) {
@@ -258,6 +259,7 @@ export default function IncidentDetailPage({
   const title = decodeURIComponent(incidentId);
   const router = useRouter();
   const api = useFluxApi(id);
+  const { session } = useAuth();
 
   const [overview, setOverview] = useState<ProjectOverviewResult | null>(null);
   const [functionStats, setFunctionStats] = useState<any>(null);
@@ -271,7 +273,7 @@ export default function IncidentDetailPage({
   const [commentDraft, setCommentDraft] = useState('');
   const { users: teamUsers } = useTeam();
   const viewerName = teamUsers[0]?.name || 'You';
-  const viewerId = teamUsers[0]?.id || null;
+  const viewerId = session?.user?.id || teamUsers[0]?.id || null;
   const userIdByName = useMemo(() => {
     const map = new Map<string, string>();
     for (const user of teamUsers) {
@@ -386,13 +388,23 @@ export default function IncidentDetailPage({
     setActivity(events);
   }, []);
 
-  const appendEventsToServer = useCallback((events: ActivityEvent[]) => {
-    for (const event of events) {
-      api.appendIncidentActivity(id, title, event).catch(() => {
+  const appendEventsToServer = useCallback((
+    events: ActivityEvent[],
+    options?: { sourceCommand?: 'assign' | 'investigate' | 'resolve' | 'reopen' | 'note' },
+  ) => {
+    for (const rawEvent of events) {
+      const shouldAttachActorId = !!viewerId && (
+        rawEvent.type === 'comment' ||
+        (rawEvent.type === 'system' && !!rawEvent.actor && rawEvent.actor.toLowerCase() !== 'system')
+      );
+      const event = shouldAttachActorId && !rawEvent.actor_id
+        ? { ...rawEvent, actor_id: viewerId }
+        : rawEvent;
+      api.appendIncidentActivity(id, title, event, { sourceCommand: options?.sourceCommand }).catch(() => {
         // Non-blocking collaboration event persistence.
       });
     }
-  }, [api, id, title]);
+  }, [api, id, title, viewerId]);
 
   const updateStatus = useCallback((
     s: IncidentStatus,
@@ -553,12 +565,11 @@ export default function IncidentDetailPage({
         type: 'system',
         text: `noted: ${noteText}`,
         actor: viewerName || 'You',
+        actor_id: viewerId ?? undefined,
         ts: new Date().toISOString(),
       };
       persistActivity([...currentActivity, ev]);
-      api.appendIncidentActivity(id, title, ev, { sourceCommand: 'note' }).catch(() => {
-        // Non-blocking command signal persistence.
-      });
+      appendEventsToServer([ev], { sourceCommand: 'note' });
       setCommentDraft('');
       return;
     }
@@ -569,6 +580,7 @@ export default function IncidentDetailPage({
       type: 'comment',
       text: trimmed,
       actor: viewerName || 'You', // user's actual name or 'You'
+      actor_id: viewerId ?? undefined,
       ts: new Date().toISOString(),
     };
     const isQuestion = /\?|^why|^how|^what|^when|^explain|^is |^does /i.test(trimmed);
@@ -595,7 +607,7 @@ export default function IncidentDetailPage({
     }
     setCommentDraft('');
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewerName, persistActivity, group, title, assignOwner, updateStatus, appendEventsToServer, userIdByName]);
+  }, [viewerName, viewerId, persistActivity, group, title, assignOwner, updateStatus, appendEventsToServer, userIdByName]);
 
   const toggleAction = useCallback((actionText: string) => {
     setCheckedActions(prev => {

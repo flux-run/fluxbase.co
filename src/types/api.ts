@@ -299,6 +299,7 @@ export interface IncidentActivityEvent {
   type: 'system' | 'comment' | 'ai';
   text: string;
   actor?: string;
+  actor_id?: string;
   ts: string;
 }
 

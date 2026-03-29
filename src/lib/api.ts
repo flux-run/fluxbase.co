@@ -153,6 +153,7 @@ export function useFluxApi(projectId?: string) {
             type: "system" | "comment" | "ai";
             text: string;
             actor?: string;
+            actor_id?: string;
             ts: string;
           }[];
         },
@@ -204,6 +205,7 @@ export function useFluxApi(projectId?: string) {
           type: "system" | "comment" | "ai";
           text: string;
           actor?: string;
+          actor_id?: string;
           ts: string;
         },
         options?: { sourceCommand?: "assign" | "investigate" | "resolve" | "reopen" | "note" },
