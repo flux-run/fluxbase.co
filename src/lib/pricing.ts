@@ -107,7 +107,7 @@ export const PRICING_TIERS: PricingTier[] = [
     name: 'Builder',
     price: 19,
     period: '/month',
-    tagline: 'Ship to production with full visibility.',
+    tagline: 'Ship to production with full execution replay.',
     cta: 'Ship to production',
     ctaHref: '/login',
     popular: true,

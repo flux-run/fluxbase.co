@@ -27,13 +27,16 @@ export default function PricingPage() {
             <Zap className="w-3 h-3" />
             Simple, usage-based pricing
           </div>
+          <p className="text-lg sm:text-2xl font-black text-white leading-tight">
+            Debug production failures with full execution replay.
+          </p>
           <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-white leading-[0.95]">
             Pay for execution time and storage.
             <br />
             Nothing else.
           </h1>
           <p className="text-lg sm:text-2xl font-semibold text-neutral-300 leading-snug">
-            See exactly what happened in every execution.
+            Replay every execution with full input, output, and context.
           </p>
           <p className="text-base sm:text-lg text-neutral-500 font-medium leading-relaxed max-w-3xl mx-auto">
             You only pay for what actually runs, not noisy logs. Start free, keep team collaboration available, and upgrade only when debugging becomes mission-critical.
@@ -114,6 +117,9 @@ export default function PricingPage() {
                     <span className="text-4xl font-black text-white leading-none">{formatPrice(tier.price)}</span>
                     {tier.price !== null && <span className="text-sm font-bold text-neutral-500 mb-1">{tier.period}</span>}
                   </div>
+                  {tier.id === "builder" && (
+                    <p className="mt-2 text-[10px] font-semibold text-emerald-300">Costs less than one debugging session.</p>
+                  )}
                 </div>
 
                 <Link
@@ -253,6 +259,7 @@ export default function PricingPage() {
               Read quickstart
             </Link>
           </div>
+          <p className="text-[11px] font-medium text-neutral-500">Install CLI -&gt; capture one execution -&gt; see replay.</p>
         </section>
       </main>
     </MarketingLayout>
