@@ -4,7 +4,7 @@
  * Update this file to change pricing across the entire frontend.
  */
 
-export type PlanId = 'free' | 'builder' | 'startup' | 'scale' | 'enterprise'
+export type PlanId = 'free' | 'builder' | 'startup' | 'enterprise'
 
 export interface PricingFeature {
   label: string
@@ -33,44 +33,35 @@ export interface PricingTier {
 
 export const LIMITS = {
   free: {
-    executions: 250_000,         // per month
+    executions: 5_000,
     retentionDays: 14,
-    projects: -1,                // unlimited
+    projects: 1,
     environments: 1,
-    members: 1,
+    members: 3,
     apiKeys: 2,
     customDomains: 0,
   },
   builder: {
     executions: 1_000_000,
     retentionDays: 30,
-    projects: -1,                // unlimited
+    projects: -1,
     environments: -1,
-    members: 3,
+    members: 5,
     apiKeys: 10,
     customDomains: 1,
   },
   startup: {
-    executions: 10_000_000,
-    retentionDays: 30,
-    projects: -1,                // unlimited
+    executions: 5_000_000,
+    retentionDays: 90,
+    projects: -1,
     environments: -1,
-    members: 10,
+    members: -1,
     apiKeys: -1,
     customDomains: 5,
   },
-  scale: {
-    executions: 50_000_000,
-    retentionDays: 60,
-    projects: -1,
-    environments: -1,
-    members: 25,
-    apiKeys: -1,
-    customDomains: -1,
-  },
   enterprise: {
-    executions: -1,              // unlimited
-    retentionDays: -1,           // custom
+    executions: -1,
+    retentionDays: -1,
     projects: -1,
     environments: -1,
     members: -1,
@@ -82,8 +73,8 @@ export const LIMITS = {
 // ─── Overage & discounts ────────────────────────────────────────────────────
 
 export const OVERAGE = {
-  /** USD per 1 million additional executions */
-  pricePerMillionExec: 5,
+  /** USD per 1 million additional executions ($0.20 per 100K) */
+  pricePerMillionExec: 2,
 }
 
 export const ANNUAL_DISCOUNT_PERCENT = 20
@@ -96,19 +87,18 @@ export const PRICING_TIERS: PricingTier[] = [
     name: 'Free',
     price: 0,
     period: '/month',
-    tagline: 'Experiment freely — full execution history, no card required.',
-    cta: 'Start for free',
-    ctaHref: '/dashboard',
+    tagline: 'Debug your code without paying anything.',
+    cta: 'Start free',
+    ctaHref: '/login',
     features: [
-      { label: 'Executions recorded', value: '250K / mo' },
+      { label: 'Executions recorded', value: '5K / mo' },
       { label: 'Trace retention', value: '14 days' },
-      { label: 'Projects', value: 'Unlimited' },
-      { label: 'Environments', value: '1' },
-      { label: 'Team members', value: '1' },
-      { label: 'API keys', value: '2' },
-      { label: 'Custom domains', value: false },
-      { label: 'SSO / SAML', value: false },
-      { label: 'SLA', value: false },
+      { label: 'Projects', value: '1' },
+      { label: 'Team members', value: '3' },
+      { label: 'Basic incident detection', value: true },
+      { label: 'Execution replay', value: 'Limited' },
+      { label: 'Advanced insights', value: false },
+      { label: 'No credit card required', value: true },
     ],
   },
   {
@@ -116,60 +106,38 @@ export const PRICING_TIERS: PricingTier[] = [
     name: 'Builder',
     price: 19,
     period: '/month',
-    tagline: 'Ship to production with full execution history and replay.',
+    tagline: 'Ship to production with full visibility.',
     cta: 'Get Builder',
-    ctaHref: '/dashboard',
+    ctaHref: '/login',
     popular: true,
     features: [
       { label: 'Executions recorded', value: '1M / mo' },
       { label: 'Trace retention', value: '30 days' },
       { label: 'Projects', value: 'Unlimited' },
-      { label: 'Environments', value: 'Unlimited' },
-      { label: 'Team members', value: '3' },
-      { label: 'API keys', value: '10' },
-      { label: 'Custom domains', value: '1' },
-      { label: 'SSO / SAML', value: false },
-      { label: 'SLA', value: false },
+      { label: 'Team members', value: '5' },
+      { label: 'Full execution replay', value: true },
+      { label: 'Root cause analysis', value: true },
+      { label: 'Basic alerts', value: true },
+      { label: 'Usage predictions', value: true },
     ],
   },
   {
     id: 'startup',
-    name: 'Startup',
-    price: 79,
+    name: 'Pro',
+    price: 49,
     period: '/month',
-    tagline: 'Scale a real product with deeper history and a growing team.',
-    cta: 'Get Startup',
-    ctaHref: '/dashboard',
+    tagline: 'For teams that rely on debugging in production.',
+    cta: 'Get Pro',
+    ctaHref: '/login',
     features: [
-      { label: 'Executions recorded', value: '10M / mo' },
-      { label: 'Trace retention', value: '30 days' },
+      { label: 'Executions recorded', value: '5M / mo' },
+      { label: 'Trace retention', value: '90 days' },
       { label: 'Projects', value: 'Unlimited' },
-      { label: 'Environments', value: 'Unlimited' },
-      { label: 'Team members', value: '10' },
-      { label: 'API keys', value: 'Unlimited' },
-      { label: 'Custom domains', value: '5' },
-      { label: 'SSO / SAML', value: false },
-      { label: 'SLA', value: false },
-    ],
-  },
-  {
-    id: 'scale',
-    name: 'Scale',
-    price: 249,
-    period: '/month',
-    tagline: 'High-volume systems with 60-day history and advanced replay.',
-    cta: 'Get Scale',
-    ctaHref: '/dashboard',
-    features: [
-      { label: 'Executions recorded', value: '50M / mo' },
-      { label: 'Trace retention', value: '60 days' },
-      { label: 'Projects', value: 'Unlimited' },
-      { label: 'Environments', value: 'Unlimited' },
-      { label: 'Team members', value: '25' },
-      { label: 'API keys', value: 'Unlimited' },
-      { label: 'Custom domains', value: 'Unlimited' },
-      { label: 'SSO / SAML', value: false },
-      { label: 'SLA', value: '99.9% uptime SLA' },
+      { label: 'Team members', value: 'Unlimited' },
+      { label: 'Advanced incident grouping', value: true },
+      { label: 'Slack + webhook alerts', value: true },
+      { label: 'Detailed usage analytics', value: true },
+      { label: 'API access', value: true },
     ],
   },
   {
@@ -178,18 +146,17 @@ export const PRICING_TIERS: PricingTier[] = [
     price: null,
     period: '',
     tagline: 'Dedicated infrastructure, custom retention, and compliance.',
-    cta: 'Contact us',
+    cta: 'Contact sales',
     ctaHref: 'mailto:team@fluxbase.co',
     features: [
       { label: 'Executions recorded', value: 'Unlimited' },
       { label: 'Trace retention', value: 'Custom' },
-      { label: 'Projects', value: 'Unlimited' },
-      { label: 'Environments', value: 'Unlimited' },
-      { label: 'Team members', value: 'Unlimited' },
-      { label: 'API keys', value: 'Unlimited' },
-      { label: 'Custom domains', value: 'Unlimited' },
-      { label: 'SSO / SAML', value: true },
-      { label: 'SLA', value: 'Custom SLA + dedicated support' },
+      { label: 'Dedicated region / infra', value: true },
+      { label: 'SLA + support', value: true },
+      { label: 'SSO / RBAC', value: true },
+      { label: 'Custom onboarding', value: true },
+      { label: 'Volume pricing', value: true },
+      { label: 'Security review', value: true },
     ],
   },
 ]

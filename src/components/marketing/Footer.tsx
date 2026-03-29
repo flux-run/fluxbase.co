@@ -16,6 +16,7 @@ export function Footer() {
       </span>
       <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
         {[
+          { href: '/pricing',          label: 'Pricing'    },
           { href: '/docs',             label: 'Docs'       },
           { href: '/docs/quickstart',  label: 'Quickstart' },
           { href: '/docs/cli',         label: 'CLI'        },

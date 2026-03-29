@@ -4,17 +4,15 @@ import { useState } from 'react'
 import { OVERAGE } from '@/lib/pricing'
 
 const STEPS = [
+  1_000,
+  5_000,
   50_000,
-  100_000,
   250_000,
-  500_000,
   1_000_000,
-  2_000_000,
+  2_500_000,
   5_000_000,
   10_000_000,
   20_000_000,
-  50_000_000,
-  75_000_000,
 ]
 
 function formatExec(n: number): string {
@@ -27,19 +25,17 @@ function formatExec(n: number): string {
 }
 
 function recommend(executions: number): { plan: string; price: number; overage: number } {
-  if (executions <= 250_000) return { plan: 'Free', price: 0, overage: 0 }
+  if (executions <= 5_000) return { plan: 'Free', price: 0, overage: 0 }
   if (executions <= 1_000_000) return { plan: 'Builder', price: 19, overage: 0 }
-  if (executions <= 10_000_000) return { plan: 'Startup', price: 79, overage: 0 }
-  if (executions <= 50_000_000) return { plan: 'Scale', price: 249, overage: 0 }
-  const overageMs = Math.ceil((executions - 50_000_000) / 1_000_000)
-  return { plan: 'Scale', price: 249, overage: overageMs * OVERAGE.pricePerMillionExec }
+  if (executions <= 5_000_000) return { plan: 'Pro', price: 49, overage: 0 }
+  const overageUnits = Math.ceil((executions - 5_000_000) / 1_000_000)
+  return { plan: 'Pro', price: 49, overage: overageUnits * OVERAGE.pricePerMillionExec }
 }
 
 const PLAN_COLORS: Record<string, string> = {
   Free: 'var(--mg-muted)',
   Builder: 'var(--mg-accent)',
-  Startup: '#10b981',
-  Scale: '#f59e0b',
+  Pro: '#10b981',
 }
 
 export function PriceCalculator() {
@@ -70,11 +66,11 @@ export function PriceCalculator() {
       {/* Slider */}
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-          <span style={{ fontSize: '.75rem', color: 'var(--mg-muted)' }}>50K</span>
+          <span style={{ fontSize: '.75rem', color: 'var(--mg-muted)' }}>1K</span>
           <span style={{ fontSize: '.9rem', fontWeight: 700, color: 'var(--mg-text)' }}>
             {formatExec(executions)} executions / mo
           </span>
-          <span style={{ fontSize: '.75rem', color: 'var(--mg-muted)' }}>75M</span>
+          <span style={{ fontSize: '.75rem', color: 'var(--mg-muted)' }}>20M</span>
         </div>
         <input
           type="range"
@@ -126,15 +122,20 @@ export function PriceCalculator() {
         </div>
       </div>
 
-      {/* Scale breakdown clarification */}
+      {/* Pricing clarification */}
       {plan === 'Free' && (
         <p style={{ fontSize: '.78rem', color: 'var(--mg-muted)', marginTop: 14, margin: '14px 0 0' }}>
-          Free forever — no credit card required up to 250K executions/mo.
+          Free forever — no credit card required up to 5K executions/mo.
         </p>
       )}
       {plan !== 'Free' && overage === 0 && (
         <p style={{ fontSize: '.78rem', color: 'var(--mg-muted)', marginTop: 14, margin: '14px 0 0' }}>
-          Flat-rate — no surprises. Overage kicks in only above your plan limit.
+          Flat-rate until your plan limit. Overage only starts above the included execution volume.
+        </p>
+      )}
+      {overage > 0 && (
+        <p style={{ fontSize: '.78rem', color: 'var(--mg-muted)', marginTop: 14, margin: '14px 0 0' }}>
+          You stay on Pro and pay soft overage instead of getting hard-blocked.
         </p>
       )}
     </div>

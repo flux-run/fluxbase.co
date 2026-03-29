@@ -46,6 +46,7 @@ function GitHubStarButton() {
 }
 
 const LINKS = [
+  { href: '/pricing', label: 'Pricing' },
   { href: '/docs', label: 'Docs' },
   { href: '/docs/cli', label: 'CLI' },
   { href: '/docs/quickstart', label: 'Quickstart' },
