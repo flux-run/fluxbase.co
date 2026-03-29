@@ -304,6 +304,7 @@ export interface IncidentActivityEvent {
 
 export interface IncidentState {
   status: IncidentStatus;
+  ownerId?: string;
   owner: string;
   checkedActions: string[];  // action text strings, not indices
   activity: IncidentActivityEvent[];

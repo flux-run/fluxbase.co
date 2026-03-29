@@ -267,9 +267,18 @@ export default function IncidentDetailPage({
   const [incidentStatus, setIncidentStatus] = useState<IncidentStatus>('active');
   const [checkedActions, setCheckedActions] = useState<Set<string>>(new Set());
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
-  const [owner, setOwnerState] = useState<string>('');
+  const [ownerId, setOwnerIdState] = useState<string>('');
   const [commentDraft, setCommentDraft] = useState('');
   const { users: teamUsers } = useTeam();
+  const viewerName = teamUsers[0]?.name || 'You';
+  const viewerId = teamUsers[0]?.id || null;
+  const userIdByName = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const user of teamUsers) {
+      map.set(user.name.trim().toLowerCase(), user.id);
+    }
+    return map;
+  }, [teamUsers]);
   const [ownerDropdownOpen, setOwnerDropdownOpen] = useState(false);
   const ownerDropdownButtonRef = useRef<HTMLButtonElement>(null);
     const [showCommandSuggestions, setShowCommandSuggestions] = useState(false);
@@ -277,6 +286,14 @@ export default function IncidentDetailPage({
     const [commandInputRef, setCommandInputRef] = useState<HTMLTextAreaElement | null>(null);
 
   // Compute incident group early so callbacks can reference it
+  const userById = useMemo(() => {
+    const map = new Map<string, { id: string; name: string }>();
+    for (const user of teamUsers) map.set(user.id, { id: user.id, name: user.name });
+    return map;
+  }, [teamUsers]);
+
+  const ownerName = ownerId ? (userById.get(ownerId)?.name ?? '') : '';
+
   const group = useMemo(() => {
     if (!overview?.incidents) return null;
     const incs = overview.incidents.filter(i => i.title === title);
@@ -344,7 +361,14 @@ export default function IncidentDetailPage({
         const state = res?.state;
         if (state) {
           setIncidentStatus(state.status);
-          setOwnerState(state.owner ?? '');
+          const persistedOwnerId = typeof state.ownerId === 'string' ? state.ownerId.trim() : '';
+          if (persistedOwnerId) {
+            setOwnerIdState(persistedOwnerId);
+          } else {
+            const legacyOwner = typeof state.owner === 'string' ? state.owner.trim() : '';
+            const mapped = legacyOwner ? userIdByName.get(legacyOwner.toLowerCase()) ?? '' : '';
+            setOwnerIdState(mapped);
+          }
           setCheckedActions(new Set((state.checkedActions ?? []).filter((s) => typeof s === 'string')));
           setActivity(Array.isArray(state.activity) ? state.activity : []);
         }
@@ -408,7 +432,7 @@ export default function IncidentDetailPage({
     });
     persistActivity([...currentActivity, ...evs]);
     appendEventsToServer(evs);
-  }, [appendEventsToServer, api, id, title, persistActivity, group, owner, incidentStatus]);
+  }, [appendEventsToServer, api, id, title, persistActivity, group, incidentStatus]);
 
     const handleCommentChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
       const val = e.target.value;
@@ -435,20 +459,30 @@ export default function IncidentDetailPage({
       }
     }, [teamUsers]);
   const assignOwner = useCallback((
-    name: string,
+    nextOwnerId: string,
     currentActivity: ActivityEvent[],
     options?: { sourceCommand?: 'assign' | 'investigate' | 'resolve' | 'reopen' | 'note' },
   ) => {
-    const trimmed = name.trim();
-    setOwnerState(trimmed);
-    api.updateIncidentOwner(id, title, trimmed, { sourceCommand: options?.sourceCommand }).catch(() => {
+    const normalizedOwnerId = nextOwnerId.trim();
+    const previousOwnerId = ownerId.trim() || null;
+    const previousOwnerName = previousOwnerId ? (userById.get(previousOwnerId)?.name ?? 'owner') : 'owner';
+    const nextOwnerName = normalizedOwnerId ? (userById.get(normalizedOwnerId)?.name ?? normalizedOwnerId) : '';
+    const actor = 'You';
+    setOwnerIdState(normalizedOwnerId);
+    api.updateIncidentOwner(id, title, normalizedOwnerId, { sourceCommand: options?.sourceCommand }).catch(() => {
       // Non-blocking owner persistence.
     });
-    if (!trimmed) {
+    if (!normalizedOwnerId) {
+      const removedSelf = !!previousOwnerId && !!viewerId && previousOwnerId === viewerId;
       const unassignEv: ActivityEvent = {
         id: `system-unassign-${Date.now()}`,
         type: 'system',
-        text: `Owner removed`,
+        text: removedSelf
+          ? 'removed yourself'
+          : previousOwnerId
+            ? `removed ${previousOwnerName}`
+            : 'removed owner',
+        actor,
         ts: new Date().toISOString(),
       };
       persistActivity([...currentActivity, unassignEv]);
@@ -458,12 +492,13 @@ export default function IncidentDetailPage({
     const ev: ActivityEvent = {
       id: `system-owner-${Date.now()}`,
       type: 'system',
-      text: `Assigned to ${trimmed}`,
+      text: `assigned to ${nextOwnerName}`,
+      actor,
       ts: new Date().toISOString(),
     };
     persistActivity([...currentActivity, ev]);
     appendEventsToServer([ev]);
-  }, [appendEventsToServer, api, id, title, persistActivity]);
+  }, [appendEventsToServer, api, id, title, persistActivity, ownerId, userById, viewerId]);
 
   const addComment = useCallback((text: string, currentActivity: ActivityEvent[]) => {
     const trimmed = text.trim();
@@ -478,7 +513,21 @@ export default function IncidentDetailPage({
 
     if (slashAssign) {
       const assignee = slashAssign[1].trim();
-      assignOwner(assignee, currentActivity, { sourceCommand: 'assign' });
+      const assigneeId = userIdByName.get(assignee.toLowerCase()) ?? '';
+      if (!assigneeId) {
+        const ev: ActivityEvent = {
+          id: `assign-not-found-${Date.now()}`,
+          type: 'system',
+          text: `could not assign: user '${assignee}' not found`,
+          actor: 'System',
+          ts: new Date().toISOString(),
+        };
+        persistActivity([...currentActivity, ev]);
+        appendEventsToServer([ev]);
+        setCommentDraft('');
+        return;
+      }
+      assignOwner(assigneeId, currentActivity, { sourceCommand: 'assign' });
       setCommentDraft('');
       return;
     }
@@ -503,7 +552,7 @@ export default function IncidentDetailPage({
         id: `note-${Date.now()}`,
         type: 'system',
         text: `noted: ${noteText}`,
-        actor: owner || 'You',
+        actor: viewerName || 'You',
         ts: new Date().toISOString(),
       };
       persistActivity([...currentActivity, ev]);
@@ -519,7 +568,7 @@ export default function IncidentDetailPage({
       id: `comment-${Date.now()}`,
       type: 'comment',
       text: trimmed,
-      actor: owner || 'You', // user's actual name or 'You'
+      actor: viewerName || 'You', // user's actual name or 'You'
       ts: new Date().toISOString(),
     };
     const isQuestion = /\?|^why|^how|^what|^when|^explain|^is |^does /i.test(trimmed);
@@ -546,7 +595,7 @@ export default function IncidentDetailPage({
     }
     setCommentDraft('');
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [owner, persistActivity, group, title, assignOwner, updateStatus]);
+  }, [viewerName, persistActivity, group, title, assignOwner, updateStatus, appendEventsToServer, userIdByName]);
 
   const toggleAction = useCallback((actionText: string) => {
     setCheckedActions(prev => {
@@ -1205,12 +1254,12 @@ export default function IncidentDetailPage({
                       onClick={() => setOwnerDropdownOpen(o => !o)}
                       className="flex items-center gap-1.5 group"
                     >
-                      {owner ? (
+                      {ownerName ? (
                         <>
-                          <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 text-[7px] font-black ${avatarColor(owner)}`}>
-                            {owner[0]?.toUpperCase()}
+                          <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 text-[7px] font-black ${avatarColor(ownerName)}`}>
+                            {ownerName[0]?.toUpperCase()}
                           </div>
-                          <span className="text-[9px] font-bold text-neutral-300 font-mono">{owner}</span>
+                          <span className="text-[9px] font-bold text-neutral-300 font-mono">{ownerName}</span>
                           <ChevronDown className="w-2.5 h-2.5 text-neutral-600" />
                         </>
                       ) : (
@@ -1230,8 +1279,8 @@ export default function IncidentDetailPage({
                           {teamUsers.map(u => (
                             <button
                               key={u.id}
-                              onClick={() => { assignOwner(u.name, activity); setOwnerDropdownOpen(false); }}
-                              className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-neutral-900 transition-colors ${owner === u.name ? 'bg-neutral-900/60' : ''}`}
+                              onClick={() => { assignOwner(u.id, activity); setOwnerDropdownOpen(false); }}
+                              className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-neutral-900 transition-colors ${ownerId === u.id ? 'bg-neutral-900/60' : ''}`}
                             >
                               <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[8px] font-black ${avatarColor(u.name)}`}>
                                 {u.name[0]?.toUpperCase()}
@@ -1240,10 +1289,10 @@ export default function IncidentDetailPage({
                                 <p className="text-[10px] font-black text-neutral-200 truncate">{u.name}</p>
                                 <p className="text-[8px] text-neutral-600 font-mono truncate">{u.role}</p>
                               </div>
-                              {owner === u.name && <span className="text-[8px] text-blue-400 font-black">✓</span>}
+                              {ownerId === u.id && <span className="text-[8px] text-blue-400 font-black">✓</span>}
                             </button>
                           ))}
-                          {owner && (
+                          {ownerId && (
                             <button
                               onClick={() => { assignOwner('', activity); setOwnerDropdownOpen(false); }}
                               className="w-full text-left px-3 py-2 text-[9px] text-neutral-600 hover:text-red-400 font-mono border-t border-neutral-800/60 transition-colors"
@@ -1416,7 +1465,8 @@ export default function IncidentDetailPage({
             const isSystemAuto  = event.type === 'system' && !event.actor;
             const isComment     = event.type === 'comment';
             const isAi          = event.type === 'ai';
-            const actorInitial  = (event.actor ?? '?')[0].toUpperCase();
+            const actorLabel = event.actor === 'You' ? viewerName : (event.actor ?? '?');
+            const actorInitial  = actorLabel[0]?.toUpperCase() ?? '?';
 
             return (
               <div key={event.id} className="flex gap-3 relative">
@@ -1427,7 +1477,7 @@ export default function IncidentDetailPage({
                 {/* avatar / dot */}
                 {(isHumanAction || isComment) ? (
                   <div className={`mt-0.5 shrink-0 w-[22px] h-[22px] rounded-full flex items-center justify-center z-10 text-[8px] font-black ${
-                    event.actor ? avatarColor(event.actor) : 'bg-emerald-950/60 border border-emerald-800/60 text-emerald-300'
+                    event.actor ? avatarColor(actorLabel) : 'bg-emerald-950/60 border border-emerald-800/60 text-emerald-300'
                   }`}>
                     {actorInitial}
                   </div>
@@ -1447,7 +1497,7 @@ export default function IncidentDetailPage({
                     {/* actor name */}
                     {(isHumanAction || isComment) && event.actor && (
                       <span className={`text-[10px] font-black ${isComment ? 'text-emerald-300' : 'text-white'}`}>
-                        {event.actor}
+                        {actorLabel}
                       </span>
                     )}
                     {isSystemAuto && (
@@ -1506,7 +1556,7 @@ export default function IncidentDetailPage({
                 Reopen
               </button>
             )}
-            {!owner && (
+            {!ownerId && (
               <button
                 onClick={() => setOwnerDropdownOpen(true)}
                 className="text-[9px] font-black text-neutral-500 hover:text-white border border-neutral-800 hover:border-neutral-600 rounded-md px-2.5 py-1 transition-all"
@@ -1527,7 +1577,7 @@ export default function IncidentDetailPage({
                     addComment(commentDraft, activity);
                   }
                 }}
-                placeholder={`${owner ? `Comment as ${owner}` : 'Add note'}… or try /assign @user, /investigate, /resolve`}
+                placeholder={`${ownerName ? `Comment as ${ownerName}` : 'Add note'}… or try /assign @user, /investigate, /resolve`}
                 rows={1}
                 className="w-full text-[10px] font-mono bg-neutral-900/60 border border-neutral-800 hover:border-neutral-700 focus:border-neutral-600 rounded-lg px-3 py-2 text-neutral-300 placeholder-neutral-700 outline-none transition-colors resize-none"
               />

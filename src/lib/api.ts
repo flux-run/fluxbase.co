@@ -146,7 +146,7 @@ export function useFluxApi(projectId?: string) {
         title: string,
         state: {
           status: "active" | "investigating" | "resolved";
-          owner: string;
+          ownerId: string;
           checkedActions: string[];
           activity: {
             id: string;
@@ -179,7 +179,7 @@ export function useFluxApi(projectId?: string) {
       updateIncidentOwner: (
         projectId: string,
         title: string,
-        owner: string,
+        ownerId: string,
         options?: { sourceCommand?: "assign" | "investigate" | "resolve" | "reopen" | "note" },
       ) =>
         request<{ ok: boolean }>(`/incidents/state/owner`, token(), {
@@ -187,7 +187,7 @@ export function useFluxApi(projectId?: string) {
           body: JSON.stringify({
             project_id: projectId,
             title,
-            owner,
+            ownerId,
             source_command: options?.sourceCommand,
           }),
         }),
