@@ -171,7 +171,7 @@ export function useFluxApi(projectId?: string) {
           method: "PATCH",
           body: JSON.stringify({ project_id: projectId, title, owner }),
         }),
-      updateIncidentChecklist: (projectId: string, title: string, checkedActions: number[]) =>
+      updateIncidentChecklist: (projectId: string, title: string, checkedActions: string[]) =>
         request<{ ok: boolean }>(`/incidents/state/checklist`, token(), {
           method: "PUT",
           body: JSON.stringify({ project_id: projectId, title, checkedActions }),

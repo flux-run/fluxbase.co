@@ -265,7 +265,7 @@ export default function IncidentDetailPage({
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [incidentStatus, setIncidentStatus] = useState<IncidentStatus>('active');
-  const [checkedActions, setCheckedActions] = useState<Set<number>>(new Set());
+  const [checkedActions, setCheckedActions] = useState<Set<string>>(new Set());
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [owner, setOwnerState] = useState<string>('');
   const [commentDraft, setCommentDraft] = useState('');
@@ -341,7 +341,7 @@ export default function IncidentDetailPage({
         if (state) {
           setIncidentStatus(state.status);
           setOwnerState(state.owner ?? '');
-          setCheckedActions(new Set((state.checkedActions ?? []).map((n) => Number(n)).filter((n) => Number.isFinite(n))));
+          setCheckedActions(new Set((state.checkedActions ?? []).filter((s) => typeof s === 'string')));
           setActivity(Array.isArray(state.activity) ? state.activity : []);
         }
       })
@@ -503,10 +503,10 @@ export default function IncidentDetailPage({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [owner, persistActivity, group, title, assignOwner, updateStatus]);
 
-  const toggleAction = useCallback((i: number) => {
+  const toggleAction = useCallback((actionText: string) => {
     setCheckedActions(prev => {
       const next = new Set(prev);
-      next.has(i) ? next.delete(i) : next.add(i);
+      next.has(actionText) ? next.delete(actionText) : next.add(actionText);
       api.updateIncidentChecklist(id, title, [...next]).catch(() => {
         // Non-blocking checklist persistence.
       });
@@ -920,29 +920,29 @@ export default function IncidentDetailPage({
                 <p className="text-[10px] text-neutral-400 font-mono leading-relaxed">{suggestedFix.summary}</p>
                 {/* Checklist actions */}
                 <div className="space-y-1">
-                  {suggestedFix.actions.map((a, i) => (
+                  {suggestedFix.actions.map((a) => (
                     <button
-                      key={i}
-                      onClick={() => toggleAction(i)}
+                      key={a}
+                      onClick={() => toggleAction(a)}
                       className={`w-full flex items-start gap-2.5 text-left px-2.5 py-2 rounded-lg transition-colors ${
-                        checkedActions.has(i)
+                        checkedActions.has(a)
                           ? 'bg-cyan-950/30 hover:bg-cyan-950/50'
                           : 'hover:bg-neutral-900/60'
                       }`}
                     >
                       <span className={`mt-0.5 shrink-0 w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${
-                        checkedActions.has(i)
+                        checkedActions.has(a)
                           ? 'bg-cyan-600 border-cyan-500'
                           : 'border-neutral-700 bg-transparent'
                       }`}>
-                        {checkedActions.has(i) && (
+                        {checkedActions.has(a) && (
                           <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 8 8">
                             <path d="M1 4l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                           </svg>
                         )}
                       </span>
                       <span className={`text-[10px] font-mono leading-relaxed transition-colors ${
-                        checkedActions.has(i) ? 'text-neutral-600 line-through' : 'text-neutral-300'
+                        checkedActions.has(a) ? 'text-neutral-600 line-through' : 'text-neutral-300'
                       }`}>{a}</span>
                     </button>
                   ))}
