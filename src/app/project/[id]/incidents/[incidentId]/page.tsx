@@ -6,6 +6,15 @@ import { useFluxApi } from "@/lib/api";
 import { ProjectOverviewResult, Execution, IncidentStatus, IncidentActivityEvent } from "@/types/api";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useTeam, avatarColor } from "@/lib/teamStore";
+import { useAutocompleteList } from "@/lib/useAutocompleteList";
+
+const COMMAND_OPTIONS = [
+  { id: "assign", cmd: "/assign", template: "/assign @", desc: "Assign incident to user" },
+  { id: "investigate", cmd: "/investigate", template: "/investigate", desc: "Mark as investigating" },
+  { id: "resolve", cmd: "/resolve", template: "/resolve", desc: "Mark as resolved" },
+  { id: "reopen", cmd: "/reopen", template: "/reopen", desc: "Reopen the incident" },
+  { id: "note", cmd: "/note", template: "/note ", desc: "Add a system note" },
+] as const;
 
 function timeAgo(d: string) {
   const m = Math.floor((Date.now() - new Date(d).getTime()) / 60000);
@@ -283,9 +292,7 @@ export default function IncidentDetailPage({
   }, [teamUsers]);
   const [ownerDropdownOpen, setOwnerDropdownOpen] = useState(false);
   const ownerDropdownButtonRef = useRef<HTMLButtonElement>(null);
-    const [showCommandSuggestions, setShowCommandSuggestions] = useState(false);
-    const [autocompleteUsers, setAutocompleteUsers] = useState<string[]>([]);
-    const [commandInputRef, setCommandInputRef] = useState<HTMLTextAreaElement | null>(null);
+  const commentInputRef = useRef<HTMLTextAreaElement>(null);
 
   // Compute incident group early so callbacks can reference it
   const userById = useMemo(() => {
@@ -295,6 +302,45 @@ export default function IncidentDetailPage({
   }, [teamUsers]);
 
   const ownerName = ownerId ? (userById.get(ownerId)?.name ?? '') : '';
+
+  const slashTokenMatch = commentDraft.match(/^\/([^\s]*)$/);
+  const commandQuery = slashTokenMatch ? slashTokenMatch[1] : "";
+  const isTypingCommandToken = !!slashTokenMatch;
+
+  const mentionMatch = commentDraft.match(/(?:^|\s)@(\w*)$/);
+  const mentionQuery = mentionMatch ? mentionMatch[1] : "";
+  const isTypingMention = !!mentionMatch;
+
+  const commandAutocomplete = useAutocompleteList({
+    items: [...COMMAND_OPTIONS],
+    query: commandQuery,
+    isOpen: isTypingCommandToken,
+    getSearchText: (item) => `${item.cmd} ${item.desc}`,
+    hideWhenExactMatch: true,
+    onSelect: (item) => {
+      setCommentDraft(item.template);
+      requestAnimationFrame(() => {
+        commentInputRef.current?.focus();
+      });
+    },
+  });
+
+  const mentionAutocomplete = useAutocompleteList({
+    items: teamUsers,
+    query: mentionQuery,
+    isOpen: isTypingMention,
+    getSearchText: (item) => `${item.name} ${item.email}`,
+    hideWhenExactMatch: true,
+    onSelect: (item) => {
+      const atIndex = commentDraft.lastIndexOf("@");
+      if (atIndex < 0) return;
+      const newDraft = `${commentDraft.slice(0, atIndex)}@${item.name} `;
+      setCommentDraft(newDraft);
+      requestAnimationFrame(() => {
+        commentInputRef.current?.focus();
+      });
+    },
+  });
 
   const group = useMemo(() => {
     if (!overview?.incidents) return null;
@@ -448,30 +494,9 @@ export default function IncidentDetailPage({
     appendEventsToServer(evs);
   }, [appendEventsToServer, api, id, title, persistActivity, group, incidentStatus, viewerName, viewerId]);
 
-    const handleCommentChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      const val = e.target.value;
-      setCommentDraft(val);
-    
-      // Detect / commands
-      if (val.startsWith('/') && val.length < 20) {
-        setShowCommandSuggestions(true);
-      } else {
-        setShowCommandSuggestions(false);
-      }
-    
-      // Detect @user mentions
-      const atMatch = val.match(/@(\w*)$/);
-      if (atMatch) {
-        const query = atMatch[1].toLowerCase();
-        const matches = teamUsers
-          .map(u => u.name.toLowerCase())
-          .filter(name => name.includes(query))
-          .slice(0, 5);
-        setAutocompleteUsers(matches);
-      } else {
-        setAutocompleteUsers([]);
-      }
-    }, [teamUsers]);
+  const handleCommentChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setCommentDraft(e.target.value);
+  }, []);
   const assignOwner = useCallback((
     nextOwnerId: string,
     currentActivity: ActivityEvent[],
@@ -1583,9 +1608,12 @@ export default function IncidentDetailPage({
           <div className="flex gap-2 items-end">
             <div className="flex-1">
               <textarea
+                ref={commentInputRef}
                 value={commentDraft}
-                  onChange={handleCommentChange}
+                onChange={handleCommentChange}
                 onKeyDown={e => {
+                  if (mentionAutocomplete.isVisible && mentionAutocomplete.handleKeyDown(e)) return;
+                  if (commandAutocomplete.isVisible && commandAutocomplete.handleKeyDown(e)) return;
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     addComment(commentDraft, activity);
@@ -1595,45 +1623,42 @@ export default function IncidentDetailPage({
                 rows={1}
                 className="w-full text-[10px] font-mono bg-neutral-900/60 border border-neutral-800 hover:border-neutral-700 focus:border-neutral-600 rounded-lg px-3 py-2 text-neutral-300 placeholder-neutral-700 outline-none transition-colors resize-none"
               />
-                {/* Command suggestions on / */}
-                {showCommandSuggestions && (
-                  <div className="mt-1 rounded-lg border border-cyan-900/40 bg-cyan-950/20 overflow-hidden text-[9px]">
-                    {[
-                      { cmd: '/assign @user', desc: 'Assign incident to user' },
-                      { cmd: '/investigate', desc: 'Mark as investigating' },
-                      { cmd: '/resolve', desc: 'Mark as resolved' },
-                      { cmd: '/reopen', desc: 'Reopen the incident' },
-                      { cmd: '/note ...', desc: 'Add a system note' },
-                    ].map((c, i) => (
-                      <div key={i} className="px-3 py-2 hover:bg-cyan-900/20 transition-colors cursor-pointer border-b border-cyan-900/20 last:border-0 flex items-center justify-between">
-                        <span className="font-mono text-cyan-400">{c.cmd}</span>
-                        <span className="text-cyan-700">{c.desc}</span>
+              {/* Command suggestions on / */}
+              {commandAutocomplete.isVisible && (
+                <div className="mt-1 rounded-lg border border-cyan-900/40 bg-cyan-950/20 overflow-hidden text-[9px]">
+                  {commandAutocomplete.filteredItems.map((item, i) => (
+                    <button
+                      key={item.id}
+                      onClick={() => commandAutocomplete.selectAt(i)}
+                      className={`w-full px-3 py-2 transition-colors text-left border-b border-cyan-900/20 last:border-0 flex items-center justify-between ${
+                        i === commandAutocomplete.activeIndex ? 'bg-cyan-900/35' : 'hover:bg-cyan-900/20'
+                      }`}
+                    >
+                      <span className="font-mono text-cyan-400">{item.cmd}</span>
+                      <span className="text-cyan-700">{item.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {/* User mention suggestions on @ */}
+              {mentionAutocomplete.isVisible && (
+                <div className="mt-1 rounded-lg border border-emerald-900/40 bg-emerald-950/20 overflow-hidden text-[9px]">
+                  {mentionAutocomplete.filteredItems.map((user, i) => (
+                    <button
+                      key={user.id}
+                      onClick={() => mentionAutocomplete.selectAt(i)}
+                      className={`w-full px-3 py-2 transition-colors text-left border-b border-emerald-900/20 last:border-0 flex items-center gap-2 ${
+                        i === mentionAutocomplete.activeIndex ? 'bg-emerald-900/35' : 'hover:bg-emerald-900/20'
+                      }`}
+                    >
+                      <div className={`w-4 h-4 rounded-full text-[7px] font-black flex items-center justify-center ${avatarColor(user.name)}`}>
+                        {user.name[0]?.toUpperCase()}
                       </div>
-                    ))}
-                  </div>
-                )}
-                {/* User mention suggestions on @ */}
-                {autocompleteUsers.length > 0 && (
-                  <div className="mt-1 rounded-lg border border-emerald-900/40 bg-emerald-950/20 overflow-hidden text-[9px]">
-                    {autocompleteUsers.map((userName, i) => (
-                      <button
-                        key={i}
-                        onClick={() => {
-                          const beforeAt = commentDraft.lastIndexOf('@');
-                          const newDraft = commentDraft.slice(0, beforeAt) + '@' + userName + ' ';
-                          setCommentDraft(newDraft);
-                          setAutocompleteUsers([]);
-                        }}
-                        className="w-full px-3 py-2 hover:bg-emerald-900/20 transition-colors text-left border-b border-emerald-900/20 last:border-0 flex items-center gap-2"
-                      >
-                        <div className={`w-4 h-4 rounded-full text-[7px] font-black flex items-center justify-center ${avatarColor(userName)}`}>
-                          {userName[0]?.toUpperCase()}
-                        </div>
-                        <span className="text-emerald-300">{userName}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
+                      <span className="text-emerald-300">{user.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <button
               onClick={() => addComment(commentDraft, activity)}
