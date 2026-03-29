@@ -934,81 +934,108 @@ export default function IncidentDetailPage({
 
       {/* Incident narrative */}
       <div className="relative rounded-xl border border-red-800/50 bg-gradient-to-b from-red-950/40 to-red-950/10 overflow-hidden">
-        <div className="h-[3px] bg-gradient-to-r from-red-500 via-orange-500/60 to-transparent" />
-        <div className="px-5 pt-4 pb-5 space-y-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <ErrorClassBadge cls={cls} />
-            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest border ${
-              incidentStatus === 'resolved'
-                ? 'text-emerald-400 bg-emerald-950/60 border-emerald-800/40'
-                : incidentStatus === 'investigating'
-                ? 'text-amber-400 bg-amber-950/60 border-amber-800/40'
-                : 'text-red-400 bg-red-950/60 border-red-800/40'
-            }`}>
-              {incidentStatus}
-            </span>
-            {isRecurring && (
-              <span className="text-[8px] font-black text-amber-400 bg-amber-950/50 border border-amber-800/50 px-1.5 py-0.5 rounded uppercase tracking-widest">
-                Recurring
+        <div className="h-[2px] bg-gradient-to-r from-red-500 via-orange-500/60 to-transparent" />
+        <div className="px-4 py-3 grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <div className="xl:col-span-2 space-y-2 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="inline-flex items-center gap-1 text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded border border-red-700/50 text-red-300 bg-red-950/40">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+                Live incident
               </span>
-            )}
-          </div>
-
-          <h1 className="text-xl font-black text-white font-mono tracking-tight break-all leading-tight">{title}</h1>
-
-          <p className="text-[11px] text-red-200 font-mono">
-            <span className="font-black text-red-300">{failureRatePct}% failure rate</span>
-            <span className="text-red-800"> · </span>
-            impacting <span className="font-black text-red-300">{trafficImpactPct}% traffic</span>
-          </p>
-
-          {likelyCause && (
-            <p className="text-[10px] text-orange-300 font-mono">{likelyCause}</p>
-          )}
-
-          <p className="text-[10px] text-neutral-400 font-mono">
-            started {timeAgo(firstSeen)} · last seen {timeAgo(lastSeen)}
-          </p>
-
-          {deployId && rateBeforePct !== null && rateAfterPct !== null && (
-            <p className="text-[11px] font-black text-orange-300 font-mono">
-              ⬆ Failure rate increased from {rateBeforePct}% → {rateAfterPct}% after deploy {deployId} (+{Math.max(0, rateAfterPct - rateBeforePct)}%)
-            </p>
-          )}
-
-          {causalityHint && (
-            <p className="text-[10px] text-orange-200 font-mono">{causalityHint}</p>
-          )}
-
-          <p className="text-[10px] text-neutral-500 font-mono">
-            Triggered by: {publicExecPct >= 50
-              ? `Public traffic (${publicExecPct}%) → affecting real users`
-              : (topActor ? `${topActor}${topActorType ? ` (${topActorType})` : ''}` : 'Unknown')}
-          </p>
-
-          {deployVerdict && (
-            <div className="pt-2 border-t border-red-900/20 flex items-center gap-3 flex-wrap">
-              <span className={`text-[10px] font-black ${
-                deployVerdict.tone === 'danger' ? 'text-orange-300'
-                : deployVerdict.tone === 'good' ? 'text-emerald-300'
-                : 'text-neutral-300'
+              <ErrorClassBadge cls={cls} />
+              <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest border ${
+                incidentStatus === 'resolved'
+                  ? 'text-emerald-400 bg-emerald-950/60 border-emerald-800/40'
+                  : incidentStatus === 'investigating'
+                  ? 'text-amber-400 bg-amber-950/60 border-amber-800/40'
+                  : 'text-red-400 bg-red-950/60 border-red-800/40'
               }`}>
-                {deployVerdict.headline}
+                {incidentStatus}
               </span>
-              <span className="text-[9px] text-neutral-600">·</span>
-              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${
-                deployVerdict.confidence === 'High' ? 'text-red-400 bg-red-950/40 border-red-800/40'
-                : deployVerdict.confidence === 'Medium' ? 'text-orange-400 bg-orange-950/40 border-orange-800/40'
-                : 'text-neutral-500 bg-neutral-900/40 border-neutral-800/40'
-              }`}>
-                Confidence: {deployVerdict.confidence}
-              </span>
-              {postDeploySampleLow && (
-                <span className="text-[9px] text-neutral-500 font-mono">Based on limited post-deploy data ({execsAfterDeploy} executions)</span>
+              {isRecurring && (
+                <span className="text-[8px] font-black text-amber-400 bg-amber-950/50 border border-amber-800/50 px-1.5 py-0.5 rounded uppercase tracking-widest">
+                  Recurring
+                </span>
               )}
             </div>
-          )}
+
+            <h1 className="text-xl font-black text-white font-mono tracking-tight break-all leading-tight">{title}</h1>
+
+            <p className="text-[11px] text-red-200 font-mono">
+              <span className="font-black text-red-300">{failureRatePct}% failure rate</span>
+              <span className="text-red-800"> · </span>
+              impacting <span className="font-black text-red-300">{trafficImpactPct}% traffic</span>
+            </p>
+
+            {likelyCause && (
+              <p className="text-[10px] text-orange-300 font-mono">{likelyCause}</p>
+            )}
+
+            {deployId && rateBeforePct !== null && rateAfterPct !== null && (
+              <p className="text-[11px] font-black text-orange-300 font-mono">
+                ⬆ Failure rate increased from {rateBeforePct}% → {rateAfterPct}% after deploy {deployId} (+{Math.max(0, rateAfterPct - rateBeforePct)}%)
+              </p>
+            )}
+
+            {causalityHint && (
+              <p className="text-[10px] text-orange-200 font-mono">{causalityHint}</p>
+            )}
+
+            <p className="text-[10px] text-neutral-500 font-mono">
+              Triggered by: {publicExecPct >= 50
+                ? `Public traffic (${publicExecPct}%) → affecting real users`
+                : (topActor ? `${topActor}${topActorType ? ` (${topActorType})` : ''}` : 'Unknown')}
+            </p>
+          </div>
+
+          <div className="xl:col-span-1">
+            <div className="rounded-lg border border-red-900/30 bg-black/25 p-3 space-y-2">
+              <div className="flex items-center justify-between text-[10px] font-mono">
+                <span className="text-neutral-500">Last seen</span>
+                <span className="text-neutral-300">{timeAgo(lastSeen)}</span>
+              </div>
+              <div className="flex items-center justify-between text-[10px] font-mono">
+                <span className="text-neutral-500">Started</span>
+                <span className="text-neutral-300">{timeAgo(firstSeen)}</span>
+              </div>
+              <div className="flex items-center justify-between text-[10px] font-mono">
+                <span className="text-neutral-500">Confidence</span>
+                <span className={`font-black ${
+                  (deployVerdict?.confidence ?? confidenceLabel) === 'High' ? 'text-red-400'
+                  : (deployVerdict?.confidence ?? confidenceLabel) === 'Medium' ? 'text-orange-400'
+                  : 'text-neutral-500'
+                }`}>{deployVerdict?.confidence ?? confidenceLabel}</span>
+              </div>
+              <div className="flex items-center justify-between text-[10px] font-mono">
+                <span className="text-neutral-500">Impact</span>
+                <span className="text-red-300 font-black">{trafficImpactPct}% traffic</span>
+              </div>
+            </div>
+          </div>
         </div>
+
+        {deployVerdict && (
+          <div className="px-4 pb-3 pt-0 border-t border-red-900/20 flex items-center gap-2 flex-wrap">
+            <span className={`text-[10px] font-black ${
+              deployVerdict.tone === 'danger' ? 'text-orange-300'
+              : deployVerdict.tone === 'good' ? 'text-emerald-300'
+              : 'text-neutral-300'
+            }`}>
+              {deployVerdict.headline}
+            </span>
+            <span className="text-[9px] text-neutral-600">·</span>
+            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${
+              deployVerdict.confidence === 'High' ? 'text-red-400 bg-red-950/40 border-red-800/40'
+              : deployVerdict.confidence === 'Medium' ? 'text-orange-400 bg-orange-950/40 border-orange-800/40'
+              : 'text-neutral-500 bg-neutral-900/40 border-neutral-800/40'
+            }`}>
+              Confidence {deployVerdict.confidence}
+            </span>
+            {postDeploySampleLow && (
+              <span className="text-[9px] text-neutral-500 font-mono">limited post-deploy data ({execsAfterDeploy} executions)</span>
+            )}
+          </div>
+        )}
       </div>
 
       {deployId && deployVerdict && (
