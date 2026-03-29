@@ -307,5 +307,21 @@ export interface IncidentState {
   owner: string;
   checkedActions: string[];  // action text strings, not indices
   activity: IncidentActivityEvent[];
+  commandSequence?: Array<{
+    command: 'assign' | 'investigate' | 'resolve' | 'reopen' | 'note';
+    ts: string;
+    user_id?: string | null;
+  }>;
+  milestones?: {
+    first_assign_at?: string;
+    first_investigate_at?: string;
+    first_resolve_at?: string;
+  };
+  signalMetrics?: {
+    time_to_assign_sec?: number;
+    time_to_investigate_sec?: number;
+    time_to_resolve_sec?: number;
+  };
+  created_at?: string;
   updated_at?: string;
 }

@@ -272,6 +272,9 @@ export default function IncidentDetailPage({
   const { users: teamUsers } = useTeam();
   const [ownerDropdownOpen, setOwnerDropdownOpen] = useState(false);
   const ownerDropdownButtonRef = useRef<HTMLButtonElement>(null);
+    const [showCommandSuggestions, setShowCommandSuggestions] = useState(false);
+    const [autocompleteUsers, setAutocompleteUsers] = useState<string[]>([]);
+    const [commandInputRef, setCommandInputRef] = useState<HTMLTextAreaElement | null>(null);
 
   // Compute incident group early so callbacks can reference it
   const group = useMemo(() => {
@@ -367,7 +370,11 @@ export default function IncidentDetailPage({
     }
   }, [api, id, title]);
 
-  const updateStatus = useCallback((s: IncidentStatus, currentActivity: ActivityEvent[]) => {
+  const updateStatus = useCallback((
+    s: IncidentStatus,
+    currentActivity: ActivityEvent[],
+    options?: { sourceCommand?: 'assign' | 'investigate' | 'resolve' | 'reopen' | 'note' },
+  ) => {
     const fromLabel = incidentStatus === 'active' ? 'Active' : incidentStatus === 'investigating' ? 'Investigating' : 'Resolved';
     const toLabel   = s   === 'active' ? 'Active' : s   === 'investigating' ? 'Investigating' : 'Resolved';
     const evs: ActivityEvent[] = [{
@@ -396,17 +403,45 @@ export default function IncidentDetailPage({
     }
 
     setIncidentStatus(s);
-    api.updateIncidentStatus(id, title, s).catch(() => {
+    api.updateIncidentStatus(id, title, s, { sourceCommand: options?.sourceCommand }).catch(() => {
       // Non-blocking status persistence.
     });
     persistActivity([...currentActivity, ...evs]);
     appendEventsToServer(evs);
   }, [appendEventsToServer, api, id, title, persistActivity, group, owner, incidentStatus]);
 
-  const assignOwner = useCallback((name: string, currentActivity: ActivityEvent[]) => {
+    const handleCommentChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const val = e.target.value;
+      setCommentDraft(val);
+    
+      // Detect / commands
+      if (val.startsWith('/') && val.length < 20) {
+        setShowCommandSuggestions(true);
+      } else {
+        setShowCommandSuggestions(false);
+      }
+    
+      // Detect @user mentions
+      const atMatch = val.match(/@(\w*)$/);
+      if (atMatch) {
+        const query = atMatch[1].toLowerCase();
+        const matches = teamUsers
+          .map(u => u.name.toLowerCase())
+          .filter(name => name.includes(query))
+          .slice(0, 5);
+        setAutocompleteUsers(matches);
+      } else {
+        setAutocompleteUsers([]);
+      }
+    }, [teamUsers]);
+  const assignOwner = useCallback((
+    name: string,
+    currentActivity: ActivityEvent[],
+    options?: { sourceCommand?: 'assign' | 'investigate' | 'resolve' | 'reopen' | 'note' },
+  ) => {
     const trimmed = name.trim();
     setOwnerState(trimmed);
-    api.updateIncidentOwner(id, title, trimmed).catch(() => {
+    api.updateIncidentOwner(id, title, trimmed, { sourceCommand: options?.sourceCommand }).catch(() => {
       // Non-blocking owner persistence.
     });
     if (!trimmed) {
@@ -443,22 +478,22 @@ export default function IncidentDetailPage({
 
     if (slashAssign) {
       const assignee = slashAssign[1].trim();
-      assignOwner(assignee, currentActivity);
+      assignOwner(assignee, currentActivity, { sourceCommand: 'assign' });
       setCommentDraft('');
       return;
     }
     if (slashResolve) {
-      updateStatus('resolved', currentActivity);
+      updateStatus('resolved', currentActivity, { sourceCommand: 'resolve' });
       setCommentDraft('');
       return;
     }
     if (slashInvestigate) {
-      updateStatus('investigating', currentActivity);
+      updateStatus('investigating', currentActivity, { sourceCommand: 'investigate' });
       setCommentDraft('');
       return;
     }
     if (slashReopen) {
-      updateStatus('active', currentActivity);
+      updateStatus('active', currentActivity, { sourceCommand: 'reopen' });
       setCommentDraft('');
       return;
     }
@@ -472,6 +507,9 @@ export default function IncidentDetailPage({
         ts: new Date().toISOString(),
       };
       persistActivity([...currentActivity, ev]);
+      api.appendIncidentActivity(id, title, ev, { sourceCommand: 'note' }).catch(() => {
+        // Non-blocking command signal persistence.
+      });
       setCommentDraft('');
       return;
     }
@@ -1482,7 +1520,7 @@ export default function IncidentDetailPage({
             <div className="flex-1">
               <textarea
                 value={commentDraft}
-                onChange={e => setCommentDraft(e.target.value)}
+                  onChange={handleCommentChange}
                 onKeyDown={e => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
@@ -1493,6 +1531,45 @@ export default function IncidentDetailPage({
                 rows={1}
                 className="w-full text-[10px] font-mono bg-neutral-900/60 border border-neutral-800 hover:border-neutral-700 focus:border-neutral-600 rounded-lg px-3 py-2 text-neutral-300 placeholder-neutral-700 outline-none transition-colors resize-none"
               />
+                {/* Command suggestions on / */}
+                {showCommandSuggestions && (
+                  <div className="mt-1 rounded-lg border border-cyan-900/40 bg-cyan-950/20 overflow-hidden text-[9px]">
+                    {[
+                      { cmd: '/assign @user', desc: 'Assign incident to user' },
+                      { cmd: '/investigate', desc: 'Mark as investigating' },
+                      { cmd: '/resolve', desc: 'Mark as resolved' },
+                      { cmd: '/reopen', desc: 'Reopen the incident' },
+                      { cmd: '/note ...', desc: 'Add a system note' },
+                    ].map((c, i) => (
+                      <div key={i} className="px-3 py-2 hover:bg-cyan-900/20 transition-colors cursor-pointer border-b border-cyan-900/20 last:border-0 flex items-center justify-between">
+                        <span className="font-mono text-cyan-400">{c.cmd}</span>
+                        <span className="text-cyan-700">{c.desc}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {/* User mention suggestions on @ */}
+                {autocompleteUsers.length > 0 && (
+                  <div className="mt-1 rounded-lg border border-emerald-900/40 bg-emerald-950/20 overflow-hidden text-[9px]">
+                    {autocompleteUsers.map((userName, i) => (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          const beforeAt = commentDraft.lastIndexOf('@');
+                          const newDraft = commentDraft.slice(0, beforeAt) + '@' + userName + ' ';
+                          setCommentDraft(newDraft);
+                          setAutocompleteUsers([]);
+                        }}
+                        className="w-full px-3 py-2 hover:bg-emerald-900/20 transition-colors text-left border-b border-emerald-900/20 last:border-0 flex items-center gap-2"
+                      >
+                        <div className={`w-4 h-4 rounded-full text-[7px] font-black flex items-center justify-center ${avatarColor(userName)}`}>
+                          {userName[0]?.toUpperCase()}
+                        </div>
+                        <span className="text-emerald-300">{userName}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
             </div>
             <button
               onClick={() => addComment(commentDraft, activity)}
