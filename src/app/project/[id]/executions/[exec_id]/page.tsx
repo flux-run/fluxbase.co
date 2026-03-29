@@ -1,9 +1,9 @@
 "use client";
-import { useEffect, useMemo, useRef, useState, use } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState, use } from "react";
+import { useSearchParams } from "next/navigation";
 import { useFluxApi } from "@/lib/api";
 import { Activity, Terminal, Copy, Check, ChevronRight, ChevronDown, GitMerge } from "lucide-react";
-import { ExecutionDetail as ExecutionDetailType, LogEntry, RequestTimelineAttempt, RequestTimelineResponse } from "@/types/api";
+import { ExecutionDetail as ExecutionDetailType, LogEntry } from "@/types/api";
 import { ExecutionTimeline } from "@/components/dashboard/ExecutionTimeline";
 
 function formatErrorHeadline(
@@ -199,87 +199,8 @@ function debuggerFailureReason(errorName?: string | null, errorMessage?: string 
   return "request failed";
 }
 
-function attemptStatusTone(status: string) {
-  const normalized = status.toLowerCase();
-  if (["ok", "success", "completed"].includes(normalized)) {
-    return {
-      label: "success",
-      icon: "✓",
-      className: "border-emerald-800/60 bg-emerald-950/20 text-emerald-300",
-    };
-  }
-  if (["running"].includes(normalized)) {
-    return {
-      label: "running",
-      icon: "⏳",
-      className: "border-amber-800/60 bg-amber-950/20 text-amber-300",
-    };
-  }
-  if (["starting", "retrying", "dispatched", "started"].includes(normalized)) {
-    return {
-      label: "starting",
-      icon: "◌",
-      className: "border-neutral-700 bg-neutral-900/80 text-neutral-300",
-    };
-  }
-  return {
-    label: "failed",
-    icon: "✕",
-    className: "border-red-800/60 bg-red-950/20 text-red-300",
-  };
-}
-
-function formatTimelineEventLabel(type: string) {
-  return type
-    .split("_")
-    .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1))
-    .join(" ");
-}
-
-function eventTone(type: string) {
-  const key = type.toLowerCase();
-  if (key.includes("timeout")) {
-    return {
-      dot: "bg-amber-300",
-      badge: "TIMEOUT",
-      badgeClass: "border-amber-800/60 bg-amber-950/30 text-amber-300",
-    };
-  }
-  if (key.includes("retry") && key.includes("exhaust")) {
-    return {
-      dot: "bg-red-300",
-      badge: "EXHAUSTED",
-      badgeClass: "border-red-800/60 bg-red-950/30 text-red-300",
-    };
-  }
-  if (key.includes("retry") && key.includes("dispatch")) {
-    return {
-      dot: "bg-sky-300",
-      badge: "RETRY",
-      badgeClass: "border-sky-800/60 bg-sky-950/30 text-sky-300",
-    };
-  }
-  return {
-    dot: "bg-neutral-200",
-    badge: "EVENT",
-    badgeClass: "border-neutral-700 bg-neutral-900 text-neutral-300",
-  };
-}
-
-function formatElapsed(baseTs: number | null, ts: number) {
-  if (!baseTs || !Number.isFinite(baseTs) || !Number.isFinite(ts)) return "-";
-  const deltaMs = Math.max(0, ts - baseTs);
-  if (deltaMs < 1000) return `+${deltaMs}ms`;
-  const seconds = deltaMs / 1000;
-  if (seconds < 60) return `+${seconds.toFixed(1)}s`;
-  const minutes = Math.floor(seconds / 60);
-  const remSeconds = Math.floor(seconds % 60);
-  return `+${minutes}m ${remSeconds}s`;
-}
-
 export default function ExecutionDetail({ params }: { params: Promise<{ id: string, exec_id: string }> }) {
   const { id, exec_id } = use(params);
-  const router = useRouter();
   const searchParams = useSearchParams();
   const api = useFluxApi(id);
   const [data, setData] = useState<ExecutionDetailType | null>(null);
@@ -288,31 +209,9 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
   const [copiedCurl, setCopiedCurl] = useState(false);
   const [showStack, setShowStack] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [timeline, setTimeline] = useState<RequestTimelineResponse | null>(null);
-  const [timelineLoading, setTimelineLoading] = useState(false);
   const [rawOpen, setRawOpen] = useState(false);
   const [rawTab, setRawTab] = useState<'request' | 'headers' | 'response'>('request');
   const debuggerMode = searchParams.get("debugger") === "1";
-  const attempts = useMemo(() => timeline?.attempts ?? [], [timeline?.attempts]);
-  const events = useMemo(() => timeline?.events ?? [], [timeline?.events]);
-  const storyItems = useMemo(() => [
-    ...attempts.map((attempt, idx) => ({
-      kind: "attempt" as const,
-      key: `attempt-${attempt.execution_id}-${attempt.attempt}`,
-      ts: attempt.started_at ? new Date(attempt.started_at).getTime() : Number.MAX_SAFE_INTEGER - (attempts.length - idx),
-      attempt,
-    })),
-    ...events.map((event) => ({
-      kind: "event" as const,
-      key: `event-${event.type}-${event.at}`,
-      ts: new Date(event.at).getTime(),
-      event,
-    })),
-  ].sort((a, b) => a.ts - b.ts), [attempts, events]);
-  const baseTs = storyItems.length > 0 && Number.isFinite(storyItems[0].ts) ? storyItems[0].ts : null;
-  const flowRef = useRef<HTMLOListElement | null>(null);
-  const [flowPaths, setFlowPaths] = useState<string[]>([]);
-  const [flowSize, setFlowSize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
     if (!api.ready) return;
@@ -325,81 +224,6 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
       setLoading(false);
     });
   }, [exec_id, api]);
-
-  useEffect(() => {
-    if (!api.ready || !data?.execution.request_id) return;
-    setTimelineLoading(true);
-    api.getRequestTimeline(id, data.execution.request_id)
-      .then((res) => setTimeline(res))
-      .catch((err: unknown) => {
-        console.error(err);
-      })
-      .finally(() => setTimelineLoading(false));
-  }, [api, api.ready, data?.execution.request_id, exec_id, id]);
-
-  useEffect(() => {
-    const container = flowRef.current;
-    if (!container || storyItems.length < 2) {
-      setFlowPaths((prev) => (prev.length === 0 ? prev : []));
-      setFlowSize((prev) => (prev.width === 0 && prev.height === 0 ? prev : { width: 0, height: 0 }));
-      return;
-    }
-
-    const computeFlow = () => {
-      const root = flowRef.current;
-      if (!root) return;
-      const rootRect = root.getBoundingClientRect();
-      const nodes = Array.from(root.querySelectorAll<HTMLElement>("[data-story-node='true']"));
-      if (nodes.length < 2) {
-        setFlowPaths([]);
-        return;
-      }
-
-      const nextPaths: string[] = [];
-      for (let i = 0; i < nodes.length - 1; i += 1) {
-        const current = nodes[i].getBoundingClientRect();
-        const next = nodes[i + 1].getBoundingClientRect();
-        const ax = current.right - rootRect.left;
-        const ay = current.top - rootRect.top + current.height / 2;
-        const bx = next.left - rootRect.left;
-        const by = next.top - rootRect.top + next.height / 2;
-        const sameRow = Math.abs(current.top - next.top) < 8;
-
-        if (sameRow) {
-          nextPaths.push(`M ${ax} ${ay} L ${bx} ${by}`);
-          continue;
-        }
-
-        const laneX = root.clientWidth - 8;
-        nextPaths.push(`M ${ax} ${ay} L ${laneX} ${ay} L ${laneX} ${by} L ${bx} ${by}`);
-      }
-
-      setFlowSize((prev) => {
-        const width = root.clientWidth;
-        const height = root.scrollHeight;
-        return prev.width === width && prev.height === height ? prev : { width, height };
-      });
-      setFlowPaths((prev) => {
-        if (prev.length === nextPaths.length && prev.every((path, index) => path === nextPaths[index])) {
-          return prev;
-        }
-        return nextPaths;
-      });
-    };
-
-    computeFlow();
-    window.addEventListener("resize", computeFlow);
-    const resizeObserver = new ResizeObserver(computeFlow);
-    resizeObserver.observe(container);
-    Array.from(container.querySelectorAll<HTMLElement>("[data-story-node='true']")).forEach((node) => {
-      resizeObserver.observe(node);
-    });
-
-    return () => {
-      window.removeEventListener("resize", computeFlow);
-      resizeObserver.disconnect();
-    };
-  }, [storyItems]);
 
   const copyReplay = () => {
     navigator.clipboard.writeText(`flux replay ${exec_id}`);
@@ -607,18 +431,6 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
              <span className="w-1.5 h-1.5 bg-neutral-900 rounded-full" />
              <span>{new Date(exec.started_at ?? new Date().toISOString()).toUTCString()}</span>
           </div>
-          {timeline?.summary.recovered && (
-            <div className="mt-3 inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-emerald-950/30 border border-emerald-900/40 text-emerald-300 text-[10px] font-black uppercase tracking-widest">
-              <span>Recovered after {Math.max(0, (timeline.summary.attempts ?? 1) - 1)} retries</span>
-            </div>
-          )}
-          {timeline?.summary.first_actor && timeline?.summary.final_actor && timeline.summary.first_actor !== timeline.summary.final_actor && (
-            <p className="mt-2 text-[11px] font-mono text-neutral-400">
-              Introduced by <span className="text-neutral-200">{timeline.summary.first_actor}</span>
-              <span className="text-neutral-700"> → </span>
-              Resolved by <span className="text-neutral-200">{timeline.summary.final_actor}</span>
-            </p>
-          )}
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -643,158 +455,6 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
           </button>
         </div>
       </header>
-
-      {/* Request timeline strip (attempts + events) */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Request Timeline</h3>
-          {timelineLoading && <span className="text-[10px] font-mono text-neutral-600">Loading timeline...</span>}
-        </div>
-        {storyItems.length > 0 ? (
-          <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 space-y-4">
-            <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono">
-              <span className="px-2 py-1 rounded border border-neutral-800 bg-neutral-900 text-neutral-300">
-                {attempts.length} attempt{attempts.length !== 1 ? "s" : ""}
-              </span>
-              <span className="px-2 py-1 rounded border border-neutral-800 bg-neutral-900 text-neutral-300">
-                {events.length} event{events.length !== 1 ? "s" : ""}
-              </span>
-              <span className="px-2 py-1 rounded border border-neutral-800 bg-neutral-900 text-neutral-300">
-                final: {timeline?.summary.final_status ?? exec.status}
-              </span>
-              {timeline?.summary.recovered ? (
-                <span className="px-2 py-1 rounded border border-emerald-900/50 bg-emerald-950/30 text-emerald-300">
-                  recovered
-                </span>
-              ) : null}
-            </div>
-
-            <div className="relative">
-              {flowPaths.length > 0 ? (
-                <svg
-                  className="pointer-events-none absolute inset-0 z-0"
-                  width={flowSize.width}
-                  height={flowSize.height}
-                  viewBox={`0 0 ${flowSize.width} ${flowSize.height}`}
-                  preserveAspectRatio="none"
-                  aria-hidden="true"
-                >
-                  <defs>
-                    <marker id="timeline-flow-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                      <path d="M 0 0 L 10 5 L 0 10 z" fill="#38bdf8" />
-                    </marker>
-                  </defs>
-                  {flowPaths.map((d, index) => (
-                    <path
-                      key={`${index}-${d}`}
-                      d={d}
-                      fill="none"
-                      stroke="#1f2937"
-                      strokeWidth="1.5"
-                      strokeDasharray="4 4"
-                      markerEnd="url(#timeline-flow-arrow)"
-                    />
-                  ))}
-                </svg>
-              ) : null}
-
-            <ol ref={flowRef} className="relative z-10 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-              {storyItems.map((item, idx) => {
-                const date = new Date(item.ts);
-                const when = Number.isFinite(item.ts)
-                  ? `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`
-                  : "-";
-
-                if (item.kind === "attempt") {
-                  const attempt: RequestTimelineAttempt = item.attempt;
-                  const tone = attemptStatusTone(attempt.status);
-                  const isCurrent = attempt.execution_id === exec_id;
-                  const actor = attempt.actor_name || "system";
-                  return (
-                    <li key={item.key} data-story-node="true" className="min-w-0">
-                      <button
-                        onClick={() => {
-                          if (!isCurrent) {
-                            router.push(`/project/${id}/executions/${attempt.execution_id}`);
-                          }
-                        }}
-                        className={`h-full w-full text-left rounded-lg border px-3 py-3 transition-colors ${tone.className} ${isCurrent ? "ring-1 ring-white/70" : "hover:border-neutral-500"}`}
-                        title={`Attempt ${attempt.attempt}`}
-                      >
-                        <div className="flex flex-wrap items-center gap-2 justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[9px] font-black uppercase tracking-widest text-neutral-500">#{idx + 1}</span>
-                            <span className="text-[10px] font-black uppercase tracking-widest">Attempt {attempt.attempt}</span>
-                            <span className={`px-1.5 py-0.5 rounded border text-[9px] font-black tracking-widest uppercase ${tone.className}`}>
-                              {tone.label}
-                            </span>
-                            {isCurrent ? (
-                              <span className="px-1.5 py-0.5 rounded border border-white/30 bg-white/10 text-[9px] font-black uppercase tracking-widest text-white">
-                                current
-                              </span>
-                            ) : null}
-                          </div>
-                          <span className="text-[10px] font-mono opacity-70">{formatElapsed(baseTs, item.ts)}</span>
-                        </div>
-
-                        <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1 text-[11px] font-mono">
-                          <span className="text-neutral-200">actor: <span className="font-semibold">{tone.icon} {actor}</span></span>
-                          <span className="text-neutral-400">type: {attempt.actor_type || "system"}</span>
-                          <span className="text-neutral-400">duration: {attempt.duration_ms ?? "-"}ms</span>
-                          <span className="text-neutral-500">{when}</span>
-                        </div>
-
-                        <div className="mt-2 pt-2 border-t border-neutral-800/60 text-[10px] font-mono text-neutral-500">node #{idx + 1}</div>
-                      </button>
-                    </li>
-                  );
-                }
-
-                const event = item.event;
-                const tone = eventTone(event.type);
-                const label = formatTimelineEventLabel(event.type);
-                const metaReason = typeof event.meta?.reason === "string" ? event.meta.reason : null;
-                const metaAttempt =
-                  typeof event.meta?.attempt === "number" || typeof event.meta?.attempt === "string"
-                    ? String(event.meta.attempt)
-                    : null;
-
-                return (
-                  <li key={item.key} data-story-node="true" className="min-w-0">
-                    <div className="h-full rounded-lg border border-neutral-800 bg-neutral-900/60 px-3 py-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[9px] font-black uppercase tracking-widest text-neutral-500">#{idx + 1}</span>
-                          <span className={`w-2 h-2 rounded-full border border-neutral-900 ${tone.dot}`} />
-                          <span className="text-xs text-neutral-200 leading-tight">{label}</span>
-                          <span className={`px-1.5 py-0.5 rounded border text-[9px] font-black tracking-widest uppercase ${tone.badgeClass}`}>
-                            {tone.badge}
-                          </span>
-                        </div>
-                        <span className="text-[10px] font-mono text-neutral-500">{formatElapsed(baseTs, item.ts)}</span>
-                      </div>
-                      <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1 text-[11px] font-mono">
-                        <span className="text-neutral-500">{when}</span>
-                        <span className="text-neutral-500">attempt: {metaAttempt ?? "-"}</span>
-                        {metaReason ? (
-                          <span className="text-neutral-400 md:col-span-2">reason: {metaReason}</span>
-                        ) : null}
-                      </div>
-
-                      <div className="mt-2 pt-2 border-t border-neutral-800/60 text-[10px] font-mono text-neutral-500">node #{idx + 1}</div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
-            </div>
-          </div>
-        ) : (
-          <div className="text-xs font-mono text-neutral-600 border border-neutral-900 rounded-lg px-4 py-3">
-            Timeline unavailable for this execution.
-          </div>
-        )}
-      </section>
 
       {/* 1. EXECUTION TIMELINE — PRIMARY */}
       <section>

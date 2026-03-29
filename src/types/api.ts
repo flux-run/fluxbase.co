@@ -223,6 +223,8 @@ export interface RequestTimelineAttempt {
   execution_id: string;
   status: string;
   error_source?: string | null;
+  error_message?: string | null;
+  error_name?: string | null;
   actor_name?: string | null;
   actor_type?: string | null;
   started_at?: string | null;
@@ -242,6 +244,13 @@ export interface RequestTimelineSummary {
   recovered: boolean;
   first_actor?: string | null;
   final_actor?: string | null;
+  primary_failure?: {
+    error_message?: string | null;
+    error_name?: string | null;
+    error_source?: string | null;
+    attempt: number;
+  } | null;
+  system_failure_note?: string | null;
 }
 
 export interface RequestTimelineRequest {
