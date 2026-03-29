@@ -166,6 +166,8 @@ export interface Execution extends BaseExecution {
   actor_name?: string | null;
   actor_type?: 'user' | 'ci' | 'service' | null;
   token_id?: string | null;
+  token_name?: string | null;
+  token_tags?: string | null;
 }
 
 export interface LogEntry extends ExecutionConsoleLog {

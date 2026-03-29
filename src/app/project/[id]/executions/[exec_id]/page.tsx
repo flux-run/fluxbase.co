@@ -297,7 +297,40 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
                {exec.path}
              </h2>
           </div>
-          <div className="flex items-center gap-4 text-neutral-500 font-mono text-[12px]">
+          {(() => {
+            const hasActor = !!exec.actor_name || !!exec.token_name;
+            const isPublic = !hasActor && !exec.token_id;
+            const tags = (() => { try { return exec.token_tags ? JSON.parse(exec.token_tags) : []; } catch { return []; } })();
+            const env = tags[0];
+            const firstIp = exec.client_ip?.split(',')[0]?.trim();
+            const actorIcon = exec.actor_type === 'ci' ? '⚙' : exec.actor_type === 'service' ? '◈' : '👤';
+            if (hasActor) {
+              return (
+                <div className="flex items-center gap-1.5 font-mono text-[11px] text-neutral-500 mt-2">
+                  <span>{actorIcon}</span>
+                  <span className="text-neutral-500 font-semibold">Origin:</span>
+                  <span className="text-neutral-300">{exec.actor_name}</span>
+                  {exec.token_name && (
+                    <><span className="text-neutral-700">·</span><span className="text-neutral-500">{exec.token_name}</span></>
+                  )}
+                  {env && (
+                    <span className="text-neutral-600 px-1 rounded border border-neutral-800 bg-neutral-950">{env}</span>
+                  )}
+                </div>
+              );
+            }
+            return (
+              <div className="flex items-center gap-1.5 font-mono text-[11px] text-neutral-500 mt-2">
+                <span>🌐</span>
+                <span className="text-neutral-500 font-semibold">Origin:</span>
+                <span className="text-neutral-400">{isPublic ? 'Public traffic' : 'Unknown'}</span>
+                {firstIp && isPublic && (
+                  <><span className="text-neutral-700">·</span><span className="text-neutral-500">{firstIp}</span></>
+                )}
+              </div>
+            );
+          })()}
+          <div className="flex items-center gap-4 text-neutral-500 font-mono text-[12px] mt-1.5">
              <span>{exec_id}</span>
              <span className="w-1.5 h-1.5 bg-neutral-900 rounded-full" />
              <span className="flex items-center gap-1.5"><Activity className="w-3.5 h-3.5" /> {exec.duration_ms}ms</span>
