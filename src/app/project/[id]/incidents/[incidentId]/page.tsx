@@ -1,6 +1,6 @@
 "use client";
 import { use, useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, ArrowRight, CheckCircle2, AlertTriangle, Info, Zap, Terminal, MessageSquare, Clock, Bot, ChevronDown, XCircle } from "lucide-react";
 import { useFluxApi } from "@/lib/api";
 import { ProjectOverviewResult, Execution, IncidentStatus, IncidentActivityEvent } from "@/types/api";
@@ -282,6 +282,8 @@ export default function IncidentDetailPage({
   const { id, incidentId } = use(params);
   const title = decodeURIComponent(incidentId);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromAlert = searchParams.get("fromAlert") === "1";
   const api = useFluxApi(id);
   const { session } = useAuth();
 
@@ -867,6 +869,21 @@ export default function IncidentDetailPage({
         <ArrowLeft className="w-3 h-3" />
         All incidents
       </button>
+
+      {fromAlert && (
+        <div className="rounded-lg border border-cyan-800/40 bg-cyan-950/20 px-4 py-3 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-cyan-400">Opened from alert</p>
+            <p className="text-[11px] text-cyan-100">You are in the exact incident context. Start with latest failure replay, then resolve.</p>
+          </div>
+          <button
+            onClick={() => router.push(`/project/${id}/usage?fromAlert=1`)}
+            className="text-[10px] font-black text-cyan-300 border border-cyan-700/40 hover:border-cyan-500/60 hover:text-cyan-100 rounded-md px-2.5 py-1.5 transition-colors"
+          >
+            Open usage/replay
+          </button>
+        </div>
+      )}
 
       {/* Header card */}
       <div className="relative rounded-xl border border-red-800/50 bg-gradient-to-b from-red-950/40 to-red-950/10 overflow-hidden">
