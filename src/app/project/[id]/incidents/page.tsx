@@ -29,8 +29,33 @@ function ErrorClassBadge({ cls }: { cls: string }) {
   );
 }
 
+function normalizeIncidentTitle(title: string, cls: string): string {
+  const t = title.toLowerCase();
+  if (t.includes("dns") || t.includes("enotfound") || t.includes("fetch failed") || t.includes("getaddrinfo")) {
+    return "External API fetch failure (DNS resolution)";
+  }
+  if (t.includes("no_artifact") || t.includes("artifact")) {
+    return "Missing artifact during execution";
+  }
+  if (cls === "user") {
+    return "User-thrown error in handler";
+  }
+  if (cls === "infra") {
+    return "Infrastructure/runtime failure";
+  }
+  if (cls === "external") {
+    return "External dependency failure";
+  }
+  return title;
+}
+
+function minutesSince(ts: string): number {
+  return Math.max(0, Math.floor((Date.now() - new Date(ts).getTime()) / 60000));
+}
+
 type IncidentRow = {
   title: string;
+  normalizedTitle: string;
   cls: string;
   failureRatePct: number;
   totalErrors: number;
@@ -41,6 +66,9 @@ type IncidentRow = {
   affectedFns: string[];
   deployId: string | null;
   isRecurring: boolean;
+  priorityScore: number;
+  insight: string;
+  differentiator: string;
 };
 
 export default function IncidentsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -78,21 +106,39 @@ export default function IncidentsPage({ params }: { params: Promise<{ id: string
         const totalExecs  = incs.reduce((s, i) => s + i.totalExecs, 0);
         const firstSeen   = incs.reduce((t, i) => i.firstSeen < t ? i.firstSeen : t, incs[0].firstSeen);
         const lastSeen    = incs.reduce((t, i) => i.lastSeen > t ? i.lastSeen : t, incs[0].lastSeen);
+        const failureRatePct = totalExecs > 0 ? Math.round((totalErrors / totalExecs) * 100) : topInc.failureRatePct;
+        const trafficImpactPct = Math.max(...incs.map(i => i.trafficImpactPct));
+        const recencyScore = Math.max(0, 100 - Math.min(100, Math.floor(minutesSince(lastSeen) / 10))); // 0..100
+        const priorityScore = (failureRatePct * 0.5) + (trafficImpactPct * 0.3) + (recencyScore * 0.2);
+        const insight = topInc.deployId
+          ? `Started immediately after deploy ${topInc.deployId.slice(0, 7)}`
+          : (failureRatePct === 100
+              ? "All executions failing (100%)"
+              : `Updated ${timeAgo(lastSeen)} · monitor trend`);
+        const differentiator = totalExecs <= 5
+          ? `Low sample size (${totalExecs} executions)`
+          : minutesSince(firstSeen) > 12 * 60
+            ? `Older issue (started ${timeAgo(firstSeen)})`
+            : `Active now (last seen ${timeAgo(lastSeen)})`;
         return {
           title,
+          normalizedTitle: normalizeIncidentTitle(title, topInc.errorClass),
           cls: topInc.errorClass,
-          failureRatePct: totalExecs > 0 ? Math.round((totalErrors / totalExecs) * 100) : topInc.failureRatePct,
+          failureRatePct,
           totalErrors,
           totalExecs,
           firstSeen,
           lastSeen,
-          trafficImpactPct: Math.max(...incs.map(i => i.trafficImpactPct)),
+          trafficImpactPct,
           affectedFns: [...new Set(incs.map(i => i.functionName))],
           deployId: topInc.deployId,
           isRecurring: incs.some(i => i.isRecurring),
+          priorityScore,
+          insight,
+          differentiator,
         };
       })
-      .sort((a, b) => (b.trafficImpactPct * b.failureRatePct) - (a.trafficImpactPct * a.failureRatePct));
+      .sort((a, b) => b.priorityScore - a.priorityScore);
   }, [overview]);
 
   if (loading) {
@@ -151,8 +197,35 @@ export default function IncidentsPage({ params }: { params: Promise<{ id: string
       )}
 
       {/* Incident rows */}
+      {rows.length > 0 && (
+        <div className="rounded-xl border border-red-800/50 bg-gradient-to-r from-red-950/35 to-red-950/10 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
+            <span className="text-[9px] font-black uppercase tracking-widest text-red-300">Needs attention now (1)</span>
+          </div>
+          <button
+            onClick={() => router.push(`/project/${id}/incidents/${encodeURIComponent(rows[0].title)}`)}
+            className="mt-2 w-full text-left group"
+          >
+            <p className="text-sm font-black text-white">{rows[0].normalizedTitle}</p>
+            <p className="text-[10px] text-neutral-400 font-mono mt-1">
+              {rows[0].trafficImpactPct}% traffic affected · {rows[0].failureRatePct}% failure rate
+            </p>
+            {rows[0].totalExecs > 0 && rows[0].totalErrors === rows[0].totalExecs && (
+              <p className="text-[10px] text-red-300 font-black font-mono mt-1">⚠ All executions failing (100%)</p>
+            )}
+            <p className="text-[10px] text-orange-300 font-mono mt-1">{rows[0].insight}</p>
+            <p className="text-[10px] text-cyan-300 font-mono mt-1">→ Investigate DNS / external API connectivity</p>
+            <p className="text-[9px] text-neutral-600 font-mono mt-2">
+              Ranked highest due to: {rows[0].trafficImpactPct}% traffic impact · {rows[0].failureRatePct}% failure rate
+              {rows[0].totalExecs > 0 && rows[0].totalErrors === rows[0].totalExecs ? ' · all executions failing' : ''}
+            </p>
+          </button>
+        </div>
+      )}
+
       <div className="space-y-2">
-        {rows.map((row, idx) => (
+        {rows.slice(1).map((row, idx) => (
           <div
             key={row.title}
             onClick={() => router.push(`/project/${id}/incidents/${encodeURIComponent(row.title)}`)}
@@ -182,7 +255,9 @@ export default function IncidentsPage({ params }: { params: Promise<{ id: string
                   )}
                 </div>
                 {/* Error title */}
-                <p className="text-sm font-black text-white font-mono tracking-tight truncate mb-2">{row.title}</p>
+                <p className="text-sm font-black text-white tracking-tight truncate mb-1">{row.normalizedTitle}</p>
+                <p className="text-[10px] text-orange-300 font-mono mb-2">{row.insight}</p>
+                <p className="text-[9px] text-neutral-500 font-mono mb-2">{row.differentiator}</p>
                 {/* Metrics row */}
                 <div className="flex items-center gap-2.5 flex-wrap">
                   <span className="text-[10px] font-black text-red-400">{row.failureRatePct}% failure rate</span>
