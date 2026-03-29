@@ -47,7 +47,7 @@ export default function PricingPage() {
             </Link>
           </div>
           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-neutral-700">
-            Used by teams debugging production systems
+            Used by teams shipping APIs, workflows, and AI systems
           </p>
         </section>
 
@@ -119,6 +119,9 @@ export default function PricingPage() {
                   </div>
                   {tier.id === "builder" && (
                     <p className="mt-2 text-[10px] font-semibold text-emerald-300">Costs less than one debugging session.</p>
+                  )}
+                  {tier.id === "startup" && (
+                    <p className="mt-2 text-[10px] font-semibold text-blue-300">For teams debugging production issues daily.</p>
                   )}
                 </div>
 
@@ -233,7 +236,7 @@ export default function PricingPage() {
             <div className="rounded-2xl border border-neutral-900 bg-[#0D0D0D] p-8 space-y-5">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.25em] text-neutral-600 mb-3">Example</p>
-                <h3 className="text-2xl font-black text-white tracking-tight">What does usage look like?</h3>
+                <h3 className="text-2xl font-black text-white tracking-tight">What will this cost me?</h3>
               </div>
               <div className="space-y-3 text-sm text-neutral-400 font-medium">
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-600">Typical usage: 10K – 500K executions / month</p>
