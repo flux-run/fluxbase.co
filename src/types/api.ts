@@ -163,6 +163,9 @@ export interface Execution extends BaseExecution {
   external_calls?: number;
   function_id?: string | null;
   function_name?: string | null;
+  actor_name?: string | null;
+  actor_type?: 'user' | 'ci' | 'service' | null;
+  token_id?: string | null;
 }
 
 export interface LogEntry extends ExecutionConsoleLog {
@@ -223,6 +226,8 @@ export interface ServiceToken {
   usage_24h?: number;
   revoked: boolean;
   token?: string; // only present on create
+  created_by?: string; // user email or name
+  tags?: string[]; // context tags: ['production', 'github-actions', etc]
 }
 
 export interface AlertChannel {

@@ -338,10 +338,10 @@ export function useFluxApi(projectId?: string) {
           `/service-tokens?project_id=${id ?? projectId}`,
           token(),
         ),
-      createServiceToken: (name: string, id?: string) =>
+      createServiceToken: (name: string, tags?: string[], id?: string) =>
         request<ServiceToken>("/service-tokens", token(), {
           method: "POST",
-          body: JSON.stringify({ project_id: id ?? projectId, name }),
+          body: JSON.stringify({ project_id: id ?? projectId, name, tags: tags || [] }),
         }),
       revokeServiceToken: (tokenId: string) =>
         request<{ success: boolean }>(`/service-tokens/${tokenId}`, token(), {

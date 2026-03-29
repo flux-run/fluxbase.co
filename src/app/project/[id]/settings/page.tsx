@@ -489,6 +489,7 @@ function ServiceTokensSection({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [newTokenName, setNewTokenName] = useState("");
+  const [newTokenTags, setNewTokenTags] = useState("");
   const [lastCreatedToken, setLastCreatedToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -511,9 +512,14 @@ function ServiceTokensSection({ projectId }: { projectId: string }) {
     if (!newTokenName.trim()) return;
     setCreating(true);
     try {
-      const token = await api.createServiceToken(newTokenName);
+      const tags = newTokenTags
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
+      const token = await api.createServiceToken(newTokenName, tags);
       setLastCreatedToken(token.token || null);
       setNewTokenName("");
+      setNewTokenTags("");
       loadTokens();
     } catch (err) {
       console.error("Failed to create token:", err);
@@ -554,22 +560,31 @@ function ServiceTokensSection({ projectId }: { projectId: string }) {
       </CardHeader>
       <CardContent className="pt-6 space-y-6">
         {/* Create Form */}
-        <div className="flex gap-2 max-w-md">
-          <Input 
-            placeholder="Token name (e.g. GitHub Action)" 
-            value={newTokenName}
-            onChange={(e) => setNewTokenName(e.target.value)}
+        <div className="flex flex-col gap-3 max-w-md">
+          <div className="flex gap-2">
+            <Input 
+              placeholder="Token name (e.g. GitHub Action)" 
+              value={newTokenName}
+              onChange={(e) => setNewTokenName(e.target.value)}
+              className="bg-black border-neutral-800 text-xs h-9"
+            />
+            <Button 
+              onClick={handleCreate} 
+              disabled={creating || !newTokenName}
+              size="sm" 
+              className="bg-white text-black hover:bg-neutral-200 font-bold h-9"
+            >
+              {creating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3.5 h-3.5 mr-2" />}
+              Create
+            </Button>
+          </div>
+          <Input
+            placeholder="Tags (comma-separated: production, github-actions, etc)"
+            value={newTokenTags}
+            onChange={(e) => setNewTokenTags(e.target.value)}
             className="bg-black border-neutral-800 text-xs h-9"
           />
-          <Button 
-            onClick={handleCreate} 
-            disabled={creating || !newTokenName}
-            size="sm" 
-            className="bg-white text-black hover:bg-neutral-200 font-bold h-9"
-          >
-            {creating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3.5 h-3.5 mr-2" />}
-            Create
-          </Button>
+          <p className="text-[9px] text-neutral-600">Tags provide context for where/how the token is used.</p>
         </div>
 
         {/* Success Modal/Banner for New Token */}
@@ -591,8 +606,8 @@ function ServiceTokensSection({ projectId }: { projectId: string }) {
 
         {/* Token List */}
         <div className="space-y-2">
-          <div className="grid grid-cols-5 px-4 py-2 text-[9px] font-bold text-neutral-600 uppercase tracking-widest border-b border-neutral-900/50">
-            <div className="col-span-1">Name</div>
+          <div className="grid grid-cols-6 px-4 py-2 text-[9px] font-bold text-neutral-600 uppercase tracking-widest border-b border-neutral-900/50">
+            <div className="col-span-2">Name & Meta</div>
             <div className="col-span-1 text-center">Created</div>
             <div className="col-span-1 text-center">Last Used</div>
             <div className="col-span-1 text-center">Usage (24h)</div>
@@ -607,9 +622,21 @@ function ServiceTokensSection({ projectId }: { projectId: string }) {
             </div>
           ) : (
             tokens.map(token => (
-              <div key={token.id} className="grid grid-cols-5 items-center px-4 py-3 bg-black border border-neutral-900 rounded-lg group hover:border-neutral-800 transition-colors">
-                <div className="col-span-1">
-                  <span className="text-xs font-bold text-neutral-300">{token.name || "Unnamed Token"}</span>
+              <div key={token.id} className="grid grid-cols-6 items-start px-4 py-3 bg-black border border-neutral-900 rounded-lg group hover:border-neutral-800 transition-colors gap-3">
+                <div className="col-span-2 space-y-1">
+                  <p className="text-xs font-bold text-neutral-300">{token.name || "Unnamed Token"}</p>
+                  {token.created_by && (
+                    <p className="text-[9px] text-neutral-600">Created by <span className="text-neutral-400">{token.created_by}</span></p>
+                  )}
+                  {token.tags && token.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {token.tags.map((tag) => (
+                        <Badge key={tag} variant="outline" className="text-[8px] font-mono border-neutral-700 bg-neutral-900/50 text-neutral-400">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="col-span-1 text-center">
                   <span className="text-[10px] text-neutral-600 font-mono uppercase">
