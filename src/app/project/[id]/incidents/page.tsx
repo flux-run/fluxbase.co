@@ -69,6 +69,9 @@ type IncidentRow = {
   priorityScore: number;
   insight: string;
   differentiator: string;
+  userImpact: string;
+  errorsAfterDeploy: number;
+  execsAfterDeploy: number;
 };
 
 export default function IncidentsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -104,22 +107,34 @@ export default function IncidentsPage({ params }: { params: Promise<{ id: string
         const topInc = incs.reduce((t, i) => i.trafficImpactPct > t.trafficImpactPct ? i : t, incs[0]);
         const totalErrors = incs.reduce((s, i) => s + i.totalErrors, 0);
         const totalExecs  = incs.reduce((s, i) => s + i.totalExecs, 0);
+        const errorsAfterDeploy = incs.reduce((s, i) => s + (i.errorsAfterDeploy ?? 0), 0);
+        const execsAfterDeploy = incs.reduce((s, i) => s + (i.execsAfterDeploy ?? 0), 0);
         const firstSeen   = incs.reduce((t, i) => i.firstSeen < t ? i.firstSeen : t, incs[0].firstSeen);
         const lastSeen    = incs.reduce((t, i) => i.lastSeen > t ? i.lastSeen : t, incs[0].lastSeen);
         const failureRatePct = totalExecs > 0 ? Math.round((totalErrors / totalExecs) * 100) : topInc.failureRatePct;
         const trafficImpactPct = Math.max(...incs.map(i => i.trafficImpactPct));
         const recencyScore = Math.max(0, 100 - Math.min(100, Math.floor(minutesSince(lastSeen) / 10))); // 0..100
         const priorityScore = (failureRatePct * 0.5) + (trafficImpactPct * 0.3) + (recencyScore * 0.2);
+        const isOlderIssue = minutesSince(firstSeen) > 12 * 60;
         const insight = topInc.deployId
-          ? `Started immediately after deploy ${topInc.deployId.slice(0, 7)}`
+          ? (isOlderIssue
+            ? `Continues after latest deploy ${topInc.deployId.slice(0, 7)}`
+            : `Started immediately after latest deploy ${topInc.deployId.slice(0, 7)}`)
           : (failureRatePct === 100
               ? "All executions failing (100%)"
               : `Updated ${timeAgo(lastSeen)} · monitor trend`);
         const differentiator = totalExecs <= 5
-          ? `Low sample size (${totalExecs} executions)`
-          : minutesSince(firstSeen) > 12 * 60
-            ? `Older issue (started ${timeAgo(firstSeen)})`
+          ? `⚠ Low confidence — only ${totalExecs} executions observed`
+          : isOlderIssue
+            ? `Persisting issue (started ${timeAgo(firstSeen)})`
             : `Active now (last seen ${timeAgo(lastSeen)})`;
+        const userImpact = topInc.errorClass === 'external'
+          ? 'User impact: requests failing before response'
+          : topInc.errorClass === 'user'
+            ? 'User impact: invalid input rejected'
+            : topInc.errorClass === 'infra'
+              ? 'User impact: execution could not start'
+              : 'User impact: request handling failed';
         return {
           title,
           normalizedTitle: normalizeIncidentTitle(title, topInc.errorClass),
@@ -136,6 +151,9 @@ export default function IncidentsPage({ params }: { params: Promise<{ id: string
           priorityScore,
           insight,
           differentiator,
+          userImpact,
+          errorsAfterDeploy,
+          execsAfterDeploy,
         };
       })
       .sort((a, b) => b.priorityScore - a.priorityScore);
@@ -211,15 +229,22 @@ export default function IncidentsPage({ params }: { params: Promise<{ id: string
             <p className="text-[10px] text-neutral-400 font-mono mt-1">
               {rows[0].trafficImpactPct}% traffic affected · {rows[0].failureRatePct}% failure rate
             </p>
-            {rows[0].totalExecs > 0 && rows[0].totalErrors === rows[0].totalExecs && (
-              <p className="text-[10px] text-red-300 font-black font-mono mt-1">⚠ All executions failing (100%)</p>
+            {rows[0].execsAfterDeploy > 0 && rows[0].errorsAfterDeploy === rows[0].execsAfterDeploy && (
+              <p className="text-[10px] text-red-300 font-black font-mono mt-1">
+                ⚠ All executions failing after latest deploy
+              </p>
             )}
             <p className="text-[10px] text-orange-300 font-mono mt-1">{rows[0].insight}</p>
-            <p className="text-[10px] text-cyan-300 font-mono mt-1">→ Investigate DNS / external API connectivity</p>
-            <p className="text-[9px] text-neutral-600 font-mono mt-2">
-              Ranked highest due to: {rows[0].trafficImpactPct}% traffic impact · {rows[0].failureRatePct}% failure rate
-              {rows[0].totalExecs > 0 && rows[0].totalErrors === rows[0].totalExecs ? ' · all executions failing' : ''}
+            <p className="text-[10px] text-cyan-200 font-mono mt-1 inline-flex items-center gap-1 underline underline-offset-2 decoration-cyan-500/60">
+              → Investigate DNS / external API connectivity
             </p>
+            <p className="text-[9px] text-neutral-500 font-mono mt-1">{rows[0].userImpact}</p>
+            <div className="text-[9px] text-neutral-600 font-mono mt-2 space-y-0.5">
+              <p>Ranked highest due to:</p>
+              <p>• High traffic impact ({rows[0].trafficImpactPct}%)</p>
+              <p>• Elevated failure rate ({rows[0].failureRatePct}%)</p>
+              {rows[0].deployId && <p>• Immediate regression after deploy {rows[0].deployId.slice(0, 7)}</p>}
+            </div>
           </button>
         </div>
       )}
@@ -229,7 +254,7 @@ export default function IncidentsPage({ params }: { params: Promise<{ id: string
           <div
             key={row.title}
             onClick={() => router.push(`/project/${id}/incidents/${encodeURIComponent(row.title)}`)}
-            className="group relative border border-red-900/40 bg-gradient-to-r from-red-950/20 to-transparent rounded-xl px-4 py-3.5 cursor-pointer hover:border-red-800/60 hover:from-red-950/35 transition-all overflow-hidden"
+            className={`group relative border border-red-900/40 bg-gradient-to-r from-red-950/20 to-transparent rounded-xl px-4 py-3.5 cursor-pointer hover:border-red-800/60 hover:from-red-950/35 transition-all overflow-hidden ${row.differentiator.startsWith('⚠ Low confidence') ? 'opacity-80' : ''}`}
           >
             {/* Priority indicator — bold for #1, subtle for rest */}
             <div className={`absolute left-0 top-0 bottom-0 w-[3px] rounded-l-xl ${idx === 0 ? 'bg-red-500' : 'bg-red-900/60'}`} />
@@ -258,6 +283,7 @@ export default function IncidentsPage({ params }: { params: Promise<{ id: string
                 <p className="text-sm font-black text-white tracking-tight truncate mb-1">{row.normalizedTitle}</p>
                 <p className="text-[10px] text-orange-300 font-mono mb-2">{row.insight}</p>
                 <p className="text-[9px] text-neutral-500 font-mono mb-2">{row.differentiator}</p>
+                <p className="text-[9px] text-neutral-500 font-mono mb-2">{row.userImpact}</p>
                 {/* Metrics row */}
                 <div className="flex items-center gap-2.5 flex-wrap">
                   <span className="text-[10px] font-black text-red-400">{row.failureRatePct}% failure rate</span>
