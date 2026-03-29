@@ -8,6 +8,7 @@ import type {
   OrgMember,
   Route,
   ServiceToken,
+  AlertChannel,
   ProjectOverviewResult,
   ProjectUsageResult,
   ProjectObservabilityResult,
@@ -149,6 +150,19 @@ export function useFluxApi(projectId?: string) {
         ).catch((err) => {
           console.error("[api] getProjectObservability failed", err);
           return null;
+        }),
+      getAlertChannels: (id?: string) =>
+        request<{ channels: AlertChannel[] }>(`/alerts/channels?project_id=${id ?? projectId}`, token())
+          .then((res) => res.channels ?? []),
+      saveAlertChannels: (channels: AlertChannel[], id?: string) =>
+        request<{ ok: boolean; channels: AlertChannel[] }>(`/alerts/channels`, token(), {
+          method: "PUT",
+          body: JSON.stringify({ project_id: id ?? projectId, channels }),
+        }),
+      testAlertChannel: (channelId: string, id?: string) =>
+        request<{ ok: boolean }>(`/alerts/channels/test`, token(), {
+          method: "POST",
+          body: JSON.stringify({ project_id: id ?? projectId, channel_id: channelId }),
         }),
       getFunctionStats: (funcId: string) =>
         request<any>(`/function/${funcId}/overview`, token()),

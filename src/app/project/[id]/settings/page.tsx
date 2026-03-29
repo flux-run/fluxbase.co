@@ -1,28 +1,88 @@
 "use client";
 import { useEffect, useState, use, useCallback } from "react";
-import { Bell, Globe, Plus, Trash2, Key, ShieldCheck, Copy, Check, Loader2 } from "lucide-react";
+import { Bell, Globe, Plus, Trash2, Key, ShieldCheck, Copy, Check, Loader2, Send, Mail, Link2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Webhook, ServiceToken } from "@/types/api";
+import { AlertChannel, ServiceToken } from "@/types/api";
 import { useFluxApi } from "@/lib/api";
 import { formatDistanceToNow } from "date-fns";
 
 export default function ProjectSettings({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const api = useFluxApi(id);
-  const [webhooks, setWebhooks] = useState<Webhook[]>([]);
+  const [alertChannels, setAlertChannels] = useState<AlertChannel[]>([]);
+  const [alertsLoading, setAlertsLoading] = useState(true);
+  const [savingAlerts, setSavingAlerts] = useState(false);
+  const [channelType, setChannelType] = useState<"webhook" | "email" | "slack">("webhook");
+  const [channelTarget, setChannelTarget] = useState("");
+  const [channelLabel, setChannelLabel] = useState("");
 
   useEffect(() => {
-    setWebhooks([
-      { id: 'wh_1', url: 'https://api.example.com/webhooks/flux', events: ['execution.failed'], status: 'active', project_id: id, created_at: null }
-    ]);
-  }, [id]);
+    if (!api.ready) return;
+    api.getAlertChannels(id)
+      .then((channels) => setAlertChannels(Array.isArray(channels) ? channels : []))
+      .finally(() => setAlertsLoading(false));
+  }, [api, api.ready, id]);
 
-  const deleteWebhook = (id: string) => {
-    setWebhooks(prev => prev.filter(w => w.id !== id));
+  const persistAlertChannels = async (next: AlertChannel[]) => {
+    setAlertChannels(next);
+    setSavingAlerts(true);
+    try {
+      await api.saveAlertChannels(next, id);
+    } catch (err) {
+      console.error("Failed to save alert channels:", err);
+      alert("Failed to save alert channels.");
+    } finally {
+      setSavingAlerts(false);
+    }
+  };
+
+  const addAlertChannel = async () => {
+    const target = channelTarget.trim();
+    if (!target) return;
+    if (channelType === "email" && !target.includes("@")) {
+      alert("Enter a valid email address.");
+      return;
+    }
+
+    const next: AlertChannel[] = [
+      {
+        id: crypto.randomUUID(),
+        type: channelType,
+        target,
+        enabled: true,
+        label: channelLabel.trim() || undefined,
+        created_at: new Date().toISOString(),
+      },
+      ...alertChannels,
+    ];
+
+    await persistAlertChannels(next);
+    setChannelTarget("");
+    setChannelLabel("");
+  };
+
+  const removeAlertChannel = async (channelId: string) => {
+    const next = alertChannels.filter((channel) => channel.id !== channelId);
+    await persistAlertChannels(next);
+  };
+
+  const toggleAlertChannel = async (channelId: string, enabled: boolean) => {
+    const next = alertChannels.map((channel) => channel.id === channelId ? { ...channel, enabled } : channel);
+    await persistAlertChannels(next);
+  };
+
+  const testAlertChannel = async (channelId: string) => {
+    try {
+      await api.testAlertChannel(channelId, id);
+      alert("Test notification sent.");
+    } catch (err) {
+      console.error("Failed to send test alert:", err);
+      alert("Failed to send test alert.");
+    }
   };
 
   const handleDeleteProject = async () => {
@@ -44,54 +104,96 @@ export default function ProjectSettings({ params }: { params: Promise<{ id: stri
     <div className="space-y-10 max-w-4xl pb-24">
       <header>
         <h2 className="text-2xl font-bold text-white tracking-tight">Project Settings</h2>
-        <p className="text-sm text-neutral-500 mt-1">Configure environment variables, webhooks, and security.</p>
+        <p className="text-sm text-neutral-500 mt-1">Configure alerts, environment variables, and security.</p>
       </header>
 
-      {/* WEBHOOKS */}
+      {/* ALERTS & NOTIFICATIONS */}
       <Card className="bg-[#111] border-neutral-900 shadow-xl overflow-hidden">
         <CardHeader className="flex flex-row items-center justify-between border-b border-neutral-900/50 pb-6">
           <div className="space-y-1.5">
             <CardTitle className="text-sm font-bold uppercase tracking-widest text-neutral-500 flex items-center gap-2">
               <Bell className="w-4 h-4" />
-              Webhooks
+              Alerts & Notifications
             </CardTitle>
             <CardDescription className="text-xs text-neutral-600 font-medium italic">
-              Notify external services of execution failures.
+              Notify webhook, email, or Slack when production issues appear and resolve.
             </CardDescription>
           </div>
-          <Button variant="outline" size="sm" className="bg-white text-black hover:bg-neutral-200 font-bold h-8">
-            <Plus className="w-3.5 h-3.5 mr-2" />
-            Add Webhook
-          </Button>
         </CardHeader>
         <CardContent className="pt-6 space-y-4">
-           {webhooks.map(wh => (
-             <div key={wh.id} className="bg-black border border-neutral-900 p-4 rounded-lg flex items-center justify-between group hover:border-neutral-800 transition-colors">
-                <div className="flex items-center gap-4">
-                   <div className="w-10 h-10 bg-[#0a0a0a] border border-neutral-900 rounded flex items-center justify-center text-neutral-700">
-                      <Globe className="w-5 h-5" />
-                   </div>
-                   <div className="flex flex-col">
-                      <span className="text-xs font-mono text-neutral-300 truncate max-w-[300px]">{wh.url}</span>
-                      <div className="flex items-center gap-2 mt-1.5">
-                         {wh.events?.map((e: string) => (
-                           <Badge key={e} variant="outline" className="text-[9px] font-bold text-blue-500 border-blue-500/20 bg-blue-500/5 px-2 py-0 uppercase">
-                             {e}
-                           </Badge>
-                         ))}
-                      </div>
-                   </div>
-                 </div>
-                 <Button variant="ghost" size="icon" onClick={() => deleteWebhook(wh.id ?? "")} className="h-8 w-8 text-neutral-800 hover:text-red-500 lg:opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="grid grid-cols-1 md:grid-cols-[140px,1fr,1fr,auto] gap-2">
+            <select
+              value={channelType}
+              onChange={(e) => setChannelType(e.target.value as "webhook" | "email" | "slack")}
+              className="h-9 bg-black border border-neutral-800 rounded px-2 text-xs text-neutral-300"
+            >
+              <option value="webhook">Webhook</option>
+              <option value="email">Email</option>
+              <option value="slack">Slack</option>
+            </select>
+            <Input
+              value={channelTarget}
+              onChange={(e) => setChannelTarget(e.target.value)}
+              placeholder={channelType === "email" ? "oncall@company.com" : channelType === "slack" ? "Slack incoming webhook URL" : "Webhook URL"}
+              className="bg-black border-neutral-800 text-xs h-9"
+            />
+            <Input
+              value={channelLabel}
+              onChange={(e) => setChannelLabel(e.target.value)}
+              placeholder="Label (optional)"
+              className="bg-black border-neutral-800 text-xs h-9"
+            />
+            <Button onClick={addAlertChannel} disabled={savingAlerts || !channelTarget.trim()} size="sm" className="bg-white text-black hover:bg-neutral-200 font-bold h-9">
+              <Plus className="w-3.5 h-3.5 mr-2" />
+              Add
+            </Button>
+          </div>
+
+          <p className="text-[10px] text-neutral-600 font-mono">No billing surprises. You always see usage first.</p>
+
+          {alertsLoading ? (
+            <div className="py-8 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-neutral-800" /></div>
+          ) : alertChannels.length === 0 ? (
+            <div className="py-12 text-center text-neutral-700 font-mono text-[10px] uppercase tracking-widest border border-dashed border-neutral-800 rounded-lg bg-[#0c0c0c]">
+              No alert channels configured.
+            </div>
+          ) : (
+            alertChannels.map((channel) => (
+              <div key={channel.id} className="bg-black border border-neutral-900 p-4 rounded-lg flex items-center justify-between gap-3 group hover:border-neutral-800 transition-colors">
+                <div className="flex items-center gap-4 min-w-0">
+                  <div className="w-10 h-10 bg-[#0a0a0a] border border-neutral-900 rounded flex items-center justify-center text-neutral-700">
+                    {channel.type === "email" ? <Mail className="w-4 h-4" /> : channel.type === "slack" ? <Send className="w-4 h-4" /> : <Globe className="w-4 h-4" />}
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-xs font-mono text-neutral-300 truncate max-w-[360px]">{channel.target}</span>
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      <Badge variant="outline" className="text-[9px] font-bold text-blue-500 border-blue-500/20 bg-blue-500/5 px-2 py-0 uppercase">{channel.type}</Badge>
+                      {channel.label && (
+                        <Badge variant="outline" className="text-[9px] font-bold text-neutral-400 border-neutral-800 bg-neutral-900 px-2 py-0">{channel.label}</Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Label className="flex items-center gap-2 text-[10px] text-neutral-500 font-mono">
+                    <input
+                      type="checkbox"
+                      checked={channel.enabled}
+                      onChange={(e) => toggleAlertChannel(channel.id, e.target.checked)}
+                    />
+                    Enabled
+                  </Label>
+                  <Button variant="outline" size="sm" onClick={() => testAlertChannel(channel.id)} className="h-8 text-[10px] uppercase font-black border-neutral-800 text-neutral-300 hover:text-white">
+                    <Link2 className="w-3 h-3 mr-1" />
+                    Test
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => removeAlertChannel(channel.id)} className="h-8 w-8 text-neutral-800 hover:text-red-500 lg:opacity-0 group-hover:opacity-100 transition-opacity">
                     <Trash2 className="w-4 h-4" />
-                 </Button>
-             </div>
-           ))}
-           {webhooks.length === 0 && (
-             <div className="py-12 text-center text-neutral-700 font-mono text-[10px] uppercase tracking-widest border border-dashed border-neutral-800 rounded-lg bg-[#0c0c0c]">
-                No configured webhooks.
-             </div>
-           )}
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
         </CardContent>
       </Card>
 

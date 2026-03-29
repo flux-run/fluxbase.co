@@ -225,6 +225,15 @@ export interface ServiceToken {
   token?: string; // only present on create
 }
 
+export interface AlertChannel {
+  id: string;
+  type: 'webhook' | 'email' | 'slack';
+  target: string;
+  enabled: boolean;
+  label?: string;
+  created_at: string;
+}
+
 export interface ProjectOverviewResult {
   incidents: {
     id: string;
