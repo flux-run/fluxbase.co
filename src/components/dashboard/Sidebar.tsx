@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Zap, Activity, Repeat, Settings, Globe, AlertTriangle, Users } from "lucide-react";
+import { LayoutDashboard, Zap, Activity, Settings, Globe, AlertTriangle, Users, BarChart2 } from "lucide-react";
 
 export function Sidebar({ projectId }: { projectId: string }) {
   const pathname = usePathname();
@@ -12,6 +12,7 @@ export function Sidebar({ projectId }: { projectId: string }) {
     { name: "Functions", href: `/project/${projectId}/functions`, icon: Zap },
     { name: "Executions", href: `/project/${projectId}/executions`, icon: Activity },
     { name: "Routes", href: `/project/${projectId}/routes`, icon: Globe },
+    { name: "Usage", href: `/project/${projectId}/usage`, icon: BarChart2 },
     { name: "Settings", href: `/project/${projectId}/settings`, icon: Settings },
   ];
 
