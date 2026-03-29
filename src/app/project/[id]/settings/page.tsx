@@ -25,6 +25,14 @@ export default function ProjectSettings({ params }: { params: Promise<{ id: stri
     failure_spike: { enabled: false, multiplier: 2, window_min: 15 },
   });
   const [savingRules, setSavingRules] = useState(false);
+  const [showProtectedMessage, setShowProtectedMessage] = useState(false);
+
+  const hasEnabledChannels = alertChannels.some((channel) => channel.enabled);
+  const anyRuleEnabled =
+    alertRules.high_error_rate.enabled ||
+    alertRules.new_incident.enabled ||
+    alertRules.failure_spike.enabled;
+  const alertsActive = hasEnabledChannels && anyRuleEnabled;
 
   useEffect(() => {
     if (!api.ready) return;
@@ -60,6 +68,7 @@ export default function ProjectSettings({ params }: { params: Promise<{ id: stri
       return;
     }
 
+    const hadNoChannels = alertChannels.length === 0;
     const next: AlertChannel[] = [
       {
         id: crypto.randomUUID(),
@@ -73,6 +82,10 @@ export default function ProjectSettings({ params }: { params: Promise<{ id: stri
     ];
 
     await persistAlertChannels(next);
+    if (hadNoChannels) {
+      setShowProtectedMessage(true);
+      setTimeout(() => setShowProtectedMessage(false), 4500);
+    }
     setChannelTarget("");
     setChannelLabel("");
   };
@@ -94,6 +107,30 @@ export default function ProjectSettings({ params }: { params: Promise<{ id: stri
     } catch (err) {
       console.error("Failed to send test alert:", err);
       alert("Failed to send test alert.");
+    }
+  };
+
+  const sendTestAlertToEnabledChannels = async () => {
+    const enabledChannels = alertChannels.filter((channel) => channel.enabled);
+    if (enabledChannels.length === 0) {
+      alert("Enable at least one channel before sending a test alert.");
+      return;
+    }
+
+    try {
+      const results = await Promise.allSettled(
+        enabledChannels.map((channel) => api.testAlertChannel(channel.id, id)),
+      );
+      const successCount = results.filter((result) => result.status === "fulfilled").length;
+      const failCount = results.length - successCount;
+      if (failCount === 0) {
+        alert(`Test alert sent to ${successCount} channel${successCount === 1 ? "" : "s"}.`);
+        return;
+      }
+      alert(`Sent to ${successCount} channel${successCount === 1 ? "" : "s"}. ${failCount} failed.`);
+    } catch (err) {
+      console.error("Failed to send test alerts:", err);
+      alert("Failed to send test alerts.");
     }
   };
 
@@ -144,6 +181,15 @@ export default function ProjectSettings({ params }: { params: Promise<{ id: stri
               Notify webhook, email, or Slack when production issues appear and resolve.
             </CardDescription>
           </div>
+          <Badge
+            variant="outline"
+            className={alertsActive
+              ? "text-[10px] uppercase font-bold border-emerald-500/40 text-emerald-300 bg-emerald-500/10"
+              : "text-[10px] uppercase font-bold border-amber-500/40 text-amber-300 bg-amber-500/10"
+            }
+          >
+            {alertsActive ? "Alerts active" : "No alerts configured"}
+          </Badge>
         </CardHeader>
         <CardContent className="pt-6 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-[140px,1fr,1fr,auto] gap-2">
@@ -174,13 +220,34 @@ export default function ProjectSettings({ params }: { params: Promise<{ id: stri
             </Button>
           </div>
 
-          <p className="text-[10px] text-neutral-600 font-mono">No billing surprises. You always see usage first.</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={sendTestAlertToEnabledChannels}
+              disabled={!hasEnabledChannels}
+              className="h-8 text-[10px] uppercase font-black border-neutral-800 text-neutral-300 hover:text-white"
+            >
+              <Send className="w-3 h-3 mr-1" />
+              Send test alert
+            </Button>
+            <p className="text-[10px] text-neutral-600 font-mono">Validate your channels now so the first real incident never gets missed.</p>
+          </div>
+
+          {showProtectedMessage && (
+            <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-[10px] font-mono text-emerald-300">
+              You are now protected. We will notify you when something breaks.
+            </div>
+          )}
 
           {alertsLoading ? (
             <div className="py-8 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-neutral-800" /></div>
           ) : alertChannels.length === 0 ? (
-            <div className="py-12 text-center text-neutral-700 font-mono text-[10px] uppercase tracking-widest border border-dashed border-neutral-800 rounded-lg bg-[#0c0c0c]">
-              No alert channels configured.
+            <div className="py-12 px-4 text-center border border-dashed border-neutral-800 rounded-lg bg-[#0c0c0c] space-y-2">
+              <p className="text-neutral-500 font-mono text-[10px] uppercase tracking-widest">No alert channels configured.</p>
+              <p className="text-neutral-600 text-[11px] max-w-xl mx-auto">
+                Add a notification channel to start receiving alerts. Without this, you will not be notified of production issues.
+              </p>
             </div>
           ) : (
             alertChannels.map((channel) => (
@@ -228,6 +295,9 @@ export default function ProjectSettings({ params }: { params: Promise<{ id: stri
           <CardDescription className="text-xs text-neutral-600 font-medium italic">
             Define what should trigger notifications.
           </CardDescription>
+          <p className="text-[11px] text-neutral-500 pt-2">
+            When any of these conditions are met, notify configured channels.
+          </p>
         </CardHeader>
         <CardContent className="pt-6 space-y-5">
           <div className="rounded-lg border border-neutral-900 bg-black p-4 space-y-2">
@@ -305,9 +375,9 @@ export default function ProjectSettings({ params }: { params: Promise<{ id: stri
               />
               Failure spike detected
             </Label>
-            <p className="text-[10px] text-neutral-600 font-mono">Trigger when current window failures spike vs previous window.</p>
+            <p className="text-[10px] text-neutral-600 font-mono">Trigger when failures are higher than usual in the selected window.</p>
             <div className="flex items-center gap-2 text-[10px] text-neutral-500 font-mono">
-              <span>Current &gt;=</span>
+              <span>Trigger when failures are</span>
               <Input
                 type="number"
                 value={alertRules.failure_spike.multiplier}
@@ -323,7 +393,7 @@ export default function ProjectSettings({ params }: { params: Promise<{ id: stri
                   },
                 })}
               />
-              <span>x previous in last</span>
+              <span>x higher than usual in last</span>
               <Input
                 type="number"
                 value={alertRules.failure_spike.window_min}
