@@ -213,7 +213,8 @@ export default function UsagePage({
       pct: source.pct,
     }));
 
-    const trendByDay = new Map((usageData?.trend ?? []).map((row) => [row.day, row]));
+    const sortedTrendRows = [...(usageData?.trend ?? [])].sort((a, b) => a.day.localeCompare(b.day));
+    const trendByDay = new Map(sortedTrendRows.map((row) => [row.day, row]));
     const toDayKey = (date: Date) => {
       const y = date.getFullYear();
       const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -237,6 +238,15 @@ export default function UsagePage({
       })(),
     }));
 
+    const recent7 = sortedTrendRows.slice(-7);
+    const previous7 = sortedTrendRows.slice(-14, -7);
+    const recent7Total = recent7.reduce((sum, row) => sum + (row.executions ?? 0), 0);
+    const previous7Total = previous7.reduce((sum, row) => sum + (row.executions ?? 0), 0);
+    const usageGrowthPct = previous7Total > 0
+      ? Math.round(((recent7Total - previous7Total) / previous7Total) * 100)
+      : null;
+    const isUsageIncreasing = usageGrowthPct !== null ? usageGrowthPct > 0 : recent7Total > 0;
+
     const range = usageData?.range
       ? {
           start: new Date(usageData.range.start),
@@ -258,6 +268,8 @@ export default function UsagePage({
       trend,
       elapsedDays,
       monthDays,
+      usageGrowthPct,
+      isUsageIncreasing,
       projectedExecutions: billingPeriod === "mtd" ? Math.round((total / elapsedDays) * monthDays) : total,
       projectedComputeMs: billingPeriod === "mtd" ? Math.round((totalComputeMs / elapsedDays) * monthDays) : totalComputeMs,
       projectedStorageBytes: billingPeriod === "mtd" ? Math.round((estimatedStorageBytes / elapsedDays) * monthDays) : estimatedStorageBytes,
@@ -301,6 +313,12 @@ export default function UsagePage({
     ? "text-amber-300 bg-amber-950/15 border-amber-800/40"
     : "text-emerald-300 bg-emerald-950/15 border-emerald-800/40";
   const includedLabel = CURRENT_PLAN === "free" ? "(Free)" : "(Included in plan)";
+  const healthErrorRatePct = observabilityData ? Math.round(observabilityData.health.error_rate * 100) : null;
+  const freeTierUrgencyLine = daysUntilLimit !== null
+    ? daysUntilLimit <= 90
+      ? `At this pace, you'll hit free tier limit in ~${daysUntilLimit} day${daysUntilLimit === 1 ? "" : "s"}`
+      : "You're within free tier today, but production traffic typically grows 10-50x as usage scales"
+    : null;
 
   if (loading) {
     return (
@@ -356,9 +374,21 @@ export default function UsagePage({
               <div className="flex items-end justify-between gap-4 mb-2">
                 <div>
                   <p className="text-[9px] font-black uppercase tracking-widest text-neutral-600">Usage vs limit</p>
-                  <p className="text-sm font-black text-white mt-1">
-                    {limits.executions > 0 ? `${remainingExecutions.toLocaleString()} executions remaining this month` : "Unlimited executions on this plan"}
-                  </p>
+                  {CURRENT_PLAN === "free" && limits.executions > 0 ? (
+                    <>
+                      <p className="text-sm font-black text-white mt-1">Free tier usage: {stats.total.toLocaleString()} / {limits.executions.toLocaleString()}</p>
+                      <p className="text-[10px] text-neutral-500 font-mono mt-1">Remaining: {remainingExecutions.toLocaleString()} executions</p>
+                      {stats.usageGrowthPct !== null && (
+                        <p className={`text-[10px] font-mono mt-1 ${stats.isUsageIncreasing ? "text-amber-300/90" : "text-neutral-500"}`}>
+                          Usage {stats.isUsageIncreasing ? "increasing" : "stable/decreasing"} week-over-week ({stats.usageGrowthPct > 0 ? "+" : ""}{stats.usageGrowthPct}%)
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-sm font-black text-white mt-1">
+                      {limits.executions > 0 ? `${remainingExecutions.toLocaleString()} executions remaining this month` : "Unlimited executions on this plan"}
+                    </p>
+                  )}
                   <p className={`text-[10px] font-mono mt-1 ${predictedOverLimit ? "text-amber-400/90" : "text-emerald-400/90"}`}>
                     {usagePaceLabel}
                   </p>
@@ -458,6 +488,25 @@ export default function UsagePage({
         </div>
       </div>
 
+      <div className="rounded-xl border border-neutral-800/60 bg-neutral-950/60 px-4 py-3">
+        <p className="text-[9px] font-black uppercase tracking-widest text-neutral-600">Value captured</p>
+        <p className="text-[11px] text-neutral-300 font-mono mt-1">
+          {stats.failed.toLocaleString()} production failures captured -&gt; each replayable with full context.
+        </p>
+        <p className="text-[10px] text-neutral-500 font-mono mt-1">Without Flux: logs + guesswork. With Flux: replay + exact failure point.</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-xl border border-neutral-800/60 bg-neutral-950/60 px-4 py-3">
+          <p className="text-[9px] font-black uppercase tracking-widest text-neutral-600">Without Flux</p>
+          <p className="text-[10px] text-neutral-500 font-mono mt-1">Logs across services, missing input/output context, harder failure reproduction.</p>
+        </div>
+        <div className="rounded-xl border border-emerald-900/40 bg-emerald-950/10 px-4 py-3">
+          <p className="text-[9px] font-black uppercase tracking-widest text-emerald-300">With Flux</p>
+          <p className="text-[10px] text-emerald-200/90 font-mono mt-1">Full execution replay, exact failure point, faster root cause in production.</p>
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-xl border border-neutral-800/60 bg-neutral-950/60 overflow-hidden">
           <div className="px-4 py-2.5 border-b border-neutral-800/40">
@@ -471,15 +520,17 @@ export default function UsagePage({
               </div>
               <div className="flex justify-between items-center py-2">
                 <span className="text-[10px] font-mono text-neutral-500">Executions</span>
-                <span className="text-[10px] font-black text-neutral-300 tabular-nums">$0.00</span>
+                <span className="text-[10px] font-black text-neutral-300 tabular-nums">
+                  {CURRENT_PLAN === "free" ? `$${(OVERAGE.pricePerMillionExec / 10).toFixed(2)} / 100K over` : "$0.00"}
+                </span>
               </div>
               <div className="flex justify-between items-center py-2">
                 <span className="text-[10px] font-mono text-neutral-500">Compute time</span>
-                <span className="text-[10px] font-black text-neutral-300 tabular-nums">$0.00</span>
+                <span className="text-[10px] font-black text-neutral-300 tabular-nums">{CURRENT_PLAN === "free" ? "usage-based" : "$0.00"}</span>
               </div>
               <div className="flex justify-between items-center py-2">
                 <span className="text-[10px] font-mono text-neutral-500">Storage retained</span>
-                <span className="text-[10px] font-black text-neutral-300 tabular-nums">$0.00</span>
+                <span className="text-[10px] font-black text-neutral-300 tabular-nums">{CURRENT_PLAN === "free" ? "~$0.05 / GB·mo" : "$0.00"}</span>
               </div>
               <div className="flex justify-between items-center py-2">
                 <span className="text-[10px] font-mono text-neutral-500">Overage</span>
@@ -501,8 +552,14 @@ export default function UsagePage({
             <p className="text-sm font-black text-white">At current usage</p>
             <p className="text-[10px] text-neutral-400 font-mono">→ You will use ~{fmtNum(stats.projectedExecutions)} executions this month</p>
             <div className={`rounded-lg border px-3 py-2 mt-2 ${predictionTone}`}>
-              <p className="text-[10px] font-black">{predictedOverLimit ? `You may exceed your ${plan.name} tier` : `You are safely within your ${plan.name} tier`}</p>
+              <p className="text-[10px] font-black">{predictedOverLimit ? `You may exceed your ${plan.name} tier` : `You are within your ${plan.name} tier`}</p>
             </div>
+            {CURRENT_PLAN === "free" && billingPeriod === "mtd" && daysUntilLimit !== null && (
+              <>
+                <p className="text-[10px] text-neutral-300 font-mono">→ {freeTierUrgencyLine}</p>
+                <p className="text-[10px] text-amber-300 font-mono">→ Upgrade before interruptions to keep debugging flow uninterrupted</p>
+              </>
+            )}
             {observabilityData && (
               <p className="text-[10px] text-neutral-400 font-mono">
                 → Health ({observabilityData.health.severity}): {observabilityData.health.message}
@@ -618,12 +675,20 @@ export default function UsagePage({
           <div className="px-5 py-4 flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-black text-white">Upgrade to {nextPlan.name}{nextPlan.price !== null && nextPlan.price > 0 && <span className="text-neutral-500 font-bold text-[11px] ml-1.5">${nextPlan.price}/mo</span>}</p>
-              <p className="text-[10px] text-neutral-500 font-mono mt-0.5 max-w-sm">You&apos;ll need this as your usage grows.</p>
+              <p className="text-[10px] text-neutral-500 font-mono mt-0.5 max-w-sm">Why upgrade now? Unlock full debugging context for production issues.</p>
+              {observabilityData && (observabilityData.health.severity === "critical" || observabilityData.health.severity === "warning") && healthErrorRatePct !== null && (
+                <div className="mt-2 rounded-lg border border-amber-800/40 bg-amber-950/20 px-3 py-2">
+                  <p className="text-[10px] font-black text-amber-300">{healthErrorRatePct}% of your executions are failing</p>
+                  <p className="text-[9px] text-neutral-500 font-mono mt-1">Without full replay, you&apos;re debugging blind and root cause takes longer.</p>
+                  <p className="text-[9px] text-amber-200 font-mono mt-1">Upgrade to see full execution context instantly.</p>
+                </div>
+              )}
               <div className="flex items-center gap-4 mt-2 flex-wrap">
-                <span className="flex items-center gap-1 text-[9px] text-neutral-400 font-mono"><CheckCircle2 className="w-2.5 h-2.5 text-emerald-500/60" />{LIMITS[nextPlan.id].executions === -1 ? "Unlimited" : fmtNum(LIMITS[nextPlan.id].executions)} executions / month</span>
-                <span className="flex items-center gap-1 text-[9px] text-neutral-400 font-mono"><CheckCircle2 className="w-2.5 h-2.5 text-emerald-500/60" />{LIMITS[nextPlan.id].retentionDays === -1 ? "Custom" : `${LIMITS[nextPlan.id].retentionDays}-day`} retention</span>
-                <span className="flex items-center gap-1 text-[9px] text-neutral-400 font-mono"><CheckCircle2 className="w-2.5 h-2.5 text-emerald-500/60" />team collaboration</span>
+                <span className="flex items-center gap-1 text-[9px] text-neutral-400 font-mono"><CheckCircle2 className="w-2.5 h-2.5 text-emerald-500/60" />Full execution replay for failed requests</span>
+                <span className="flex items-center gap-1 text-[9px] text-neutral-400 font-mono"><CheckCircle2 className="w-2.5 h-2.5 text-emerald-500/60" />{LIMITS[nextPlan.id].retentionDays === -1 ? "Custom" : `${LIMITS[nextPlan.id].retentionDays}-day`} retention for production history</span>
+                <span className="flex items-center gap-1 text-[9px] text-neutral-400 font-mono"><CheckCircle2 className="w-2.5 h-2.5 text-emerald-500/60" />{LIMITS[nextPlan.id].executions === -1 ? "Unlimited" : fmtNum(LIMITS[nextPlan.id].executions)} executions for production workloads</span>
               </div>
+              <p className="text-[9px] text-neutral-500 font-mono mt-2">Without upgrade: limited replay data, short retention (14 days), slower production debugging.</p>
               {billingPeriod === "mtd" && daysUntilLimit !== null && execPct >= 20 && (
                 <p className="text-[9px] text-blue-300/80 font-mono mt-2">You may need this in ~{daysUntilLimit} day{daysUntilLimit === 1 ? "" : "s"} at the current pace.</p>
               )}
