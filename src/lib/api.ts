@@ -138,12 +138,18 @@ export function useFluxApi(projectId?: string) {
         request<ProjectUsageResult>(
           `/usage/project?project_id=${id ?? projectId}&period=${period}`,
           token(),
-        ).catch(() => null),
+        ).catch((err) => {
+          console.error("[api] getProjectUsage failed", err);
+          return null;
+        }),
       getProjectObservability: (id?: string) =>
         request<ProjectObservabilityResult>(
           `/observability/project?project_id=${id ?? projectId}`,
           token(),
-        ).catch(() => null),
+        ).catch((err) => {
+          console.error("[api] getProjectObservability failed", err);
+          return null;
+        }),
       getFunctionStats: (funcId: string) =>
         request<any>(`/function/${funcId}/overview`, token()),
       getDeployments: (funcId: string) =>

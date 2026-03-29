@@ -108,9 +108,84 @@ export default function UsagePage({
       api.getProjectUsage(id, billingPeriod),
       api.getProjectObservability(id),
     ])
-      .then(([usage, observability]) => {
+      .then(async ([usage, observability]) => {
         if (cancelled) return;
-        setUsageData(usage);
+        let resolvedUsage = usage;
+
+        // Fallback path to prevent empty usage dashboards if backend aggregation is unavailable.
+        if (!resolvedUsage) {
+          const rawExecutions = await api.getExecutions(id).catch(() => []);
+          const rows = Array.isArray(rawExecutions) ? rawExecutions : [];
+          const { start, end } = monthRange(billingPeriod);
+
+          const filtered = rows.filter((execution) => {
+            if (!execution.started_at) return false;
+            const ts = new Date(execution.started_at).getTime();
+            return ts >= start.getTime() && ts <= end.getTime();
+          });
+
+          const total = filtered.length;
+          const failed = filtered.filter((execution) => execution.status !== "ok" && execution.status !== "success").length;
+          const totalComputeMs = filtered.reduce((sum, execution) => sum + (execution.duration_ms ?? 0), 0);
+          const avgDurationMs = total > 0 ? Math.round(totalComputeMs / total) : 0;
+
+          const byPath = new Map<string, number>();
+          for (const execution of filtered) {
+            const path = execution.path ?? "unknown";
+            byPath.set(path, (byPath.get(path) ?? 0) + 1);
+          }
+
+          const top_sources = [...byPath.entries()]
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([source, count]) => ({
+              source,
+              count,
+              pct: total > 0 ? Math.round((count / total) * 100) : 0,
+            }));
+
+          const trend = Array.from({ length: 7 }, (_, offset) => {
+            const day = new Date();
+            day.setHours(0, 0, 0, 0);
+            day.setDate(day.getDate() - (6 - offset));
+            const dayStart = day.getTime();
+            const dayEnd = dayStart + 86_399_999;
+
+            const dayRows = rows.filter((execution) => {
+              if (!execution.started_at) return false;
+              const ts = new Date(execution.started_at).getTime();
+              return ts >= dayStart && ts <= dayEnd;
+            });
+
+            const y = day.getFullYear();
+            const m = String(day.getMonth() + 1).padStart(2, "0");
+            const d = String(day.getDate()).padStart(2, "0");
+
+            return {
+              day: `${y}-${m}-${d}`,
+              executions: dayRows.length,
+              compute_ms: dayRows.reduce((sum, execution) => sum + (execution.duration_ms ?? 0), 0),
+            };
+          });
+
+          resolvedUsage = {
+            period: billingPeriod,
+            range: {
+              start: start.toISOString(),
+              end: end.toISOString(),
+            },
+            usage: {
+              total_executions: total,
+              failed_executions: failed,
+              total_compute_ms: totalComputeMs,
+              avg_duration_ms: avgDurationMs,
+            },
+            top_sources,
+            trend,
+          };
+        }
+
+        setUsageData(resolvedUsage);
         setObservabilityData(observability);
         setLoading(false);
       })
