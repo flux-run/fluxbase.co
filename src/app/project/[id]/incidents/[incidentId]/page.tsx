@@ -822,6 +822,51 @@ export default function IncidentDetailPage({
 
   const suggestedFix = generateSuggestedFix(cls, title);
 
+  const executionEvidenceRaw = executions
+    .map((e) => `${e.error ?? ''} ${e.error_message ?? ''}`)
+    .join(' ');
+  const executionEvidence = executionEvidenceRaw.toLowerCase();
+  const serviceHostMatch = executionEvidenceRaw.match(/([a-z0-9-]+(?:\.[a-z0-9-]+)+)/i);
+  const serviceHost = serviceHostMatch?.[1] ?? null;
+
+  const contextualSuggestedFix =
+    executionEvidence.includes('dns') ||
+    executionEvidence.includes('getaddrinfo') ||
+    executionEvidence.includes('enotfound') ||
+    executionEvidence.includes('fetch failed')
+      ? {
+          summary: 'Likely issue: external dependency failure (DNS resolution).',
+          causes: [
+            'DNS resolution failed for an external host',
+            'Outbound network path is blocked or unstable',
+            'External endpoint availability is degraded',
+          ],
+          actions: [
+            'Verify DNS resolution from the runtime environment',
+            'Check outbound network access and egress rules',
+            'Add retry or fallback logic around external fetch calls',
+          ],
+        }
+      : suggestedFix;
+
+  const publicExecs = executions.filter((e) => !e.token_id && !e.actor_name).length;
+  const internalExecs = executions.length - publicExecs;
+  const publicExecPct = executions.length > 0 ? Math.round((publicExecs / executions.length) * 100) : 0;
+  const internalExecPct = executions.length > 0 ? 100 - publicExecPct : 0;
+
+  const likelyCause =
+    executionEvidence.includes('dns') ||
+    executionEvidence.includes('getaddrinfo') ||
+    executionEvidence.includes('enotfound') ||
+    executionEvidence.includes('fetch failed')
+      ? 'Likely cause: DNS / network issue after deployment'
+      : cls === 'external'
+        ? 'Likely cause: regression in external dependency handling'
+        : null;
+
+  const topActor = executions.find((e) => e.actor_name)?.actor_name ?? null;
+  const topActorType = executions.find((e) => e.actor_type)?.actor_type ?? null;
+
   const deployVerdict = !deployId ? null : (() => {
     const delta = rateAfterPct !== null && rateBeforePct !== null
       ? `${rateBeforePct}% → ${rateAfterPct}%`
@@ -835,9 +880,7 @@ export default function IncidentDetailPage({
       delta: null, deltaNum: null, tone: 'danger' as const, confidence: 'High',
     };
     if (deployMode === 'regressed') return {
-      headline: postDeploySampleLow
-        ? `Possible regression after deploy ${deployId}`
-        : `Regression detected after deploy ${deployId}`,
+      headline: `Regression detected after deploy ${deployId}`,
       sub: delta ? `Failure rate: ${delta}${deltaNum !== null ? ` (Δ +${deltaNum}%)` : ''}` : 'Failure rate worsened after deploy',
       delta, deltaNum, tone: 'danger' as const,
       confidence: postDeploySampleLow ? 'Low' : 'Medium',
@@ -885,94 +928,147 @@ export default function IncidentDetailPage({
         </div>
       )}
 
-      {/* Header card */}
+      {/* Incident narrative */}
       <div className="relative rounded-xl border border-red-800/50 bg-gradient-to-b from-red-950/40 to-red-950/10 overflow-hidden">
         <div className="h-[3px] bg-gradient-to-r from-red-500 via-orange-500/60 to-transparent" />
-        <div className="px-5 pt-4 pb-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 flex-wrap mb-2">
-                <ErrorClassBadge cls={cls} />
-                <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest border ${
-                  incidentStatus === 'resolved'
-                    ? 'text-emerald-400 bg-emerald-950/60 border-emerald-800/40'
-                    : incidentStatus === 'investigating'
-                    ? 'text-amber-400 bg-amber-950/60 border-amber-800/40'
-                    : 'text-red-400 bg-red-950/60 border-red-800/40'
-                }`}>
-                  {incidentStatus}
-                </span>
-                {isRecurring && (
-                  <span className="text-[8px] font-black text-amber-400 bg-amber-950/50 border border-amber-800/50 px-1.5 py-0.5 rounded uppercase tracking-widest">
-                    Recurring
-                  </span>
-                )}
-              </div>
-              <h1 className="text-xl font-black text-white font-mono tracking-tight break-all leading-tight">{title}</h1>
-              <p className="text-[10px] text-neutral-500 font-mono mt-2">
-                started {timeAgo(firstSeen)} · last seen {timeAgo(lastSeen)}
-              </p>
-            </div>
-            <div className="shrink-0 text-right">
-              <div className="text-4xl font-black tabular-nums text-red-400 leading-none">{trafficImpactPct}%</div>
-              <div className="text-[9px] text-neutral-500 mt-1">of traffic</div>
-            </div>
-          </div>
-          {/* Scope row */}
-          <div className="mt-4 flex items-center gap-3 flex-wrap border-t border-red-900/20 pt-3">
-            <span className="text-[10px] font-black text-red-400">{failureRatePct}% failure rate</span>
-            <span className="text-[10px] text-neutral-700">·</span>
-            <span className="text-[10px] text-neutral-400 font-mono">{totalErrors}/{totalExecs} executions</span>
-            <span className="text-[10px] text-neutral-700">·</span>
-            <span className="text-[10px] text-neutral-400 font-mono">
-              {affectedFns.length} function{affectedFns.length !== 1 ? 's' : ''}
+        <div className="px-5 pt-4 pb-5 space-y-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <ErrorClassBadge cls={cls} />
+            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest border ${
+              incidentStatus === 'resolved'
+                ? 'text-emerald-400 bg-emerald-950/60 border-emerald-800/40'
+                : incidentStatus === 'investigating'
+                ? 'text-amber-400 bg-amber-950/60 border-amber-800/40'
+                : 'text-red-400 bg-red-950/60 border-red-800/40'
+            }`}>
+              {incidentStatus}
             </span>
+            {isRecurring && (
+              <span className="text-[8px] font-black text-amber-400 bg-amber-950/50 border border-amber-800/50 px-1.5 py-0.5 rounded uppercase tracking-widest">
+                Recurring
+              </span>
+            )}
           </div>
+
+          <h1 className="text-xl font-black text-white font-mono tracking-tight break-all leading-tight">{title}</h1>
+
+          <p className="text-[11px] text-red-200 font-mono">
+            <span className="font-black text-red-300">{failureRatePct}% failure rate</span>
+            <span className="text-red-800"> · </span>
+            impacting <span className="font-black text-red-300">{trafficImpactPct}% traffic</span>
+          </p>
+
+          {likelyCause && (
+            <p className="text-[10px] text-orange-300 font-mono">{likelyCause}</p>
+          )}
+
+          <p className="text-[10px] text-neutral-400 font-mono">
+            started {timeAgo(firstSeen)} · last seen {timeAgo(lastSeen)}
+            {deployVerdict && deployId && (
+              <>
+                <span className="text-neutral-700"> · </span>
+                <span className="text-orange-300 font-black">deploy {deployId}</span>
+                {rateBeforePct !== null && rateAfterPct !== null && (
+                  <span className="text-orange-400 font-black"> ({rateBeforePct}% → {rateAfterPct}%)</span>
+                )}
+              </>
+            )}
+          </p>
+
+          {deployId && rateBeforePct !== null && rateAfterPct !== null && (
+            <p className="text-[11px] font-black text-orange-300 font-mono">
+              ⬆ +{Math.max(0, rateAfterPct - rateBeforePct)}% failure spike after deploy
+            </p>
+          )}
+
+          <p className="text-[10px] text-neutral-500 font-mono">
+            Triggered by: {publicExecPct >= 50 ? `Public traffic (${publicExecPct}%)` : (topActor ? `${topActor}${topActorType ? ` (${topActorType})` : ''}` : 'Unknown')}
+          </p>
+
+          {deployVerdict && (
+            <div className="pt-2 border-t border-red-900/20 flex items-center gap-3 flex-wrap">
+              <span className={`text-[10px] font-black ${
+                deployVerdict.tone === 'danger' ? 'text-orange-300'
+                : deployVerdict.tone === 'good' ? 'text-emerald-300'
+                : 'text-neutral-300'
+              }`}>
+                {deployVerdict.headline}
+              </span>
+              <span className="text-[9px] text-neutral-600">·</span>
+              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${
+                deployVerdict.confidence === 'High' ? 'text-red-400 bg-red-950/40 border-red-800/40'
+                : deployVerdict.confidence === 'Medium' ? 'text-orange-400 bg-orange-950/40 border-orange-800/40'
+                : 'text-neutral-500 bg-neutral-900/40 border-neutral-800/40'
+              }`}>
+                Confidence: {deployVerdict.confidence}
+              </span>
+              {postDeploySampleLow && (
+                <span className="text-[9px] text-neutral-500 font-mono">Based on limited post-deploy data ({execsAfterDeploy} executions)</span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Deploy Verdict — strong binary verdict */}
-      {deployVerdict && (
-        <div className={`rounded-xl border overflow-hidden ${
-          deployVerdict.tone === 'danger' ? 'border-orange-700/50 bg-orange-950/20'
-          : deployVerdict.tone === 'good'  ? 'border-emerald-700/50 bg-emerald-950/15'
-          : 'border-neutral-700/50 bg-neutral-900/30'
-        }`}>
-          <div className="px-5 py-4 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              {deployVerdict.tone === 'danger' ? (
-                <AlertTriangle className="w-5 h-5 text-orange-400 shrink-0" />
-              ) : deployVerdict.tone === 'good' ? (
-                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-              ) : (
-                <Info className="w-5 h-5 text-neutral-400 shrink-0" />
-              )}
-              <div>
-                <p className={`text-base font-black ${
-                  deployVerdict.tone === 'danger' ? 'text-orange-200'
-                  : deployVerdict.tone === 'good'  ? 'text-emerald-200'
-                  : 'text-neutral-200'
-                }`}>{deployVerdict.headline}</p>
-                <p className="text-[11px] text-neutral-400 font-mono mt-0.5">
-                  {deployVerdict.sub}
-                  {deployedAt && <span className="text-neutral-600 ml-2">· {timeAgo(deployedAt)}</span>}
-                </p>
-              </div>
+      {/* Recommended decision */}
+      {deployId && deployVerdict && (deployMode === 'introduced' || deployMode === 'regressed') && (
+        <div className="rounded-xl border border-orange-700/40 bg-orange-950/15 px-5 py-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-orange-300">Recommended action</p>
+              <p className="text-sm font-black text-orange-100 mt-1">
+                {deployVerdict.confidence === 'Low'
+                  ? `Investigate DNS / external fetch failure before rollback`
+                  : `Rollback deploy ${deployId}`}
+              </p>
+              <p className="text-[10px] text-neutral-400 font-mono mt-1">
+                Reason: failure spike after deploy (+{(rateAfterPct !== null && rateBeforePct !== null) ? Math.max(0, rateAfterPct - rateBeforePct) : 'n/a'}%)
+              </p>
+              <p className="text-[10px] text-neutral-400 font-mono mt-0.5">
+                Error type: {executionEvidence.includes('dns') || executionEvidence.includes('fetch failed') ? 'external dependency (DNS resolution)' : cls}
+              </p>
+              <p className="text-[10px] text-neutral-500 font-mono mt-0.5">
+                Confidence: {deployVerdict.confidence}{postDeploySampleLow ? ` (limited post-deploy data: ${execsAfterDeploy} executions)` : ''}
+              </p>
+              <p className="text-[10px] text-neutral-500 font-mono mt-0.5">
+                Impact: {severity} ({trafficImpactPct}% traffic affected) · Risk: {deployVerdict.confidence === 'Low' ? 'Medium' : 'Low'}
+              </p>
             </div>
-            <div className="shrink-0 text-right">
-              <span className={`text-xs font-black px-2 py-1 rounded border ${
-                deployVerdict.confidence === 'High'   ? 'text-red-400 bg-red-950/40 border-red-800/40'
-                : deployVerdict.confidence === 'Medium' ? 'text-orange-400 bg-orange-950/40 border-orange-800/40'
-                : 'text-neutral-500 bg-neutral-900/40 border-neutral-800/40'
-              }`}>{deployVerdict.confidence} confidence</span>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => pinToTimeline(`Recommended rollback for deploy ${deployId} (confidence: ${deployVerdict.confidence})`, activity)}
+                className="flex items-center gap-1.5 text-[10px] font-black text-orange-200 bg-orange-900/30 hover:bg-orange-900/50 border border-orange-700/60 rounded-lg px-3 py-1.5 transition-all disabled:opacity-40"
+                disabled={deployVerdict.confidence === 'Low'}
+              >
+                <ArrowRight className="w-3 h-3" /> Rollback
+              </button>
+              <button
+                onClick={() => updateStatus('investigating', activity)}
+                className="flex items-center gap-1.5 text-[10px] font-black text-neutral-300 hover:text-white border border-neutral-700 hover:border-neutral-500 rounded-lg px-3 py-1.5 transition-all"
+              >
+                <Zap className="w-3 h-3" /> Investigate instead
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Next Step CTAs */}
+      {deployId && deployVerdict && (
+        <div className="rounded-xl border border-neutral-800/50 bg-neutral-900/35 px-4 py-3">
+          <p className="text-[9px] font-black uppercase tracking-widest text-neutral-500">What changed</p>
+          <div className="mt-2 text-[10px] font-mono text-neutral-400 space-y-1">
+            <p>• Deploy <span className="text-neutral-300">{deployId}</span> introduced</p>
+            {(rateBeforePct !== null && rateAfterPct !== null) && (
+              <p>• Failure rate changed: <span className="text-orange-300 font-black">{rateBeforePct}% → {rateAfterPct}%</span></p>
+            )}
+            <p>• Errors shifted to: <span className="text-neutral-300">{executionEvidence.includes('dns') || executionEvidence.includes('fetch failed') ? 'external fetch (DNS failure)' : cls}</span></p>
+          </div>
+        </div>
+      )}
+
+      {/* Take action CTAs */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-[9px] font-black uppercase tracking-widest text-neutral-600 mr-1">Next step</span>
+        <span className="text-[9px] font-black uppercase tracking-widest text-neutral-600 mr-1">Take action</span>
         {executions.length > 0 && (
           <button
             onClick={() => router.push(`/project/${id}/executions/${executions[0].id}`)}
@@ -1083,6 +1179,34 @@ export default function IncidentDetailPage({
         ))}
       </div>
 
+      <div className="rounded-xl border border-neutral-800/50 bg-neutral-900/40 px-4 py-3">
+        <div className="flex items-center justify-between">
+          <span className="text-[9px] font-black uppercase tracking-widest text-neutral-500">Origin Distribution</span>
+          <span className="text-[9px] text-neutral-600 font-mono">from recent failures</span>
+        </div>
+        <div className="mt-3 space-y-2">
+          <div>
+            <div className="flex items-center justify-between text-[10px] font-mono">
+              <span className="text-neutral-300">🌍 Public traffic</span>
+              <span className="text-neutral-400">{publicExecPct}%</span>
+            </div>
+            <div className="h-1.5 bg-neutral-900 rounded mt-1 overflow-hidden">
+              <div className="h-full bg-red-500/70 rounded" style={{ width: `${publicExecPct}%` }} />
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center justify-between text-[10px] font-mono">
+              <span className="text-neutral-300">🔒 Internal systems</span>
+              <span className="text-neutral-400">{internalExecPct}%</span>
+            </div>
+            <div className="h-1.5 bg-neutral-900 rounded mt-1 overflow-hidden">
+              <div className="h-full bg-cyan-500/70 rounded" style={{ width: `${internalExecPct}%` }} />
+            </div>
+          </div>
+        </div>
+        <p className="text-[9px] text-neutral-600 font-mono mt-2">→ {publicExecPct >= 50 ? 'affecting real users' : 'primarily internal impact'}</p>
+      </div>
+
       {/* Two-column body */}
       <div className="grid grid-cols-5 gap-3 items-start">
 
@@ -1090,21 +1214,21 @@ export default function IncidentDetailPage({
         <div className="col-span-3 space-y-3">
 
           {/* Suggested Fix — top of stack, above the fold */}
-          {suggestedFix && (
+          {contextualSuggestedFix && (
             <div className="rounded-xl border border-cyan-900/50 bg-cyan-950/10 overflow-hidden">
               <div className="px-4 py-2.5 border-b border-cyan-900/30 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Zap className="w-3 h-3 text-cyan-400" />
-                  <span className="text-[9px] font-black uppercase tracking-widest text-cyan-500">Suggested Actions</span>
+                  <span className="text-[9px] font-black uppercase tracking-widest text-cyan-500">Recommended checks (priority order)</span>
                 </div>
                 <div className="flex items-center gap-3">
                   {checkedActions.size > 0 && (
                     <span className="text-[8px] font-black text-cyan-600">
-                      {checkedActions.size}/{suggestedFix.actions.length} done
+                      {checkedActions.size}/{contextualSuggestedFix.actions.length} done
                     </span>
                   )}
                   <button
-                    onClick={() => pinToTimeline(`Suggested fix pinned — ${suggestedFix.summary.slice(0, 80)}`, activity)}
+                    onClick={() => pinToTimeline(`Suggested fix pinned — ${contextualSuggestedFix.summary.slice(0, 80)}`, activity)}
                     className="flex items-center gap-1 text-[8px] font-black text-neutral-600 hover:text-cyan-400 transition-colors"
                     title="Pin to timeline"
                   >
@@ -1113,10 +1237,10 @@ export default function IncidentDetailPage({
                 </div>
               </div>
               <div className="px-4 py-3 space-y-3">
-                <p className="text-[10px] text-neutral-400 font-mono leading-relaxed">{suggestedFix.summary}</p>
+                <p className="text-[10px] text-neutral-400 font-mono leading-relaxed">{contextualSuggestedFix.summary}</p>
                 {/* Checklist actions */}
                 <div className="space-y-1">
-                  {suggestedFix.actions.map((a) => (
+                  {contextualSuggestedFix.actions.map((a, idx) => (
                     <button
                       key={a}
                       onClick={() => toggleAction(a)}
@@ -1139,7 +1263,7 @@ export default function IncidentDetailPage({
                       </span>
                       <span className={`text-[10px] font-mono leading-relaxed transition-colors ${
                         checkedActions.has(a) ? 'text-neutral-600 line-through' : 'text-neutral-300'
-                      }`}>{a}</span>
+                      }`}>{idx + 1}. {a}</span>
                     </button>
                   ))}
                 </div>
@@ -1149,7 +1273,7 @@ export default function IncidentDetailPage({
                     <span className="group-open:rotate-90 transition-transform inline-block">›</span> Likely causes
                   </summary>
                   <ul className="mt-1.5 space-y-1 pl-3">
-                    {suggestedFix.causes.map((c, i) => (
+                    {contextualSuggestedFix.causes.map((c, i) => (
                       <li key={i} className="text-[9px] text-neutral-500 font-mono flex gap-1.5">
                         <span className="text-neutral-700 shrink-0">–</span>{c}
                       </li>
@@ -1309,6 +1433,14 @@ export default function IncidentDetailPage({
           {functionStats?.root_cause && (
             <SectionCard title="Root Cause">
               <div className="space-y-1.5">
+                <p className="text-[10px] font-black text-neutral-200">
+                  {executionEvidence.includes('dns') || executionEvidence.includes('fetch failed')
+                    ? 'External API call failed due to DNS resolution error'
+                    : 'Execution failed due to a runtime/application error'}
+                </p>
+                {serviceHost && (
+                  <p className="text-[10px] text-neutral-500 font-mono">Service unreachable: {serviceHost}</p>
+                )}
                 <p className="text-[10px] font-black text-neutral-200">{functionStats.root_cause.issue}</p>
                 {functionStats.root_cause.cause && (
                   <p className="text-[10px] text-neutral-500 font-mono">{functionStats.root_cause.cause}</p>
@@ -1512,6 +1644,19 @@ export default function IncidentDetailPage({
             </div>
           )}
         </div>
+      </div>
+
+      <div className="rounded-xl border border-neutral-800/50 bg-neutral-900/35 px-4 py-3">
+        <p className="text-[9px] font-black uppercase tracking-widest text-neutral-500">Causal Chain</p>
+        <p className="mt-2 text-[10px] font-mono text-neutral-400">
+          🚀 Deploy {deployId ?? 'unknown'}
+          <span className="text-neutral-700"> → </span>
+          ⬆ Failure rate increased{rateBeforePct !== null && rateAfterPct !== null ? ` (${rateBeforePct}% → ${rateAfterPct}%)` : ''}
+          <span className="text-neutral-700"> → </span>
+          🔥 Incident triggered
+          <span className="text-neutral-700"> → </span>
+          💡 Suggested {deployVerdict?.confidence === 'Low' ? 'investigation' : 'rollback'}
+        </p>
       </div>
 
       {/* Activity & Comments — full width collaboration layer */}
