@@ -9,6 +9,8 @@ import type {
   Route,
   ServiceToken,
   ProjectOverviewResult,
+  ProjectUsageResult,
+  ProjectObservabilityResult,
   IncidentState,
 } from "@/types/api";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -132,6 +134,16 @@ export function useFluxApi(projectId?: string) {
         }),
       getProjectOverview: (id?: string) =>
         request<ProjectOverviewResult>(`/overview?project_id=${id ?? projectId}`, token()).catch(() => null),
+      getProjectUsage: (id?: string, period: "mtd" | "lastMonth" = "mtd") =>
+        request<ProjectUsageResult>(
+          `/usage/project?project_id=${id ?? projectId}&period=${period}`,
+          token(),
+        ).catch(() => null),
+      getProjectObservability: (id?: string) =>
+        request<ProjectObservabilityResult>(
+          `/observability/project?project_id=${id ?? projectId}`,
+          token(),
+        ).catch(() => null),
       getFunctionStats: (funcId: string) =>
         request<any>(`/function/${funcId}/overview`, token()),
       getDeployments: (funcId: string) =>

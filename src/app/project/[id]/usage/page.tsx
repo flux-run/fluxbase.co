@@ -2,7 +2,7 @@
 import { use, useEffect, useMemo, useState } from "react";
 import { ArrowRight, Zap, CheckCircle2, AlertTriangle, TrendingUp, Clock, Database, DollarSign, ExternalLink } from "lucide-react";
 import { useFluxApi } from "@/lib/api";
-import { Execution } from "@/types/api";
+import { ProjectObservabilityResult, ProjectUsageResult } from "@/types/api";
 import { LIMITS, OVERAGE, PRICING_TIERS, type PlanId } from "@/lib/pricing";
 
 type BillingPeriod = "mtd" | "lastMonth";
@@ -91,7 +91,8 @@ export default function UsagePage({
   const { id } = use(params);
   const api = useFluxApi(id); 
 
-  const [executions, setExecutions] = useState<Execution[]>([]);
+  const [usageData, setUsageData] = useState<ProjectUsageResult | null>(null);
+  const [observabilityData, setObservabilityData] = useState<ProjectObservabilityResult | null>(null);
   const [loading, setLoading] = useState(true); 
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("mtd");
 
@@ -99,61 +100,74 @@ export default function UsagePage({
   const limits = LIMITS[CURRENT_PLAN]; 
 
   useEffect(() => {
-    if (!api.ready) return; 
-    api.getExecutions(id).then((data) => {
-      setExecutions(Array.isArray(data) ? data : []);
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, [api.ready, id]);
+    if (!api.ready) return;
+    let cancelled = false;
 
-  const filteredExecutions = useMemo(() => {
-    const { start, end } = monthRange(billingPeriod);
-    return executions.filter((execution) => {
-      if (!execution.started_at) return false;
-      const ts = new Date(execution.started_at).getTime();
-      return ts >= start.getTime() && ts <= end.getTime();
-    });
-  }, [billingPeriod, executions]);
+    setLoading(true);
+    Promise.all([
+      api.getProjectUsage(id, billingPeriod),
+      api.getProjectObservability(id),
+    ])
+      .then(([usage, observability]) => {
+        if (cancelled) return;
+        setUsageData(usage);
+        setObservabilityData(observability);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [api, api.ready, billingPeriod, id]);
 
   const stats = useMemo(() => {
-    const total = filteredExecutions.length;
-    const failed = filteredExecutions.filter((execution) => execution.status !== "ok" && execution.status !== "success").length;
-    const durations = filteredExecutions.map((execution) => execution.duration_ms ?? 0).filter((duration) => duration > 0);
-    const totalComputeMs = durations.reduce((sum, duration) => sum + duration, 0);
-    const avgDurationMs = durations.length > 0 ? Math.round(totalComputeMs / durations.length) : 0;
+    const usage = usageData?.usage;
+    const total = usage?.total_executions ?? 0;
+    const failed = usage?.failed_executions ?? 0;
+    const totalComputeMs = usage?.total_compute_ms ?? 0;
+    const avgDurationMs = usage?.avg_duration_ms ?? 0;
     const estimatedStorageBytes = total * ESTIMATED_STORAGE_BYTES_PER_EXECUTION;
 
-    const byFn = new Map<string, number>();
-    for (const execution of filteredExecutions) {
-      const fn = execution.function_name ?? "unknown";
-      byFn.set(fn, (byFn.get(fn) ?? 0) + 1);
-    }
-    const topSources = [...byFn.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([name, count]) => ({
-        name,
-        count,
-        pct: total > 0 ? Math.round((count / total) * 100) : 0,
-      }));
+    const topSources = (usageData?.top_sources ?? []).map((source) => ({
+      name: source.source,
+      count: source.count,
+      pct: source.pct,
+    }));
+
+    const trendByDay = new Map((usageData?.trend ?? []).map((row) => [row.day, row]));
+    const toDayKey = (date: Date) => {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, "0");
+      const d = String(date.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    };
 
     const trend = Array.from({ length: 7 }, (_, index) => ({
       label: index === 6 ? "Today" : `${6 - index}d`,
-      executions: 0,
-      computeMs: 0,
+      executions: (() => {
+        const day = new Date();
+        day.setDate(day.getDate() - (6 - index));
+        const row = trendByDay.get(toDayKey(day));
+        return row?.executions ?? 0;
+      })(),
+      computeMs: (() => {
+        const day = new Date();
+        day.setDate(day.getDate() - (6 - index));
+        const row = trendByDay.get(toDayKey(day));
+        return row?.compute_ms ?? 0;
+      })(),
     }));
-    const now = Date.now();
-    for (const execution of filteredExecutions) {
-      if (!execution.started_at) continue;
-      const daysAgo = Math.floor((now - new Date(execution.started_at).getTime()) / 86_400_000);
-      if (daysAgo >= 0 && daysAgo < 7) {
-        const bucket = trend[6 - daysAgo];
-        bucket.executions += 1;
-        bucket.computeMs += execution.duration_ms ?? 0;
-      }
-    }
 
-    const range = monthRange(billingPeriod);
+    const range = usageData?.range
+      ? {
+          start: new Date(usageData.range.start),
+          end: new Date(usageData.range.end),
+        }
+      : monthRange(billingPeriod);
     const monthDays = new Date(range.start.getFullYear(), range.start.getMonth() + 1, 0).getDate();
     const elapsedDays = billingPeriod === "mtd"
       ? Math.max(1, Math.ceil((range.end.getTime() - range.start.getTime()) / 86_400_000))
@@ -173,7 +187,7 @@ export default function UsagePage({
       projectedComputeMs: billingPeriod === "mtd" ? Math.round((totalComputeMs / elapsedDays) * monthDays) : totalComputeMs,
       projectedStorageBytes: billingPeriod === "mtd" ? Math.round((estimatedStorageBytes / elapsedDays) * monthDays) : estimatedStorageBytes,
     };
-  }, [billingPeriod, filteredExecutions]);
+  }, [billingPeriod, usageData]);
 
   const execPct = fmtPct(stats.total, limits.executions);
   const remainingExecutions = limits.executions > 0 ? Math.max(0, limits.executions - stats.total) : -1;
@@ -414,6 +428,11 @@ export default function UsagePage({
             <div className={`rounded-lg border px-3 py-2 mt-2 ${predictionTone}`}>
               <p className="text-[10px] font-black">{predictedOverLimit ? `You may exceed your ${plan.name} tier` : `You are safely within your ${plan.name} tier`}</p>
             </div>
+            {observabilityData && (
+              <p className="text-[10px] text-neutral-400 font-mono">
+                → Health ({observabilityData.health.severity}): {observabilityData.health.message}
+              </p>
+            )}
             <p className="text-[10px] text-neutral-400 font-mono">→ Estimated cost: ${projectedCost.toFixed(2)}</p>
             <p className="text-[10px] text-neutral-400 font-mono">→ Estimated storage: {fmtBytes(stats.projectedStorageBytes)}</p>
             <p className="text-[10px] text-neutral-400 font-mono">→ Estimated compute: {fmtMs(stats.projectedComputeMs)}</p>

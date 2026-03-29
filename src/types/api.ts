@@ -292,6 +292,57 @@ export interface ProjectOverviewResult {
   };
 }
 
+export interface ProjectUsageResult {
+  period: 'mtd' | 'lastMonth';
+  range: {
+    start: string;
+    end: string;
+  };
+  usage: {
+    total_executions: number;
+    failed_executions: number;
+    total_compute_ms: number;
+    avg_duration_ms: number;
+  };
+  top_sources: {
+    source: string;
+    count: number;
+    pct: number;
+  }[];
+  trend: {
+    day: string;
+    executions: number;
+    compute_ms: number;
+  }[];
+}
+
+export interface ProjectObservabilityResult {
+  health: {
+    severity: 'critical' | 'warning' | 'info' | 'healthy';
+    error_rate: number;
+    message: string;
+  };
+  last_24h: {
+    total: number;
+    errors: number;
+    p95_duration_ms: number;
+    avg_duration_ms: number;
+  };
+  top_failing_paths: {
+    path: string;
+    total: number;
+    errors: number;
+    error_rate: number;
+  }[];
+  top_issues: {
+    title: string;
+    fingerprint: string;
+    occurrence_count: number;
+    last_seen: string;
+    function_name: string;
+  }[];
+}
+
 export type IncidentStatus = 'active' | 'investigating' | 'resolved';
 
 export interface IncidentActivityEvent {
