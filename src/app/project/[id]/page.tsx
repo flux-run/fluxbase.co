@@ -14,9 +14,13 @@ import {
   ArrowRight,
   Flame,
   Target,
+  Sparkles,
+  PlayCircle,
+  Rocket,
+  Terminal,
 } from "lucide-react";
 import { useFluxApi } from "@/lib/api";
-import { ProjectOverviewResult } from "@/types/api";
+import { Execution, ProjectOverviewResult } from "@/types/api";
 
 function timeAgo(d: string) {
   const m = Math.floor((Date.now() - new Date(d).getTime()) / 60000);
@@ -67,7 +71,9 @@ export default function ProjectPage({
   const router = useRouter();
 
   const [overview, setOverview] = useState<ProjectOverviewResult | null>(null);
+  const [recentExecutions, setRecentExecutions] = useState<Execution[]>([]);
   const [loading, setLoading] = useState(true);
+  const [seeding, setSeeding] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
   const api = useFluxApi(id);
@@ -77,8 +83,12 @@ export default function ProjectPage({
       if (!api.ready) return;
       if (!silent) setLoading(true);
       try {
-        const data = await api.getProjectOverview(id);
+        const [data, execRows] = await Promise.all([
+          api.getProjectOverview(id),
+          api.getExecutions(id).catch(() => []),
+        ]);
         if (data) setOverview(data);
+        setRecentExecutions(Array.isArray(execRows) ? execRows : []);
         setLastRefreshed(new Date());
       } catch (e: unknown) {
         const err = e instanceof Error ? e : new Error(String(e));
@@ -101,6 +111,22 @@ export default function ProjectPage({
 
   const health = overview?.health;
   const isBroken = !!health && (health.activeIncidents > 0 || health.functionsFailing > 0);
+  const firstExecution = recentExecutions[0] ?? null;
+  const firstFailedExecution = recentExecutions.find((execution) => execution.status !== "ok" && execution.status !== "success") ?? null;
+  const activation = {
+    hasExecution: !!firstExecution,
+    hasFailure: !!firstFailedExecution,
+  };
+
+  const seedDemoTraffic = useCallback(async () => {
+    setSeeding(true);
+    try {
+      await api.seedProject(id);
+      await load(true);
+    } finally {
+      setSeeding(false);
+    }
+  }, [api, id, load]);
 
   // Group incidents by errorClass for cross-function display
   type IncidentGroup = {
@@ -309,6 +335,81 @@ export default function ProjectPage({
           >
             <RefreshCw className="w-3 h-3" />
           </button>
+        </div>
+      </div>
+
+      {/* ── ACTIVATION LOOP ─────────────────────────────────────────── */}
+      <div className="rounded-xl border border-blue-900/40 bg-blue-950/10 overflow-hidden">
+        <div className="px-4 py-3 border-b border-blue-900/30 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-3.5 h-3.5 text-blue-300" />
+            <p className="text-[10px] font-black uppercase tracking-widest text-blue-300">First failure activation</p>
+          </div>
+          <p className="text-[9px] text-neutral-500 font-mono">Goal: hit replay value in 5-10 min</p>
+        </div>
+        <div className="px-4 py-3 grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="rounded-lg border border-neutral-800/60 bg-black/20 p-3">
+            <p className="text-[9px] font-black text-white flex items-center gap-1.5"><Terminal className="w-3 h-3 text-blue-300" />1. Install CLI</p>
+            <p className="text-[9px] text-neutral-500 font-mono mt-1">Connect runtime and send your first request.</p>
+            <button
+              onClick={() => router.push("/docs/quickstart")}
+              className="mt-2 text-[9px] font-black text-blue-300 hover:text-blue-200 transition-colors"
+            >
+              Open quickstart -&gt;
+            </button>
+          </div>
+
+          <div className="rounded-lg border border-neutral-800/60 bg-black/20 p-3">
+            <p className="text-[9px] font-black text-white flex items-center gap-1.5"><Rocket className="w-3 h-3 text-emerald-300" />2. Capture execution</p>
+            <p className="text-[9px] text-neutral-500 font-mono mt-1">{activation.hasExecution ? "Execution captured successfully." : "No executions yet in this project."}</p>
+            {!activation.hasExecution ? (
+              <button
+                onClick={seedDemoTraffic}
+                disabled={seeding}
+                className="mt-2 text-[9px] font-black text-emerald-300 hover:text-emerald-200 transition-colors disabled:opacity-50"
+              >
+                {seeding ? "Generating..." : "Generate sample traffic ->"}
+              </button>
+            ) : (
+              <button
+                onClick={() => router.push(`/project/${id}/executions`)}
+                className="mt-2 text-[9px] font-black text-emerald-300 hover:text-emerald-200 transition-colors"
+              >
+                View executions -&gt;
+              </button>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-neutral-800/60 bg-black/20 p-3">
+            <p className="text-[9px] font-black text-white flex items-center gap-1.5"><PlayCircle className="w-3 h-3 text-amber-300" />3. Replay failure</p>
+            <p className="text-[9px] text-neutral-500 font-mono mt-1">{activation.hasFailure ? "Failure found - replay with full context." : "Trigger one failing request to unlock replay."}</p>
+            {activation.hasFailure ? (
+              <button
+                onClick={() => router.push(`/project/${id}/executions/${firstFailedExecution!.id}?onboarding=1`)}
+                className="mt-2 text-[9px] font-black text-amber-300 hover:text-amber-200 transition-colors"
+              >
+                Replay first failure -&gt;
+              </button>
+            ) : (
+              <button
+                onClick={() => router.push(`/project/${id}/functions`)}
+                className="mt-2 text-[9px] font-black text-amber-300 hover:text-amber-200 transition-colors"
+              >
+                Open functions -&gt;
+              </button>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-neutral-800/60 bg-black/20 p-3">
+            <p className="text-[9px] font-black text-white flex items-center gap-1.5"><TrendingUp className="w-3 h-3 text-violet-300" />4. Upgrade trigger</p>
+            <p className="text-[9px] text-neutral-500 font-mono mt-1">See usage-driven upgrade context after replay.</p>
+            <button
+              onClick={() => router.push(`/project/${id}/usage?fromReplay=1`)}
+              className="mt-2 text-[9px] font-black text-violet-300 hover:text-violet-200 transition-colors"
+            >
+              Go to usage triggers -&gt;
+            </button>
+          </div>
         </div>
       </div>
 

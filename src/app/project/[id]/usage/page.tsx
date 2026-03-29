@@ -1,5 +1,6 @@
 "use client";
 import { use, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { ArrowRight, Zap, CheckCircle2, AlertTriangle, TrendingUp, Clock, Database, DollarSign, ExternalLink } from "lucide-react";
 import { useFluxApi } from "@/lib/api";
 import { ProjectObservabilityResult, ProjectUsageResult } from "@/types/api";
@@ -89,7 +90,9 @@ export default function UsagePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const searchParams = useSearchParams();
   const api = useFluxApi(id); 
+  const fromReplay = searchParams.get("fromReplay") === "1";
 
   const [usageData, setUsageData] = useState<ProjectUsageResult | null>(null);
   const [observabilityData, setObservabilityData] = useState<ProjectObservabilityResult | null>(null);
@@ -340,6 +343,13 @@ export default function UsagePage({
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300 pb-16">
+      {fromReplay && (
+        <div className="rounded-xl border border-emerald-800/40 bg-emerald-950/20 px-4 py-3">
+          <p className="text-[10px] font-black uppercase tracking-widest text-emerald-300">Replay completed</p>
+          <p className="text-[11px] text-emerald-100 mt-1 font-mono">You just hit the value moment: failure replay with full context. This page shows when to unlock full replay for production debugging.</p>
+        </div>
+      )}
+
       <div className="rounded-xl border border-neutral-800/60 bg-neutral-950/60 overflow-hidden">
         <div className="px-5 py-4 flex items-start justify-between gap-4 border-b border-neutral-800/40">
           <div>
