@@ -211,6 +211,7 @@ export default function UsagePage({
   const predictionTone = predictedOverLimit
     ? "text-amber-300 bg-amber-950/15 border-amber-800/40"
     : "text-emerald-300 bg-emerald-950/15 border-emerald-800/40";
+  const includedLabel = CURRENT_PLAN === "free" ? "(Free)" : "(Included in plan)";
 
   if (loading) {
     return (
@@ -277,14 +278,18 @@ export default function UsagePage({
               </div>
               {limits.executions > 0 && <UsageBar pct={execPct} />}
             </div>
-            <p className="text-[9px] text-neutral-600 font-mono mt-3">No charges until you exceed free tier. No credit card required.</p>
+            <p className="text-[9px] text-neutral-600 font-mono mt-3">
+              {CURRENT_PLAN === "free"
+                ? "No charges until you exceed free tier. No credit card required."
+                : "No surprise billing. You always see usage before you pay."}
+            </p>
           </div>
 
           <div className="rounded-lg border border-neutral-800/50 bg-black/30 px-4 py-4 space-y-2">
             <p className="text-[8px] font-black uppercase tracking-widest text-neutral-600">What you&apos;re paying for</p>
-            <MetaRow label="Executions" value={`${stats.total.toLocaleString()} ${CURRENT_PLAN === "free" ? "(Free)" : "$0.00"}`} />
-            <MetaRow label="Compute time" value={`${fmtMs(stats.totalComputeMs)} ${CURRENT_PLAN === "free" ? "(Free)" : "$0.00"}`} />
-            <MetaRow label="Storage (est.)" value={`${fmtBytes(stats.estimatedStorageBytes)} ${CURRENT_PLAN === "free" ? "(Free)" : "$0.00"}`} />
+            <MetaRow label="Executions" value={`${stats.total.toLocaleString()} ${includedLabel}`} />
+            <MetaRow label="Compute time" value={`${fmtMs(stats.totalComputeMs)} ${includedLabel}`} />
+            <MetaRow label="Storage (est.)" value={`${fmtBytes(stats.estimatedStorageBytes)} ${includedLabel}`} />
             {primaryUsageSource && (
               <div className="pt-2 border-t border-neutral-800/40">
                 <p className="text-[8px] font-black uppercase tracking-widest text-neutral-700 mb-1">Most usage comes from</p>
@@ -318,7 +323,7 @@ export default function UsagePage({
           <TrendingUp className="w-4 h-4 text-amber-400 shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-black text-amber-300">You are approaching your monthly limit</p>
-            <p className="text-[10px] text-neutral-500 font-mono mt-0.5">{remainingExecutions.toLocaleString()} executions remain before the free tier cap.</p>
+            <p className="text-[10px] text-neutral-500 font-mono mt-0.5">{remainingExecutions.toLocaleString()} executions remain before your {plan.name} tier cap.</p>
           </div>
           {nextPlan && (
             <a href="/pricing" className="shrink-0 flex items-center gap-1.5 text-[9px] font-black text-amber-400 hover:text-amber-300 border border-amber-800/50 hover:border-amber-700 rounded-lg px-3 py-1.5 transition-colors">
@@ -407,14 +412,14 @@ export default function UsagePage({
             <p className="text-sm font-black text-white">At current usage</p>
             <p className="text-[10px] text-neutral-400 font-mono">→ You will use ~{fmtNum(stats.projectedExecutions)} executions this month</p>
             <div className={`rounded-lg border px-3 py-2 mt-2 ${predictionTone}`}>
-              <p className="text-[10px] font-black">{predictedOverLimit ? "You may exceed free tier" : "You are safely within free tier"}</p>
+              <p className="text-[10px] font-black">{predictedOverLimit ? `You may exceed your ${plan.name} tier` : `You are safely within your ${plan.name} tier`}</p>
             </div>
             <p className="text-[10px] text-neutral-400 font-mono">→ Estimated cost: ${projectedCost.toFixed(2)}</p>
             <p className="text-[10px] text-neutral-400 font-mono">→ Estimated storage: {fmtBytes(stats.projectedStorageBytes)}</p>
             <p className="text-[10px] text-neutral-400 font-mono">→ Estimated compute: {fmtMs(stats.projectedComputeMs)}</p>
             {predictedOverLimit && daysUntilLimit !== null && (
               <div className="mt-3 rounded-lg border border-amber-800/40 bg-amber-950/15 px-3 py-2">
-                <p className="text-[10px] font-black text-amber-300">You may exceed the free tier soon</p>
+                <p className="text-[10px] font-black text-amber-300">You may exceed your {plan.name} tier soon</p>
                 <p className="text-[9px] text-neutral-500 font-mono mt-1">At the current pace, you may hit the limit in ~{daysUntilLimit} day{daysUntilLimit === 1 ? "" : "s"}.</p>
               </div>
             )}
