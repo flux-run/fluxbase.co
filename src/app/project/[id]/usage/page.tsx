@@ -202,6 +202,15 @@ export default function UsagePage({
         : "text-emerald-400 bg-emerald-950/40 border-emerald-800/40";
   const maxExecTrend = Math.max(1, ...stats.trend.map((point) => point.executions));
   const maxComputeTrend = Math.max(1, ...stats.trend.map((point) => point.computeMs));
+  const primaryUsageSource = stats.topSources[0] ?? null;
+  const usagePaceLabel = predictedOverLimit && daysUntilLimit !== null
+    ? `At this pace, you will exceed your limit in ~${daysUntilLimit} day${daysUntilLimit === 1 ? "" : "s"}`
+    : limits.executions > 0
+      ? "At this pace, you will stay within your limit this month"
+      : "At this pace, your plan has headroom for continued growth";
+  const predictionTone = predictedOverLimit
+    ? "text-amber-300 bg-amber-950/15 border-amber-800/40"
+    : "text-emerald-300 bg-emerald-950/15 border-emerald-800/40";
 
   if (loading) {
     return (
@@ -260,18 +269,28 @@ export default function UsagePage({
                   <p className="text-sm font-black text-white mt-1">
                     {limits.executions > 0 ? `${remainingExecutions.toLocaleString()} executions remaining this month` : "Unlimited executions on this plan"}
                   </p>
+                  <p className={`text-[10px] font-mono mt-1 ${predictedOverLimit ? "text-amber-400/90" : "text-emerald-400/90"}`}>
+                    {usagePaceLabel}
+                  </p>
                 </div>
                 <span className={`text-[10px] font-black ${execPct >= 90 ? "text-red-400" : execPct >= 70 ? "text-amber-400" : "text-emerald-400"}`}>{limits.executions > 0 ? `${execPct}% used` : "No cap"}</span>
               </div>
               {limits.executions > 0 && <UsageBar pct={execPct} />}
             </div>
+            <p className="text-[9px] text-neutral-600 font-mono mt-3">No charges until you exceed free tier. No credit card required.</p>
           </div>
 
           <div className="rounded-lg border border-neutral-800/50 bg-black/30 px-4 py-4 space-y-2">
-            <p className="text-[8px] font-black uppercase tracking-widest text-neutral-600">Cost drivers</p>
+            <p className="text-[8px] font-black uppercase tracking-widest text-neutral-600">What you&apos;re paying for</p>
             <MetaRow label="Executions" value={`${stats.total.toLocaleString()} ${CURRENT_PLAN === "free" ? "(Free)" : "$0.00"}`} />
             <MetaRow label="Compute time" value={`${fmtMs(stats.totalComputeMs)} ${CURRENT_PLAN === "free" ? "(Free)" : "$0.00"}`} />
             <MetaRow label="Storage (est.)" value={`${fmtBytes(stats.estimatedStorageBytes)} ${CURRENT_PLAN === "free" ? "(Free)" : "$0.00"}`} />
+            {primaryUsageSource && (
+              <div className="pt-2 border-t border-neutral-800/40">
+                <p className="text-[8px] font-black uppercase tracking-widest text-neutral-700 mb-1">Most usage comes from</p>
+                <p className="text-[10px] font-mono text-neutral-300 truncate">{primaryUsageSource.name} <span className="text-neutral-600">→ {primaryUsageSource.pct}%</span></p>
+              </div>
+            )}
             <div className="flex items-center justify-between pt-2">
               <span className="text-[10px] font-black text-white">Total</span>
               <span className="text-[14px] font-black text-white tabular-nums">${estimatedCost.toFixed(2)}</span>
@@ -351,7 +370,6 @@ export default function UsagePage({
             <span className="text-[9px] font-black uppercase tracking-widest text-neutral-500">Cost Breakdown</span>
           </div>
           <div className="px-4 py-3">
-            <p className="text-[9px] text-neutral-600 font-mono mb-3">Clear pricing logic builds trust.</p>
             <div className="space-y-0 divide-y divide-neutral-800/30">
               <div className="flex justify-between items-center py-2">
                 <span className="text-[10px] font-mono text-neutral-500">Base plan ({plan.name})</span>
@@ -386,8 +404,11 @@ export default function UsagePage({
             <span className="text-[9px] font-black uppercase tracking-widest text-neutral-500">Prediction</span>
           </div>
           <div className="px-4 py-3 space-y-2">
-            <p className="text-sm font-black text-white">At current usage:</p>
+            <p className="text-sm font-black text-white">At current usage</p>
             <p className="text-[10px] text-neutral-400 font-mono">→ You will use ~{fmtNum(stats.projectedExecutions)} executions this month</p>
+            <div className={`rounded-lg border px-3 py-2 mt-2 ${predictionTone}`}>
+              <p className="text-[10px] font-black">{predictedOverLimit ? "You may exceed free tier" : "You are safely within free tier"}</p>
+            </div>
             <p className="text-[10px] text-neutral-400 font-mono">→ Estimated cost: ${projectedCost.toFixed(2)}</p>
             <p className="text-[10px] text-neutral-400 font-mono">→ Estimated storage: {fmtBytes(stats.projectedStorageBytes)}</p>
             <p className="text-[10px] text-neutral-400 font-mono">→ Estimated compute: {fmtMs(stats.projectedComputeMs)}</p>
@@ -412,6 +433,10 @@ export default function UsagePage({
                 <span className="text-[8px] font-black uppercase tracking-widest text-neutral-700">Executions / day</span>
                 <span className="text-[8px] text-neutral-600 font-mono">last 7 days</span>
               </div>
+              <div className="flex items-center gap-4 mb-3 text-[9px] font-mono text-neutral-500">
+                <span>Today: {stats.trend[6]?.executions ?? 0} executions</span>
+                <span>Yesterday: {stats.trend[5]?.executions ?? 0}</span>
+              </div>
               <div className="grid grid-cols-7 gap-2 items-end h-28">
                 {stats.trend.map((point) => (
                   <div key={`exec-${point.label}`} className="flex flex-col items-center gap-1 h-full justify-end">
@@ -427,6 +452,10 @@ export default function UsagePage({
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[8px] font-black uppercase tracking-widest text-neutral-700">Compute / day</span>
                 <span className="text-[8px] text-neutral-600 font-mono">runtime trend</span>
+              </div>
+              <div className="flex items-center gap-4 mb-3 text-[9px] font-mono text-neutral-500">
+                <span>Today: {fmtMs(stats.trend[6]?.computeMs ?? 0)}</span>
+                <span>Yesterday: {fmtMs(stats.trend[5]?.computeMs ?? 0)}</span>
               </div>
               <div className="grid grid-cols-7 gap-2 items-end h-24">
                 {stats.trend.map((point) => (
@@ -490,11 +519,11 @@ export default function UsagePage({
           <div className="px-5 py-4 flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-black text-white">Upgrade to {nextPlan.name}{nextPlan.price !== null && nextPlan.price > 0 && <span className="text-neutral-500 font-bold text-[11px] ml-1.5">${nextPlan.price}/mo</span>}</p>
-              <p className="text-[10px] text-neutral-500 font-mono mt-0.5 max-w-sm">{nextPlan.tagline}</p>
+              <p className="text-[10px] text-neutral-500 font-mono mt-0.5 max-w-sm">You&apos;ll need this as your usage grows.</p>
               <div className="flex items-center gap-4 mt-2 flex-wrap">
                 <span className="flex items-center gap-1 text-[9px] text-neutral-400 font-mono"><CheckCircle2 className="w-2.5 h-2.5 text-emerald-500/60" />{LIMITS[nextPlan.id].executions === -1 ? "Unlimited" : fmtNum(LIMITS[nextPlan.id].executions)} executions / month</span>
                 <span className="flex items-center gap-1 text-[9px] text-neutral-400 font-mono"><CheckCircle2 className="w-2.5 h-2.5 text-emerald-500/60" />{LIMITS[nextPlan.id].retentionDays === -1 ? "Custom" : `${LIMITS[nextPlan.id].retentionDays}-day`} retention</span>
-                <span className="flex items-center gap-1 text-[9px] text-neutral-400 font-mono"><CheckCircle2 className="w-2.5 h-2.5 text-emerald-500/60" />{LIMITS[nextPlan.id].members === -1 ? "Unlimited" : LIMITS[nextPlan.id].members} team members</span>
+                <span className="flex items-center gap-1 text-[9px] text-neutral-400 font-mono"><CheckCircle2 className="w-2.5 h-2.5 text-emerald-500/60" />team collaboration</span>
               </div>
               {billingPeriod === "mtd" && daysUntilLimit !== null && execPct >= 20 && (
                 <p className="text-[9px] text-blue-300/80 font-mono mt-2">You may need this in ~{daysUntilLimit} day{daysUntilLimit === 1 ? "" : "s"} at the current pace.</p>
