@@ -25,7 +25,7 @@ function formatExec(n: number): string {
 }
 
 function recommend(executions: number): { plan: string; price: number; overage: number } {
-  if (executions <= 5_000) return { plan: 'Free', price: 0, overage: 0 }
+  if (executions <= 3_000) return { plan: 'Free', price: 0, overage: 0 }
   if (executions <= 1_000_000) return { plan: 'Builder', price: 19, overage: 0 }
   if (executions <= 5_000_000) return { plan: 'Pro', price: 49, overage: 0 }
   const overageUnits = Math.ceil((executions - 5_000_000) / 1_000_000)
@@ -122,10 +122,17 @@ export function PriceCalculator() {
         </div>
       </div>
 
+      {/* Smart usage label */}
+      <div style={{ fontSize: '.78rem', fontWeight: 600, marginTop: 12, color: overage > 0 ? '#f59e0b' : '#10b981' }}>
+        {overage > 0
+          ? `You may exceed the ${plan} plan's included volume — soft overage applies.`
+          : `You'll stay within the ${plan} plan at this volume.`}
+      </div>
+
       {/* Pricing clarification */}
       {plan === 'Free' && (
         <p style={{ fontSize: '.78rem', color: 'var(--mg-muted)', marginTop: 14, margin: '14px 0 0' }}>
-          Free forever — no credit card required up to 5K executions/mo.
+          Free forever — no credit card required up to 3K executions/mo.
         </p>
       )}
       {plan !== 'Free' && overage === 0 && (

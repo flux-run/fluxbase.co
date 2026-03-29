@@ -147,11 +147,11 @@ export default function PricingPage() {
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <span>Storage retained</span>
-                  <span className="font-mono text-neutral-500">usage-based</span>
+                  <span className="font-mono text-neutral-400">~$0.05 / GB·mo</span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <span>Compute time</span>
-                  <span className="font-mono text-neutral-500">usage-based</span>
+                  <span className="font-mono text-neutral-400">~$0.001 / ms</span>
                 </div>
               </div>
               <p className="text-[11px] text-neutral-500 mt-4 leading-relaxed">
@@ -167,6 +167,23 @@ export default function PricingPage() {
                   The tiers are generous enough to hit the aha moment, but shaped around critical-path debugging, replay, and incident response rather than replacing your entire application runtime.
                 </p>
               </div>
+            </div>
+
+            <div className="rounded-xl border border-neutral-800 bg-black/40 p-5">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-600 mb-3">Unlike traditional tools</p>
+              <ul className="space-y-2.5">
+                {[
+                  "No per-event pricing",
+                  "No noisy logs billing",
+                  "Only real execution cost",
+                ].map((item) => (
+                  <li key={item} className="flex items-center gap-2.5 text-[11px] font-medium text-neutral-400">
+                    <Check className="w-3 h-3 text-emerald-400 shrink-0" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-[10px] text-neutral-600 mt-3 font-medium">Simple, predictable pricing as you scale.</p>
             </div>
           </div>
 

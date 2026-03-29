@@ -33,7 +33,7 @@ export interface PricingTier {
 
 export const LIMITS = {
   free: {
-    executions: 5_000,
+    executions: 3_000,
     retentionDays: 14,
     projects: 1,
     environments: 1,
@@ -88,10 +88,10 @@ export const PRICING_TIERS: PricingTier[] = [
     price: 0,
     period: '/month',
     tagline: 'Debug your code without paying anything.',
-    cta: 'Start free',
+    cta: 'Debug your first failure',
     ctaHref: '/login',
     features: [
-      { label: 'Executions recorded', value: '5K / mo' },
+      { label: 'Executions recorded', value: '3K / mo' },
       { label: 'Trace retention', value: '14 days' },
       { label: 'Projects', value: '1' },
       { label: 'Team members', value: '3' },
@@ -107,7 +107,7 @@ export const PRICING_TIERS: PricingTier[] = [
     price: 19,
     period: '/month',
     tagline: 'Ship to production with full visibility.',
-    cta: 'Get Builder',
+    cta: 'Ship to production',
     ctaHref: '/login',
     popular: true,
     features: [
@@ -135,7 +135,9 @@ export const PRICING_TIERS: PricingTier[] = [
       { label: 'Projects', value: 'Unlimited' },
       { label: 'Team members', value: 'Unlimited' },
       { label: 'Advanced incident grouping', value: true },
-      { label: 'Slack + webhook alerts', value: true },
+      { label: 'Priority incident alerts', value: true },
+      { label: 'Priority execution queue', value: true },
+      { label: '99.9% uptime SLA', value: true },
       { label: 'Detailed usage analytics', value: true },
       { label: 'API access', value: true },
     ],
