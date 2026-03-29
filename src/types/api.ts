@@ -300,6 +300,13 @@ export interface IncidentActivityEvent {
   text: string;
   actor?: string;
   actor_id?: string;
+  metadata?: {
+    command?: string;
+    success?: boolean;
+    previous_state?: string;
+    next_state?: string;
+    duration_ms?: number;
+  };
   ts: string;
 }
 

@@ -1,7 +1,7 @@
 "use client";
 import { use, useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, CheckCircle2, AlertTriangle, Info, Zap, Terminal, MessageSquare, Clock, Bot, ChevronDown } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, AlertTriangle, Info, Zap, Terminal, MessageSquare, Clock, Bot, ChevronDown, XCircle } from "lucide-react";
 import { useFluxApi } from "@/lib/api";
 import { ProjectOverviewResult, Execution, IncidentStatus, IncidentActivityEvent } from "@/types/api";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -123,6 +123,21 @@ function formatTs(ts: string) {
   const d = new Date(ts);
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' · ' +
     d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+function dedupeActivity(events: ActivityEvent[]): ActivityEvent[] {
+  const out: ActivityEvent[] = [];
+  for (const ev of events) {
+    const last = out[out.length - 1];
+    if (
+      last &&
+      last.type === ev.type &&
+      last.text === ev.text &&
+      Math.abs(new Date(ev.ts).getTime() - new Date(last.ts).getTime()) < 10_000
+    ) continue;
+    out.push(ev);
+  }
+  return out;
 }
 
 function generateSuggestedFix(errorClass: string, title: string): { summary: string; causes: string[]; actions: string[] } | null {
@@ -342,6 +357,34 @@ export default function IncidentDetailPage({
     },
   });
 
+  const nextAction = useMemo(() => {
+    if (!ownerId) return { label: 'Assign this incident (common first step)', command: '/assign @' };
+    if (incidentStatus === 'active') return { label: 'Start investigating this incident', command: '/investigate' };
+    if (incidentStatus === 'investigating') return { label: 'Mark resolved once fix is deployed', command: '/resolve' };
+    return null;
+  }, [ownerId, incidentStatus]);
+
+  const commandPreview = useMemo(() => {
+    if (!commentDraft.startsWith('/')) return null;
+    const assignMatch = commentDraft.match(/^\/assign\s+@?(.+)/i);
+    if (assignMatch) {
+      const assignee = assignMatch[1].trim();
+      if (!assignee) return null;
+      const assigneeId = userIdByName.get(assignee.toLowerCase()) ?? '';
+      if (assigneeId) {
+        const name = userById.get(assigneeId)?.name ?? assignee;
+        return { text: `\u2192 Assign incident to ${name}`, valid: true };
+      }
+      return { text: `\u2192 Assign to \u201c${assignee}\u201d \u2014 user not found`, valid: false };
+    }
+    if (/^\/resolve\b/i.test(commentDraft)) return { text: '\u2192 Mark as Resolved', valid: true };
+    if (/^\/invest(igate)?\b/i.test(commentDraft)) return { text: '\u2192 Mark as Investigating', valid: true };
+    if (/^\/reopen\b/i.test(commentDraft)) return { text: '\u2192 Reopen incident', valid: true };
+    const noteMatch = commentDraft.match(/^\/note\s+(.+)/i);
+    if (noteMatch) return { text: `\u2192 Add note: \u201c${noteMatch[1].trim()}\u201d`, valid: true };
+    return null;
+  }, [commentDraft, userIdByName, userById]);
+
   const group = useMemo(() => {
     if (!overview?.incidents) return null;
     const incs = overview.incidents.filter(i => i.title === title);
@@ -465,6 +508,7 @@ export default function IncidentDetailPage({
       text: `Status changed: ${fromLabel} → ${toLabel}`,
       actor: viewerName || 'You',
       actor_id: viewerId ?? undefined,
+      metadata: { command: options?.sourceCommand, success: true, previous_state: incidentStatus, next_state: s },
       ts: new Date().toISOString(),
     }];
     if (s === 'resolved' && group) {
@@ -522,6 +566,7 @@ export default function IncidentDetailPage({
             ? `removed ${previousOwnerName}`
             : 'removed owner',
         actor,
+        metadata: { command: 'assign', success: true, previous_state: previousOwnerName || undefined, next_state: undefined },
         ts: new Date().toISOString(),
       };
       persistActivity([...currentActivity, unassignEv]);
@@ -533,6 +578,7 @@ export default function IncidentDetailPage({
       type: 'system',
       text: `assigned to ${nextOwnerName}`,
       actor,
+      metadata: { command: 'assign', success: true, previous_state: previousOwnerName || undefined, next_state: nextOwnerName },
       ts: new Date().toISOString(),
     };
     persistActivity([...currentActivity, ev]);
@@ -559,6 +605,7 @@ export default function IncidentDetailPage({
           type: 'system',
           text: `could not assign: user '${assignee}' not found`,
           actor: 'System',
+          metadata: { command: 'assign', success: false },
           ts: new Date().toISOString(),
         };
         persistActivity([...currentActivity, ev]);
@@ -1498,10 +1545,13 @@ export default function IncidentDetailPage({
               </div>
             </div>
           )}
-          {[...activity].reverse().map((event, idx, arr) => {
-            // is this a human-attributed system event?
-            const isHumanAction = event.type === 'system' && !!event.actor;
-            const isSystemAuto  = event.type === 'system' && !event.actor;
+          {dedupeActivity([...activity]).reverse().map((event, idx, arr) => {
+            // error events: command explicitly failed
+            const isErrorEvent  = event.metadata?.success === false || /^could not /i.test(event.text);
+            // human-attributed: real user actor (not bare 'System' label, not errors)
+            const isHumanAction = !isErrorEvent && event.type === 'system' && !!event.actor && event.actor !== 'System';
+            // automated system with no real actor
+            const isSystemAuto  = !isErrorEvent && event.type === 'system' && (!event.actor || event.actor === 'System');
             const isComment     = event.type === 'comment';
             const isAi          = event.type === 'ai';
             const actorLabel = event.actor === 'You' ? viewerName : (event.actor ?? '?');
@@ -1514,7 +1564,11 @@ export default function IncidentDetailPage({
                   <div className="absolute left-[11px] top-6 bottom-0 w-px bg-neutral-800/50" />
                 )}
                 {/* avatar / dot */}
-                {(isHumanAction || isComment) ? (
+                {isErrorEvent ? (
+                  <div className="mt-0.5 shrink-0 w-[22px] h-[22px] rounded-full bg-red-950/60 border border-red-900/50 flex items-center justify-center z-10">
+                    <XCircle className="w-2.5 h-2.5 text-red-400" />
+                  </div>
+                ) : (isHumanAction || isComment) ? (
                   <div className={`mt-0.5 shrink-0 w-[22px] h-[22px] rounded-full flex items-center justify-center z-10 text-[8px] font-black ${
                     event.actor ? avatarColor(actorLabel) : 'bg-emerald-950/60 border border-emerald-800/60 text-emerald-300'
                   }`}>
@@ -1525,41 +1579,55 @@ export default function IncidentDetailPage({
                     <Bot className="w-2.5 h-2.5 text-cyan-400" />
                   </div>
                 ) : (
-                  <div className="mt-0.5 shrink-0 w-[22px] h-[22px] rounded-full bg-blue-950/30 border border-blue-900/40 flex items-center justify-center z-10">
-                    <Clock className="w-2.5 h-2.5 text-blue-500/70" />
+                  <div className="mt-0.5 shrink-0 w-[22px] h-[22px] rounded-full bg-neutral-900/40 border border-neutral-800/30 flex items-center justify-center z-10">
+                    <Clock className="w-2 h-2 text-neutral-700" />
                   </div>
                 )}
 
                 {/* content */}
-                <div className={`flex-1 pb-4 min-w-0 ${isAi ? 'bg-cyan-950/10 border border-cyan-900/20 rounded-lg px-3 py-2 -ml-1 mb-3' : isSystemAuto ? 'bg-neutral-900/20 border border-neutral-800/20 rounded-lg px-3 py-2 -ml-1 mb-2' : ''}`}>
-                  <div className="flex items-baseline gap-1.5 flex-wrap">
-                    {/* actor name */}
-                    {(isHumanAction || isComment) && event.actor && (
-                      <span className={`text-[10px] font-black ${isComment ? 'text-emerald-300' : 'text-white'}`}>
-                        {actorLabel}
-                      </span>
-                    )}
-                    {isSystemAuto && (
-                      <span className="text-[10px] font-black text-neutral-500">System</span>
-                    )}
-                    {isAi && (
-                      <span className="text-[10px] font-black text-cyan-400">Flux AI</span>
-                    )}
-                    {/* action separator for system events */}
-                    {(isSystemAuto || isHumanAction) && (
-                      <span className={`text-[9px] ${isSystemAuto ? 'text-neutral-700' : 'text-neutral-600'}`}>—</span>
-                    )}
-                    {/* event text */}
-                    <span className={`text-[10px] font-mono leading-relaxed ${
-                      isSystemAuto  ? 'text-neutral-500'
-                      : isHumanAction ? 'text-neutral-300'
-                      : isComment ? 'text-neutral-200'
-                      : isAi          ? 'text-neutral-300'
-                      : 'text-neutral-300'
-                    }`}>{event.text}</span>
-                    {/* timestamp */}
-                    <span className={`text-[9px] font-mono shrink-0 ml-auto ${isSystemAuto ? 'text-neutral-700' : 'text-neutral-700'}`}>{formatTs(event.ts)}</span>
-                  </div>
+                <div className={`flex-1 pb-4 min-w-0 ${
+                  isErrorEvent  ? 'bg-red-950/15 border border-red-900/30 rounded-lg px-3 py-2 -ml-1 mb-3'
+                  : isAi        ? 'bg-cyan-950/10 border border-cyan-900/20 rounded-lg px-3 py-2 -ml-1 mb-3'
+                  : isSystemAuto ? 'pb-2'
+                  : ''
+                }`}>
+                  {isErrorEvent ? (
+                    <div className="flex items-baseline gap-1.5 flex-wrap">
+                      <span className="text-[10px] font-black text-red-400">Command failed</span>
+                      <span className="text-[9px] text-neutral-700">—</span>
+                      <span className="text-[9px] font-mono text-red-300/70 leading-relaxed">{event.text}</span>
+                      <span className="text-[9px] font-mono shrink-0 ml-auto text-neutral-700">{formatTs(event.ts)}</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-baseline gap-1.5 flex-wrap">
+                      {/* actor name */}
+                      {(isHumanAction || isComment) && event.actor && (
+                        <span className={`text-[10px] font-black ${isComment ? 'text-emerald-300' : 'text-white'}`}>
+                          {actorLabel}
+                        </span>
+                      )}
+                      {isSystemAuto && (
+                        <span className="text-[9px] font-black text-neutral-600">System</span>
+                      )}
+                      {isAi && (
+                        <span className="text-[10px] font-black text-cyan-400">Flux AI</span>
+                      )}
+                      {/* action separator for system events */}
+                      {(isSystemAuto || isHumanAction) && (
+                        <span className={`text-[9px] ${isSystemAuto ? 'text-neutral-700' : 'text-neutral-600'}`}>—</span>
+                      )}
+                      {/* event text */}
+                      <span className={`font-mono leading-relaxed ${
+                        isSystemAuto  ? 'text-[9px] text-neutral-600'
+                        : isHumanAction ? 'text-[10px] text-neutral-300'
+                        : isComment     ? 'text-[10px] text-neutral-200'
+                        : isAi          ? 'text-[10px] text-neutral-300'
+                        : 'text-[10px] text-neutral-300'
+                      }`}>{event.text}</span>
+                      {/* timestamp */}
+                      <span className={`text-[9px] font-mono shrink-0 ml-auto ${isSystemAuto ? 'text-neutral-700' : 'text-neutral-700'}`}>{formatTs(event.ts)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -1604,6 +1672,19 @@ export default function IncidentDetailPage({
               </button>
             )}
           </div>
+          {/* Next Best Action hint */}
+          {nextAction && !commentDraft && (
+            <div className="flex items-center gap-2 px-1">
+              <span className="text-[10px] text-cyan-500/60">💡</span>
+              <span className="text-[9px] text-neutral-600 font-mono">{nextAction.label}</span>
+              <button
+                onClick={() => { setCommentDraft(nextAction.command); requestAnimationFrame(() => commentInputRef.current?.focus()); }}
+                className="text-[9px] font-mono text-cyan-600 hover:text-cyan-400 border border-cyan-900/40 hover:border-cyan-700/60 rounded px-1.5 py-0.5 transition-colors shrink-0"
+              >
+                {nextAction.command}
+              </button>
+            </div>
+          )}
           {/* Comment box */}
           <div className="flex gap-2 items-end">
             <div className="flex-1">
@@ -1658,6 +1739,14 @@ export default function IncidentDetailPage({
                     </button>
                   ))}
                 </div>
+              )}
+              {/* Inline command preview */}
+              {commandPreview && !commandAutocomplete.isVisible && !mentionAutocomplete.isVisible && (
+                <p className={`text-[9px] font-mono px-1 mt-1 ${
+                  commandPreview.valid ? 'text-cyan-600' : 'text-amber-600/80'
+                }`}>
+                  {commandPreview.text}
+                </p>
               )}
             </div>
             <button
