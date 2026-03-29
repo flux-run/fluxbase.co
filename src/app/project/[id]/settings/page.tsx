@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { AlertChannel, ServiceToken } from "@/types/api";
+import { AlertChannel, AlertRules, ServiceToken } from "@/types/api";
 import { useFluxApi } from "@/lib/api";
 import { formatDistanceToNow } from "date-fns";
 
@@ -19,11 +19,23 @@ export default function ProjectSettings({ params }: { params: Promise<{ id: stri
   const [channelType, setChannelType] = useState<"webhook" | "email" | "slack">("webhook");
   const [channelTarget, setChannelTarget] = useState("");
   const [channelLabel, setChannelLabel] = useState("");
+  const [alertRules, setAlertRules] = useState<AlertRules>({
+    high_error_rate: { enabled: true, threshold_pct: 10, window_min: 15 },
+    new_incident: { enabled: true },
+    failure_spike: { enabled: false, multiplier: 2, window_min: 15 },
+  });
+  const [savingRules, setSavingRules] = useState(false);
 
   useEffect(() => {
     if (!api.ready) return;
-    api.getAlertChannels(id)
-      .then((channels) => setAlertChannels(Array.isArray(channels) ? channels : []))
+    Promise.all([
+      api.getAlertChannels(id),
+      api.getAlertRules(id),
+    ])
+      .then(([channels, rules]) => {
+        setAlertChannels(Array.isArray(channels) ? channels : []);
+        if (rules) setAlertRules(rules);
+      })
       .finally(() => setAlertsLoading(false));
   }, [api, api.ready, id]);
 
@@ -82,6 +94,19 @@ export default function ProjectSettings({ params }: { params: Promise<{ id: stri
     } catch (err) {
       console.error("Failed to send test alert:", err);
       alert("Failed to send test alert.");
+    }
+  };
+
+  const persistAlertRules = async (next: AlertRules) => {
+    setAlertRules(next);
+    setSavingRules(true);
+    try {
+      await api.saveAlertRules(next, id);
+    } catch (err) {
+      console.error("Failed to save alert rules:", err);
+      alert("Failed to save alert rules.");
+    } finally {
+      setSavingRules(false);
     }
   };
 
@@ -194,6 +219,132 @@ export default function ProjectSettings({ params }: { params: Promise<{ id: stri
               </div>
             ))
           )}
+        </CardContent>
+      </Card>
+
+      <Card className="bg-[#111] border-neutral-900 shadow-xl overflow-hidden">
+        <CardHeader className="border-b border-neutral-900/50 pb-6">
+          <CardTitle className="text-sm font-bold uppercase tracking-widest text-neutral-500">Alert Rules</CardTitle>
+          <CardDescription className="text-xs text-neutral-600 font-medium italic">
+            Define what should trigger notifications.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pt-6 space-y-5">
+          <div className="rounded-lg border border-neutral-900 bg-black p-4 space-y-2">
+            <Label className="flex items-center gap-2 text-[11px] font-bold text-neutral-300">
+              <input
+                type="checkbox"
+                checked={alertRules.high_error_rate.enabled}
+                onChange={(e) => persistAlertRules({
+                  ...alertRules,
+                  high_error_rate: { ...alertRules.high_error_rate, enabled: e.target.checked },
+                })}
+              />
+              High error rate
+            </Label>
+            <p className="text-[10px] text-neutral-600 font-mono">Trigger when error rate exceeds threshold in rolling window.</p>
+            <div className="flex items-center gap-2 text-[10px] text-neutral-500 font-mono">
+              <span>&gt;</span>
+              <Input
+                type="number"
+                value={alertRules.high_error_rate.threshold_pct}
+                min={1}
+                max={100}
+                className="w-20 h-8 bg-neutral-950 border-neutral-800"
+                onChange={(e) => persistAlertRules({
+                  ...alertRules,
+                  high_error_rate: {
+                    ...alertRules.high_error_rate,
+                    threshold_pct: Math.max(1, Math.min(100, Number(e.target.value || 10))),
+                  },
+                })}
+              />
+              <span>% in last</span>
+              <Input
+                type="number"
+                value={alertRules.high_error_rate.window_min}
+                min={1}
+                max={240}
+                className="w-20 h-8 bg-neutral-950 border-neutral-800"
+                onChange={(e) => persistAlertRules({
+                  ...alertRules,
+                  high_error_rate: {
+                    ...alertRules.high_error_rate,
+                    window_min: Math.max(1, Math.min(240, Number(e.target.value || 15))),
+                  },
+                })}
+              />
+              <span>min</span>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-neutral-900 bg-black p-4 space-y-2">
+            <Label className="flex items-center gap-2 text-[11px] font-bold text-neutral-300">
+              <input
+                type="checkbox"
+                checked={alertRules.new_incident.enabled}
+                onChange={(e) => persistAlertRules({
+                  ...alertRules,
+                  new_incident: { enabled: e.target.checked },
+                })}
+              />
+              New incident created
+            </Label>
+            <p className="text-[10px] text-neutral-600 font-mono">Send an alert immediately when a new incident state is created.</p>
+          </div>
+
+          <div className="rounded-lg border border-neutral-900 bg-black p-4 space-y-2">
+            <Label className="flex items-center gap-2 text-[11px] font-bold text-neutral-300">
+              <input
+                type="checkbox"
+                checked={alertRules.failure_spike.enabled}
+                onChange={(e) => persistAlertRules({
+                  ...alertRules,
+                  failure_spike: { ...alertRules.failure_spike, enabled: e.target.checked },
+                })}
+              />
+              Failure spike detected
+            </Label>
+            <p className="text-[10px] text-neutral-600 font-mono">Trigger when current window failures spike vs previous window.</p>
+            <div className="flex items-center gap-2 text-[10px] text-neutral-500 font-mono">
+              <span>Current &gt;=</span>
+              <Input
+                type="number"
+                value={alertRules.failure_spike.multiplier}
+                min={1.1}
+                step={0.1}
+                max={10}
+                className="w-20 h-8 bg-neutral-950 border-neutral-800"
+                onChange={(e) => persistAlertRules({
+                  ...alertRules,
+                  failure_spike: {
+                    ...alertRules.failure_spike,
+                    multiplier: Math.max(1.1, Math.min(10, Number(e.target.value || 2))),
+                  },
+                })}
+              />
+              <span>x previous in last</span>
+              <Input
+                type="number"
+                value={alertRules.failure_spike.window_min}
+                min={1}
+                max={240}
+                className="w-20 h-8 bg-neutral-950 border-neutral-800"
+                onChange={(e) => persistAlertRules({
+                  ...alertRules,
+                  failure_spike: {
+                    ...alertRules.failure_spike,
+                    window_min: Math.max(1, Math.min(240, Number(e.target.value || 15))),
+                  },
+                })}
+              />
+              <span>min</span>
+            </div>
+          </div>
+
+          <p className="text-[10px] text-neutral-600 font-mono">
+            {savingRules ? "Saving rules..." : "Rules are saved automatically."}
+          </p>
         </CardContent>
       </Card>
 

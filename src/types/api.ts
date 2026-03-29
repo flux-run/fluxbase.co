@@ -234,6 +234,22 @@ export interface AlertChannel {
   created_at: string;
 }
 
+export interface AlertRules {
+  high_error_rate: {
+    enabled: boolean;
+    threshold_pct: number;
+    window_min: number;
+  };
+  new_incident: {
+    enabled: boolean;
+  };
+  failure_spike: {
+    enabled: boolean;
+    multiplier: number;
+    window_min: number;
+  };
+}
+
 export interface ProjectOverviewResult {
   incidents: {
     id: string;

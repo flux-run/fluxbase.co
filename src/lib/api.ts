@@ -9,6 +9,7 @@ import type {
   Route,
   ServiceToken,
   AlertChannel,
+  AlertRules,
   ProjectOverviewResult,
   ProjectUsageResult,
   ProjectObservabilityResult,
@@ -163,6 +164,14 @@ export function useFluxApi(projectId?: string) {
         request<{ ok: boolean }>(`/alerts/channels/test`, token(), {
           method: "POST",
           body: JSON.stringify({ project_id: id ?? projectId, channel_id: channelId }),
+        }),
+      getAlertRules: (id?: string) =>
+        request<{ rules: AlertRules }>(`/alerts/rules?project_id=${id ?? projectId}`, token())
+          .then((res) => res.rules),
+      saveAlertRules: (rules: AlertRules, id?: string) =>
+        request<{ ok: boolean; rules: AlertRules }>(`/alerts/rules`, token(), {
+          method: "PUT",
+          body: JSON.stringify({ project_id: id ?? projectId, rules }),
         }),
       getFunctionStats: (funcId: string) =>
         request<any>(`/function/${funcId}/overview`, token()),
