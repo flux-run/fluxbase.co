@@ -945,12 +945,12 @@ export default function IncidentDetailPage({
               <ErrorClassBadge cls={cls} />
               <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest border ${
                 incidentStatus === 'resolved'
-                  ? 'text-emerald-400 bg-emerald-950/60 border-emerald-800/40'
+                  ? 'text-emerald-400 bg-emerald-950/40 border-emerald-800/30'
                   : incidentStatus === 'investigating'
-                  ? 'text-amber-400 bg-amber-950/60 border-amber-800/40'
-                  : 'text-red-400 bg-red-950/60 border-red-800/40'
+                  ? 'text-amber-400 bg-amber-950/30 border-amber-800/30'
+                  : 'text-red-400 bg-red-950/40 border-red-800/30'
               }`}>
-                {incidentStatus}
+                status: {incidentStatus}
               </span>
               {isRecurring && (
                 <span className="text-[8px] font-black text-amber-400 bg-amber-950/50 border border-amber-800/50 px-1.5 py-0.5 rounded uppercase tracking-widest">
@@ -982,7 +982,9 @@ export default function IncidentDetailPage({
             )}
 
             {execsAfterDeploy > 0 && errorsAfterDeploy === execsAfterDeploy && (
-              <p className="text-[10px] text-orange-200 font-mono">No successful executions observed after deployment</p>
+              <p className="text-[10px] font-black text-red-300 bg-red-950/30 border border-red-900/40 rounded px-2 py-1 inline-flex items-center gap-1.5 font-mono">
+                ⚠ 100% failure rate observed after deployment
+              </p>
             )}
 
             <p className="text-[10px] text-neutral-500 font-mono">
@@ -1003,41 +1005,34 @@ export default function IncidentDetailPage({
                 <span className="text-neutral-300">{timeAgo(firstSeen)}</span>
               </div>
               <div className="flex items-center justify-between text-[10px] font-mono">
-                <span className="text-neutral-500">Confidence</span>
-                <span className={`font-black ${
-                  (deployVerdict?.confidence ?? confidenceLabel) === 'High' ? 'text-red-400'
-                  : (deployVerdict?.confidence ?? confidenceLabel) === 'Medium' ? 'text-orange-400'
-                  : 'text-neutral-500'
-                }`}>{deployVerdict?.confidence ?? confidenceLabel}</span>
-              </div>
-              <div className="flex items-center justify-between text-[10px] font-mono">
                 <span className="text-neutral-500">Impact</span>
                 <span className="text-red-300 font-black">{trafficImpactPct}% traffic</span>
+              </div>
+              <div className="flex items-center justify-between text-[10px] font-mono">
+                <span className="text-neutral-500">Current state</span>
+                <span className="text-red-300 font-black">
+                  {execsAfterDeploy > 0 && errorsAfterDeploy === execsAfterDeploy
+                    ? 'No successful responses'
+                    : `${failureRatePct}% failure rate`}
+                </span>
               </div>
             </div>
           </div>
         </div>
 
         {deployVerdict && (
-          <div className="px-4 pb-3 pt-0 border-t border-red-900/20 flex items-center gap-2 flex-wrap">
-            <span className={`text-[10px] font-black ${
+          <div className="px-4 pb-3 pt-0 border-t border-red-900/20 space-y-1.5">
+            <p className={`text-[10px] font-black ${
               deployVerdict.tone === 'danger' ? 'text-orange-300'
               : deployVerdict.tone === 'good' ? 'text-emerald-300'
               : 'text-neutral-300'
             }`}>
               {deployVerdict.headline}
-            </span>
-            <span className="text-[9px] text-neutral-600">·</span>
-            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${
-              deployVerdict.confidence === 'High' ? 'text-red-400 bg-red-950/40 border-red-800/40'
-              : deployVerdict.confidence === 'Medium' ? 'text-orange-400 bg-orange-950/40 border-orange-800/40'
-              : 'text-neutral-500 bg-neutral-900/40 border-neutral-800/40'
-            }`}>
-              Confidence {deployVerdict.confidence}
-            </span>
-            {postDeploySampleLow && (
-              <span className="text-[9px] text-neutral-500 font-mono">limited post-deploy data ({execsAfterDeploy} executions)</span>
-            )}
+            </p>
+            <p className="text-[9px] text-neutral-500 font-mono">
+              Confidence: {deployVerdict.confidence}
+              {postDeploySampleLow ? ` — based on only ${execsAfterDeploy} executions after deploy` : ''}
+            </p>
           </div>
         )}
       </div>
@@ -1068,6 +1063,14 @@ export default function IncidentDetailPage({
                       ? `Investigate DNS / external fetch failure before rollback`
                       : `Rollback deploy ${deployId}`}
                   </p>
+                  {deployVerdict.confidence === 'Low' && (
+                    <div className="text-[10px] text-neutral-400 font-mono mt-1 space-y-0.5">
+                      <p>Next step:</p>
+                      <p>→ Verify DNS resolution from runtime environment</p>
+                      <p>→ Confirm external API hostname resolves correctly</p>
+                      <p>→ Check outbound network / egress rules</p>
+                    </div>
+                  )}
                   <p className="text-[10px] text-neutral-400 font-mono mt-1">
                     Reason: failure spike after deploy (+{(rateAfterPct !== null && rateBeforePct !== null) ? Math.max(0, rateAfterPct - rateBeforePct) : 'n/a'}%)
                   </p>
@@ -1086,7 +1089,7 @@ export default function IncidentDetailPage({
                     onClick={() => updateStatus('investigating', activity)}
                     className={`flex items-center gap-1.5 text-[10px] font-black rounded-lg px-3 py-1.5 transition-all border ${
                       deployVerdict.confidence === 'Low'
-                        ? 'text-white bg-neutral-100/10 border-neutral-400/60 hover:bg-neutral-100/20'
+                        ? 'text-white bg-cyan-600/20 border-cyan-400/60 hover:bg-cyan-600/30'
                         : 'text-neutral-300 hover:text-white border-neutral-700 hover:border-neutral-500'
                     }`}
                   >
@@ -1096,7 +1099,7 @@ export default function IncidentDetailPage({
                     onClick={() => pinToTimeline(`Recommended rollback for deploy ${deployId} (confidence: ${deployVerdict.confidence})`, activity)}
                     className={`flex items-center gap-1.5 text-[10px] font-black rounded-lg px-3 py-1.5 transition-all border ${
                       deployVerdict.confidence === 'Low'
-                        ? 'text-neutral-500 border-neutral-800 bg-neutral-900/20 hover:border-neutral-700'
+                        ? 'text-neutral-500 border-neutral-700 bg-transparent hover:border-neutral-500'
                         : 'text-orange-200 bg-orange-900/30 hover:bg-orange-900/50 border-orange-700/60'
                     }`}
                   >
