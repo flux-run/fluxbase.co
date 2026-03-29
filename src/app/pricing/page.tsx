@@ -48,6 +48,41 @@ export default function PricingPage() {
           </p>
         </section>
 
+        {/* Killer example strip */}
+        <section className="rounded-2xl border border-neutral-800 bg-[#0D0D0D] px-8 py-7 flex flex-col sm:flex-row items-center justify-between gap-6 max-w-5xl mx-auto w-full">
+          <div className="space-y-1 text-center sm:text-left">
+            <p className="text-[10px] font-black uppercase tracking-[0.25em] text-neutral-600">How it works</p>
+            <p className="text-lg sm:text-xl font-black text-white leading-snug">
+              One API call failed — see input, output, and exact failure instantly.
+            </p>
+            <p className="text-[11px] text-neutral-500 font-medium">Replay any failed execution with full context in seconds. No log grepping.</p>
+          </div>
+          <Link
+            href="/login"
+            className="shrink-0 flex items-center gap-2 bg-blue-600 text-white text-[10px] font-black uppercase tracking-[0.18em] px-5 py-3 rounded-lg hover:bg-blue-500 transition-colors"
+          >
+            Get your first replay in minutes
+            <ArrowRight className="w-3 h-3" />
+          </Link>
+        </section>
+
+        {/* "Not logs. Not metrics." category positioning */}
+        <section className="text-center max-w-3xl mx-auto space-y-2 -mt-8">
+          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-neutral-600">
+            Not logs. Not metrics. Not traces.
+          </p>
+          <p className="text-sm font-semibold text-neutral-500">Execution-level debugging — the layer between your code and your incidents.</p>
+        </section>
+
+        {/* "Built for debugging" qualifier — shown before tier cards */}
+        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] px-6 py-4 flex items-center gap-3 max-w-3xl mx-auto w-full -mt-8">
+          <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+          <p className="text-[11px] font-medium text-neutral-400">
+            <span className="text-white font-black">Built for debugging, not full backend hosting.</span>{" "}
+            Shaped for critical-path replay and incident response — not replacing your runtime.
+          </p>
+        </div>
+
         <section className="grid grid-cols-1 lg:grid-cols-4 gap-5 items-stretch">
           {PRICING_TIERS.map((tier) => (
             <div
@@ -160,14 +195,10 @@ export default function PricingPage() {
               <p className="text-[11px] text-neutral-500 mt-4 leading-relaxed">
                 No hard block when you grow. Flux keeps your debugging workflow running and adds predictable overage instead of shutting you off.
               </p>
-            </div>
-
-            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] p-5 flex items-start gap-3">
-              <ShieldCheck className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-              <div>
-                <p className="text-sm font-black text-white">Built for debugging, not full backend hosting</p>
-                <p className="text-[11px] text-neutral-500 mt-1 leading-relaxed">
-                  The tiers are generous enough to hit the aha moment, but shaped around critical-path debugging, replay, and incident response rather than replacing your entire application runtime.
+              <div className="mt-4 pt-4 border-t border-neutral-800 flex items-center gap-2">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <p className="text-[11px] font-semibold text-emerald-300">
+                  No surprise billing. You always see usage before you pay.
                 </p>
               </div>
             </div>
@@ -199,6 +230,7 @@ export default function PricingPage() {
                 <h3 className="text-2xl font-black text-white tracking-tight">What does usage look like?</h3>
               </div>
               <div className="space-y-3 text-sm text-neutral-400 font-medium">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-600">Typical usage: 10K – 500K executions / month</p>
                 <p>If you run 100K executions in a month, you stay comfortably inside Builder with full replay and 30-day retention.</p>
                 <p>If you grow past Pro, overage starts at <span className="text-white font-mono">${(OVERAGE.pricePerMillionExec / 10).toFixed(2)} / 100K</span> instead of interrupting your team.</p>
                 <p>That keeps pricing fair, predictable, and aligned with how much real debugging value you are getting.</p>
@@ -209,9 +241,9 @@ export default function PricingPage() {
 
         <section className="rounded-2xl border border-neutral-900 bg-[#0D0D0D] p-8 sm:p-10 text-center space-y-5">
           <p className="text-[10px] font-black uppercase tracking-[0.25em] text-neutral-600">Start without friction</p>
-          <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Get to your first replay before you ever think about billing.</h2>
+          <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Get your first replay in under 2 minutes.</h2>
           <p className="text-base text-neutral-500 font-medium max-w-2xl mx-auto leading-relaxed">
-            The free tier is for reaching the aha moment. Upgrade only when you need deeper history, more execution volume, and team workflows that run every day.
+            Install the CLI, capture one execution, and see it in the dashboard — before you ever think about billing.
           </p>
           <div className="flex items-center justify-center gap-3 flex-wrap pt-2">
             <Link href="/login" className="bg-white text-black text-[11px] font-black uppercase tracking-[0.18em] px-6 py-3 rounded-sm hover:bg-neutral-200 transition-colors">
