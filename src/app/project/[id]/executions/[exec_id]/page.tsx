@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, use } from "react";
+import { useSearchParams } from "next/navigation";
 import { useFluxApi } from "@/lib/api";
 import { Activity, Terminal, Copy, Check, ChevronRight, ChevronDown, GitMerge } from "lucide-react";
 import { ExecutionDetail as ExecutionDetailType, LogEntry } from "@/types/api";
@@ -162,8 +163,45 @@ function errorTypeToFix(errorName?: string | null, errorMessage?: string | null,
   return null;
 }
 
+function normalizeDebuggerTitle(issue: string, errorName?: string | null, errorMessage?: string | null): string {
+  const hay = `${issue} ${errorName ?? ""} ${errorMessage ?? ""}`.toLowerCase();
+  if (hay.includes("dns") || hay.includes("enotfound") || hay.includes("getaddrinfo")) {
+    return "External API fetch failure (DNS resolution)";
+  }
+  if (hay.includes("timeout") || hay.includes("timed out")) {
+    return "External API request failure (timeout)";
+  }
+  return issue;
+}
+
+function extractExternalTarget(
+  spans: Array<{ type: string; label: string | null }> | undefined,
+  errorMessage?: string | null,
+): string {
+  const spanWithUrl = spans?.find((s) => /https?:\/\//i.test(s.label ?? ""))?.label ?? "";
+  const urlFromSpan = spanWithUrl.match(/https?:\/\/[^\s)"']+/i)?.[0];
+  if (urlFromSpan) return urlFromSpan;
+
+  const urlFromMessage = (errorMessage ?? "").match(/https?:\/\/[^\s)"']+/i)?.[0];
+  if (urlFromMessage) return urlFromMessage;
+
+  const hostFromMessage = (errorMessage ?? "").match(/(?:getaddrinfo|ENOTFOUND|lookup)\s+([a-z0-9.-]+\.[a-z]{2,})/i)?.[1];
+  if (hostFromMessage) return `https://${hostFromMessage}`;
+
+  return "external dependency";
+}
+
+function debuggerFailureReason(errorName?: string | null, errorMessage?: string | null, fallback?: string | null): string {
+  const hay = `${errorName ?? ""} ${errorMessage ?? ""} ${fallback ?? ""}`.toLowerCase();
+  if (hay.includes("dns") || hay.includes("enotfound") || hay.includes("getaddrinfo")) return "DNS resolution failed";
+  if (hay.includes("timeout") || hay.includes("timed out")) return "request timed out";
+  if (hay.includes("econnrefused") || hay.includes("connection refused")) return "connection refused";
+  return "request failed";
+}
+
 export default function ExecutionDetail({ params }: { params: Promise<{ id: string, exec_id: string }> }) {
   const { id, exec_id } = use(params);
+  const searchParams = useSearchParams();
   const api = useFluxApi(id);
   const [data, setData] = useState<ExecutionDetailType | null>(null);
   const [copied, setCopied] = useState(false);
@@ -173,6 +211,7 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
   const [loading, setLoading] = useState(true);
   const [rawOpen, setRawOpen] = useState(false);
   const [rawTab, setRawTab] = useState<'request' | 'headers' | 'response'>('request');
+  const debuggerMode = searchParams.get("debugger") === "1";
 
   useEffect(() => {
     if (!api.ready) return;
@@ -278,6 +317,61 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
     !infraHeaderExact.includes(k.toLowerCase())
   );
   const curlCommand = `curl -X ${exec.method ?? 'GET'} 'https://your-domain${exec.path}'${authHeaders.length ? `\n  -H 'Authorization: <redacted>'` : ''}${reqObj?.body ? `\n  -d '${JSON.stringify(reqObj.body)}'` : ''}`;
+
+  if (debuggerMode) {
+    const headline = normalizeDebuggerTitle(displayIssue || errorHeadline, exec.error_name, exec.error_message);
+    const externalTarget = extractExternalTarget(data.spans, exec.error_message);
+    const failureReason = debuggerFailureReason(exec.error_name, exec.error_message, exec.error);
+    const rootCause = failureReason === "DNS resolution failed"
+      ? "DNS resolution failed in runtime environment"
+      : failureReason === "request timed out"
+        ? "Outbound request timed out in runtime environment"
+        : failureReason === "connection refused"
+          ? "Outbound connection was refused by the target service"
+          : "External request failed in runtime environment";
+
+    const suggestedFixes = failureReason === "DNS resolution failed"
+      ? ["Check DNS config", "Verify outbound network access"]
+      : failureReason === "request timed out"
+        ? ["Check target service latency and availability", "Increase timeout or add retries with backoff"]
+        : failureReason === "connection refused"
+          ? ["Verify target host/port and service health", "Confirm outbound egress is allowed"]
+          : ["Validate target URL and service availability", "Verify outbound network policy and connectivity"];
+
+    return (
+      <div className="space-y-6 pb-16 max-w-3xl mx-auto">
+        <header className="border-b border-neutral-900 pb-5">
+          <h1 className="text-xl font-black text-white tracking-tight">{headline}</h1>
+        </header>
+
+        <section className="space-y-3">
+          <h2 className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Timeline</h2>
+          <ol className="space-y-2">
+            <li className="text-sm text-neutral-200">1. Request received</li>
+            <li className="text-sm text-neutral-200">2. Handler started</li>
+            <li className="text-sm text-neutral-200">
+              3. Fetch {externalTarget}
+              <span className="ml-2 text-red-300 font-semibold">❌ {failureReason}</span>
+            </li>
+          </ol>
+        </section>
+
+        <section className="space-y-2">
+          <h2 className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Root cause</h2>
+          <p className="text-sm text-neutral-200">{rootCause}</p>
+        </section>
+
+        <section className="space-y-2">
+          <h2 className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Suggested fix</h2>
+          <ul className="space-y-1">
+            {suggestedFixes.map((fix, i) => (
+              <li key={i} className="text-sm text-neutral-200">• {fix}</li>
+            ))}
+          </ul>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 pb-24 max-w-5xl mx-auto">

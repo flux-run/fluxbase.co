@@ -56,6 +56,7 @@ function minutesSince(ts: string): number {
 type IncidentRow = {
   title: string;
   normalizedTitle: string;
+  alertLevel: "critical" | "degraded" | "warning";
   cls: string;
   failureRatePct: number;
   totalErrors: number;
@@ -72,6 +73,7 @@ type IncidentRow = {
   userImpact: string;
   errorsAfterDeploy: number;
   execsAfterDeploy: number;
+  blastRadius: string;
 };
 
 export default function IncidentsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -135,9 +137,23 @@ export default function IncidentsPage({ params }: { params: Promise<{ id: string
             : topInc.errorClass === 'infra'
               ? 'User impact: execution could not start'
               : 'User impact: request handling failed';
+        const alertLevel: "critical" | "degraded" | "warning" =
+          (execsAfterDeploy > 0 && errorsAfterDeploy === execsAfterDeploy) || failureRatePct >= 80 || trafficImpactPct >= 50
+            ? "critical"
+            : (failureRatePct >= 30 || trafficImpactPct >= 20)
+              ? "degraded"
+              : "warning";
+        const blastRadius = trafficImpactPct >= 90
+          ? "impacting almost all incoming requests"
+          : trafficImpactPct >= 50
+            ? "affecting majority of users"
+            : trafficImpactPct >= 20
+              ? "affecting a significant user segment"
+              : "affecting a limited set of requests";
         return {
           title,
           normalizedTitle: normalizeIncidentTitle(title, topInc.errorClass),
+          alertLevel,
           cls: topInc.errorClass,
           failureRatePct,
           totalErrors,
@@ -154,6 +170,7 @@ export default function IncidentsPage({ params }: { params: Promise<{ id: string
           userImpact,
           errorsAfterDeploy,
           execsAfterDeploy,
+          blastRadius,
         };
       })
       .sort((a, b) => b.priorityScore - a.priorityScore);
@@ -205,47 +222,57 @@ export default function IncidentsPage({ params }: { params: Promise<{ id: string
         </button>
       </div>
 
-      {/* Empty state */}
-      {rows.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-24 text-center border border-neutral-800/40 rounded-xl bg-neutral-950/30">
-          <CheckCircle2 className="w-8 h-8 text-emerald-500 mb-3" />
-          <p className="text-sm font-bold text-neutral-300">All clear</p>
-          <p className="text-[11px] text-neutral-600 mt-1">No active incidents detected</p>
-        </div>
-      )}
-
-      {/* Incident rows */}
       {rows.length > 0 && (
         <div className="rounded-xl border border-red-800/50 bg-gradient-to-r from-red-950/35 to-red-950/10 px-4 py-3">
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
             <span className="text-[9px] font-black uppercase tracking-widest text-red-300">Needs attention now (1)</span>
           </div>
-          <button
-            onClick={() => router.push(`/project/${id}/incidents/${encodeURIComponent(rows[0].title)}`)}
-            className="mt-2 w-full text-left group"
-          >
-            <p className="text-sm font-black text-white">{rows[0].normalizedTitle}</p>
-            <p className="text-[10px] text-neutral-400 font-mono mt-1">
-              {rows[0].trafficImpactPct}% traffic affected · {rows[0].failureRatePct}% failure rate
-            </p>
-            {rows[0].execsAfterDeploy > 0 && rows[0].errorsAfterDeploy === rows[0].execsAfterDeploy && (
-              <p className="text-[10px] text-red-300 font-black font-mono mt-1">
-                ⚠ All executions failing after latest deploy
+
+          <div className="mt-2 w-full text-left group grid grid-cols-1 xl:grid-cols-3 gap-4">
+            <div className="xl:col-span-2 min-w-0">
+              <p className="text-sm font-black text-white">{rows[0].normalizedTitle}</p>
+              <div className="mt-1 mb-1 flex items-center gap-1.5 flex-wrap">
+                <ErrorClassBadge cls={rows[0].cls} />
+                <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest border ${
+                  rows[0].alertLevel === 'critical'
+                    ? 'text-red-400 bg-red-950/50 border-red-800/50'
+                    : rows[0].alertLevel === 'degraded'
+                      ? 'text-orange-400 bg-orange-950/40 border-orange-800/40'
+                      : 'text-amber-400 bg-amber-950/40 border-amber-800/40'
+                }`}>
+                  {rows[0].alertLevel}
+                </span>
+                {rows[0].deployId && (
+                  <span className="text-[8px] font-mono text-neutral-600 border border-neutral-800/60 px-1.5 py-0.5 rounded">
+                    after deploy {rows[0].deployId.slice(0, 7)}
+                  </span>
+                )}
+              </div>
+              <p className="text-[10px] text-neutral-400 font-mono mt-1">
+                {rows[0].trafficImpactPct}% traffic affected · {rows[0].failureRatePct}% failure rate
               </p>
-            )}
-            <p className="text-[10px] text-orange-300 font-mono mt-1">{rows[0].insight}</p>
-            <p className="text-[10px] text-cyan-200 font-mono mt-1 inline-flex items-center gap-1 underline underline-offset-2 decoration-cyan-500/60">
-              → Investigate DNS / external API connectivity
-            </p>
-            <p className="text-[9px] text-neutral-500 font-mono mt-1">{rows[0].userImpact}</p>
-            <div className="text-[9px] text-neutral-600 font-mono mt-2 space-y-0.5">
-              <p>Ranked highest due to:</p>
+              <p className="text-[9px] text-neutral-500 font-mono mt-1">→ {rows[0].blastRadius}</p>
+              {rows[0].execsAfterDeploy > 0 && rows[0].errorsAfterDeploy === rows[0].execsAfterDeploy && (
+                <p className="text-[10px] text-red-300 font-black font-mono mt-1">⚠ All executions failing after latest deploy</p>
+              )}
+              <p className="text-[10px] text-orange-300 font-mono mt-1">{rows[0].insight}</p>
+              <button
+                onClick={() => router.push(`/project/${id}/executions?status=error&incident=${encodeURIComponent(rows[0].title)}&class=${rows[0].cls}${rows[0].deployId ? `&afterDeploy=${rows[0].deployId}` : ''}&debugger=1`)}
+                className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-cyan-700/70 bg-cyan-500/15 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-cyan-100 shadow-[0_0_0_1px_rgba(14,116,144,0.25)] transition-colors hover:border-cyan-500 hover:bg-cyan-500/25"
+              >
+                → Investigate DNS / external API connectivity
+              </button>
+              <p className="text-[9px] text-neutral-500 font-mono mt-1">{rows[0].userImpact}</p>
+            </div>
+
+            <div className="xl:col-span-1 rounded-lg border border-red-900/30 bg-black/20 px-3 py-2 text-[9px] text-neutral-500 font-mono space-y-1">
+              <p className="text-neutral-400 font-black uppercase tracking-widest text-[8px]">Why ranked #1</p>
               <p>• High traffic impact ({rows[0].trafficImpactPct}%)</p>
               <p>• Elevated failure rate ({rows[0].failureRatePct}%)</p>
               {rows[0].deployId && <p>• Immediate regression after deploy {rows[0].deployId.slice(0, 7)}</p>}
             </div>
-          </button>
+          </div>
         </div>
       )}
 
@@ -263,11 +290,15 @@ export default function IncidentsPage({ params }: { params: Promise<{ id: string
                 {/* Title + badges row */}
                 <div className="flex items-center gap-2 mb-2 flex-wrap">
                   <ErrorClassBadge cls={row.cls} />
-                  {idx === 0 && (
-                    <span className="text-[8px] font-black text-red-400 bg-red-950/50 border border-red-800/50 px-1.5 py-0.5 rounded uppercase tracking-widest">
-                      Critical
-                    </span>
-                  )}
+                  <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest border ${
+                    row.alertLevel === 'critical'
+                      ? 'text-red-400 bg-red-950/50 border-red-800/50'
+                      : row.alertLevel === 'degraded'
+                        ? 'text-orange-400 bg-orange-950/40 border-orange-800/40'
+                        : 'text-amber-400 bg-amber-950/40 border-amber-800/40'
+                  }`}>
+                    {row.alertLevel}
+                  </span>
                   {row.isRecurring && (
                     <span className="text-[8px] font-black text-amber-400 bg-amber-950/40 border border-amber-800/40 px-1.5 py-0.5 rounded uppercase tracking-widest">
                       Recurring

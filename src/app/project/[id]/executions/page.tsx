@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useState, use, Fragment } from "react";
+import { useEffect, useState, use, Fragment, useRef } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useFluxApi } from "@/lib/api";
 import { Activity, Search, ChevronRight, Clock, AlertTriangle } from "lucide-react";
 import { 
@@ -15,12 +16,65 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Execution } from "@/types/api";
 
+function normalize(str: string) {
+  return str.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function classScore(exec: Execution, cls: string | null): number {
+  if (!cls) return 0;
+  const msg = `${exec.error_name ?? ""} ${exec.error_message ?? ""} ${exec.error ?? ""}`.toLowerCase();
+  if (cls === "external") {
+    return /dns|enotfound|getaddrinfo|fetch|network|host|socket/.test(msg) ? 30 : 0;
+  }
+  if (cls === "infra") {
+    return /platform|runtime|executor|artifact|bootstrap|init/.test(msg) ? 30 : 0;
+  }
+  if (cls === "user") {
+    return /referenceerror|typeerror|syntaxerror|user code|thrown/.test(msg) ? 30 : 0;
+  }
+  return 0;
+}
+
+function pickDebuggerExecution(
+  executions: Execution[],
+  incident: string | null,
+  cls: string | null,
+  afterDeploy: string | null,
+): Execution | null {
+  const tokens = (incident ? normalize(incident).split(" ") : []).filter((t) => t.length > 3);
+  const failed = executions.filter((e) => e.status !== "ok");
+  if (failed.length === 0) return null;
+
+  const scored = failed.map((e) => {
+    const hay = normalize(`${e.error_name ?? ""} ${e.error_message ?? ""} ${e.error ?? ""} ${e.path ?? ""} ${e.function_name ?? ""}`);
+    let score = 0;
+
+    if (afterDeploy && e.code_sha?.startsWith(afterDeploy)) score += 40;
+    if (tokens.length > 0) {
+      const hits = tokens.filter((t) => hay.includes(t)).length;
+      score += hits * 8;
+    }
+    score += classScore(e, cls);
+
+    // Prefer most recent when score ties.
+    const ts = e.started_at ? new Date(e.started_at).getTime() : 0;
+    return { e, score, ts };
+  });
+
+  scored.sort((a, b) => (b.score - a.score) || (b.ts - a.ts));
+  return scored[0]?.e ?? failed[0] ?? null;
+}
+
 export default function ExecutionsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const api = useFluxApi(id);
   const [executions, setExecutions] = useState<Execution[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all");
+  const initialFilter = searchParams.get("status") === "error" ? "error" : "all";
+  const [filter, setFilter] = useState(initialFilter);
+  const redirectedToDebugger = useRef(false);
 
   useEffect(() => {
     if (!api.ready) return;
@@ -30,6 +84,22 @@ export default function ExecutionsPage({ params }: { params: Promise<{ id: strin
       setLoading(false);
     }).catch(console.error);
   }, [id, api]);
+
+  useEffect(() => {
+    const wantsDebugger = searchParams.get("debugger") === "1";
+    if (!wantsDebugger || loading || redirectedToDebugger.current) return;
+
+    const target = pickDebuggerExecution(
+      executions,
+      searchParams.get("incident"),
+      searchParams.get("class"),
+      searchParams.get("afterDeploy"),
+    );
+    if (!target) return;
+
+    redirectedToDebugger.current = true;
+    router.replace(`/project/${id}/executions/${target.id}?debugger=1`);
+  }, [executions, id, loading, router, searchParams]);
 
   const filtered = filter === "all" ? executions : executions.filter(e => e.status === filter);
 
