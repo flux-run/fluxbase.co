@@ -859,9 +859,9 @@ export default function IncidentDetailPage({
     executionEvidence.includes('getaddrinfo') ||
     executionEvidence.includes('enotfound') ||
     executionEvidence.includes('fetch failed')
-      ? 'Likely cause: external dependency failure (DNS resolution)'
+      ? 'Likely cause: DNS resolution failure when calling external API'
       : cls === 'external'
-        ? 'Likely cause: external dependency failure (DNS resolution)'
+        ? 'Likely cause: DNS resolution failure when calling external API'
         : null;
 
   const causalityHint = deployMode === 'introduced'
@@ -968,20 +968,11 @@ export default function IncidentDetailPage({
 
           <p className="text-[10px] text-neutral-400 font-mono">
             started {timeAgo(firstSeen)} · last seen {timeAgo(lastSeen)}
-            {deployVerdict && deployId && (
-              <>
-                <span className="text-neutral-700"> · </span>
-                <span className="text-orange-300 font-black">deploy {deployId}</span>
-                {rateBeforePct !== null && rateAfterPct !== null && (
-                  <span className="text-orange-400 font-black"> ({rateBeforePct}% → {rateAfterPct}%)</span>
-                )}
-              </>
-            )}
           </p>
 
           {deployId && rateBeforePct !== null && rateAfterPct !== null && (
             <p className="text-[11px] font-black text-orange-300 font-mono">
-              ⬆ +{Math.max(0, rateAfterPct - rateBeforePct)}% failure spike after deploy {deployId}
+              ⬆ Failure rate increased from {rateBeforePct}% → {rateAfterPct}% after deploy {deployId} (+{Math.max(0, rateAfterPct - rateBeforePct)}%)
             </p>
           )}
 
@@ -1021,65 +1012,72 @@ export default function IncidentDetailPage({
       </div>
 
       {deployId && deployVerdict && (
-        <div className="rounded-xl border border-neutral-800/50 bg-neutral-900/35 px-4 py-3">
-          <p className="text-[9px] font-black uppercase tracking-widest text-neutral-500">What changed</p>
-          <div className="mt-2 text-[10px] font-mono text-neutral-400 space-y-1">
-            <p>• Deploy <span className="text-neutral-300">{deployId}</span> introduced</p>
-            {(rateBeforePct !== null && rateAfterPct !== null) && (
-              <p>• Failure rate changed: <span className="text-orange-300 font-black">{rateBeforePct}% → {rateAfterPct}%</span></p>
-            )}
-            <p>• Errors shifted to: <span className="text-neutral-300">{executionEvidence.includes('dns') || executionEvidence.includes('fetch failed') ? 'external fetch (DNS failure)' : cls}</span></p>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+          <div className="rounded-xl border border-neutral-800/50 bg-neutral-900/35 px-4 py-3">
+            <p className="text-[9px] font-black uppercase tracking-widest text-neutral-500">What changed</p>
+            <div className="mt-2 text-[10px] font-mono text-neutral-400 space-y-1">
+              <p>• Deploy <span className="text-neutral-300">{deployId}</span> introduced</p>
+              {(rateBeforePct !== null && rateAfterPct !== null) && (
+                <p>• Failure rate changed: <span className="text-orange-300 font-black">{rateBeforePct}% → {rateAfterPct}%</span></p>
+              )}
+              <p>• Errors shifted to: <span className="text-neutral-300">{executionEvidence.includes('dns') || executionEvidence.includes('fetch failed') ? 'external fetch (DNS failure)' : cls}</span></p>
+              {(deployMode === 'introduced' || deployMode === 'regressed') && (
+                <p>• No similar errors observed before this deployment</p>
+              )}
+            </div>
           </div>
-        </div>
-      )}
 
-      {/* Recommended decision */}
-      {deployId && deployVerdict && (deployMode === 'introduced' || deployMode === 'regressed') && (
-        <div className="rounded-xl border border-orange-700/40 bg-orange-950/15 px-5 py-4">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-orange-300">Recommended action</p>
-              <p className="text-sm font-black text-orange-100 mt-1">
-                {deployVerdict.confidence === 'Low'
-                  ? `Investigate DNS / external fetch failure before rollback`
-                  : `Rollback deploy ${deployId}`}
-              </p>
-              <p className="text-[10px] text-neutral-400 font-mono mt-1">
-                Reason: failure spike after deploy (+{(rateAfterPct !== null && rateBeforePct !== null) ? Math.max(0, rateAfterPct - rateBeforePct) : 'n/a'}%)
-              </p>
-              <p className="text-[10px] text-neutral-400 font-mono mt-0.5">
-                Error type: {executionEvidence.includes('dns') || executionEvidence.includes('fetch failed') ? 'external dependency (DNS resolution)' : cls}
-              </p>
-              <p className="text-[10px] text-neutral-500 font-mono mt-0.5">
-                Confidence: {deployVerdict.confidence}{postDeploySampleLow ? ` (only ${execsAfterDeploy} executions after deploy)` : ''}
-              </p>
-              <p className="text-[10px] text-neutral-500 font-mono mt-0.5">
-                Impact: {severity} ({trafficImpactPct}% traffic affected) · Risk: {deployVerdict.confidence === 'Low' ? 'Medium' : 'Low'}
-              </p>
+          {(deployMode === 'introduced' || deployMode === 'regressed') && (
+            <div className="rounded-xl border border-orange-700/40 bg-orange-950/15 px-4 py-3">
+              <div className="flex flex-col gap-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-orange-300">Recommended action</p>
+                  <p className="text-sm font-black text-orange-100 mt-1">
+                    {deployVerdict.confidence === 'Low'
+                      ? `Investigate DNS / external fetch failure before rollback`
+                      : `Rollback deploy ${deployId}`}
+                  </p>
+                  <p className="text-[10px] text-neutral-400 font-mono mt-1">
+                    Reason: failure spike after deploy (+{(rateAfterPct !== null && rateBeforePct !== null) ? Math.max(0, rateAfterPct - rateBeforePct) : 'n/a'}%)
+                  </p>
+                  <p className="text-[10px] text-neutral-400 font-mono mt-0.5">
+                    Error type: {executionEvidence.includes('dns') || executionEvidence.includes('fetch failed') ? 'external dependency (DNS resolution)' : cls}
+                  </p>
+                  <p className="text-[10px] text-neutral-500 font-mono mt-0.5">
+                    Confidence: {deployVerdict.confidence}{postDeploySampleLow ? ` — limited data (${execsAfterDeploy} executions after deploy)` : ''}
+                  </p>
+                  <p className="text-[10px] text-neutral-500 font-mono mt-0.5">
+                    Impact: {severity} ({trafficImpactPct}% traffic affected) · Risk: {deployVerdict.confidence === 'Low' ? 'Medium' : 'Low'}
+                  </p>
+                  <p className="text-[10px] text-neutral-500 font-mono mt-0.5">
+                    User impact: Requests failing before response is returned
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => updateStatus('investigating', activity)}
+                    className={`flex items-center gap-1.5 text-[10px] font-black rounded-lg px-3 py-1.5 transition-all border ${
+                      deployVerdict.confidence === 'Low'
+                        ? 'text-white bg-neutral-100/10 border-neutral-400/60 hover:bg-neutral-100/20'
+                        : 'text-neutral-300 hover:text-white border-neutral-700 hover:border-neutral-500'
+                    }`}
+                  >
+                    <Zap className="w-3 h-3" /> {deployVerdict.confidence === 'Low' ? 'Investigate (recommended)' : 'Investigate instead'}
+                  </button>
+                  <button
+                    onClick={() => pinToTimeline(`Recommended rollback for deploy ${deployId} (confidence: ${deployVerdict.confidence})`, activity)}
+                    className={`flex items-center gap-1.5 text-[10px] font-black rounded-lg px-3 py-1.5 transition-all border ${
+                      deployVerdict.confidence === 'Low'
+                        ? 'text-neutral-500 border-neutral-800 bg-neutral-900/20 hover:border-neutral-700'
+                        : 'text-orange-200 bg-orange-900/30 hover:bg-orange-900/50 border-orange-700/60'
+                    }`}
+                  >
+                    <ArrowRight className="w-3 h-3" /> {deployVerdict.confidence === 'Low' ? 'Rollback (faster, risky)' : 'Rollback (recommended)'}
+                  </button>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                onClick={() => updateStatus('investigating', activity)}
-                className={`flex items-center gap-1.5 text-[10px] font-black rounded-lg px-3 py-1.5 transition-all border ${
-                  deployVerdict.confidence === 'Low'
-                    ? 'text-white bg-neutral-100/10 border-neutral-400/60 hover:bg-neutral-100/20'
-                    : 'text-neutral-300 hover:text-white border-neutral-700 hover:border-neutral-500'
-                }`}
-              >
-                <Zap className="w-3 h-3" /> {deployVerdict.confidence === 'Low' ? 'Investigate (recommended)' : 'Investigate instead'}
-              </button>
-              <button
-                onClick={() => pinToTimeline(`Recommended rollback for deploy ${deployId} (confidence: ${deployVerdict.confidence})`, activity)}
-                className={`flex items-center gap-1.5 text-[10px] font-black rounded-lg px-3 py-1.5 transition-all border ${
-                  deployVerdict.confidence === 'Low'
-                    ? 'text-neutral-500 border-neutral-800 bg-neutral-900/20 hover:border-neutral-700'
-                    : 'text-orange-200 bg-orange-900/30 hover:bg-orange-900/50 border-orange-700/60'
-                }`}
-              >
-                <ArrowRight className="w-3 h-3" /> {deployVerdict.confidence === 'Low' ? 'Rollback (faster, risky)' : 'Rollback (recommended)'}
-              </button>
-            </div>
-          </div>
+          )}
         </div>
       )}
 
