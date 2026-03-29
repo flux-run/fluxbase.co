@@ -981,9 +981,13 @@ export default function IncidentDetailPage({
               <p className="text-[10px] text-orange-200 font-mono">{causalityHint}</p>
             )}
 
+            {execsAfterDeploy > 0 && errorsAfterDeploy === execsAfterDeploy && (
+              <p className="text-[10px] text-orange-200 font-mono">No successful executions observed after deployment</p>
+            )}
+
             <p className="text-[10px] text-neutral-500 font-mono">
               Triggered by: {publicExecPct >= 50
-                ? `Public traffic (${publicExecPct}%) → affecting real users`
+                ? `All incoming user traffic (${publicExecPct}%)`
                 : (topActor ? `${topActor}${topActorType ? ` (${topActorType})` : ''}` : 'Unknown')}
             </p>
           </div>
@@ -1067,11 +1071,8 @@ export default function IncidentDetailPage({
                   <p className="text-[10px] text-neutral-400 font-mono mt-1">
                     Reason: failure spike after deploy (+{(rateAfterPct !== null && rateBeforePct !== null) ? Math.max(0, rateAfterPct - rateBeforePct) : 'n/a'}%)
                   </p>
-                  <p className="text-[10px] text-neutral-400 font-mono mt-0.5">
-                    Error type: {executionEvidence.includes('dns') || executionEvidence.includes('fetch failed') ? 'external dependency (DNS resolution)' : cls}
-                  </p>
                   <p className="text-[10px] text-neutral-500 font-mono mt-0.5">
-                    Confidence: {deployVerdict.confidence}{postDeploySampleLow ? ` — limited data (${execsAfterDeploy} executions after deploy)` : ''}
+                    Confidence: {deployVerdict.confidence}{postDeploySampleLow ? ` — based on only ${execsAfterDeploy} executions after deploy` : ''}
                   </p>
                   <p className="text-[10px] text-neutral-500 font-mono mt-0.5">
                     Impact: {severity} ({trafficImpactPct}% traffic affected) · Risk: {deployVerdict.confidence === 'Low' ? 'Medium' : 'Low'}
