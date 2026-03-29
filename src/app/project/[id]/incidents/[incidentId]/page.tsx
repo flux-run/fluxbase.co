@@ -269,7 +269,6 @@ export default function IncidentDetailPage({
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [owner, setOwnerState] = useState<string>('');
   const [commentDraft, setCommentDraft] = useState('');
-  const [stateHydrated, setStateHydrated] = useState(false);
   const { users: teamUsers } = useTeam();
   const [ownerDropdownOpen, setOwnerDropdownOpen] = useState(false);
 
@@ -348,9 +347,6 @@ export default function IncidentDetailPage({
       })
       .catch(() => {
         // Keep UI usable even if persistence temporarily fails.
-      })
-      .finally(() => {
-        if (!cancelled) setStateHydrated(true);
       });
 
     return () => {
@@ -358,65 +354,62 @@ export default function IncidentDetailPage({
     };
   }, [api, id, title]);
 
-  // Persist incident collaboration state to backend after initial hydration.
-  useEffect(() => {
-    if (!api.ready || !stateHydrated) return;
-    const timer = setTimeout(() => {
-      api.saveIncidentState(id, title, {
-        status: incidentStatus,
-        owner,
-        checkedActions: [...checkedActions],
-        activity,
-      }).catch(() => {
-        // Save failures are non-blocking; next change retries automatically.
-      });
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [api, id, title, stateHydrated, incidentStatus, owner, checkedActions, activity]);
-
   const persistActivity = useCallback((events: ActivityEvent[]) => {
     setActivity(events);
   }, []);
 
+  const appendEventsToServer = useCallback((events: ActivityEvent[]) => {
+    for (const event of events) {
+      api.appendIncidentActivity(id, title, event).catch(() => {
+        // Non-blocking collaboration event persistence.
+      });
+    }
+  }, [api, id, title]);
+
   const updateStatus = useCallback((s: IncidentStatus, currentActivity: ActivityEvent[]) => {
-    setIncidentStatus(prev => {
-      const who = owner || 'Someone';
-      const fromLabel = prev === 'active' ? 'Active' : prev === 'investigating' ? 'Investigating' : 'Resolved';
-      const toLabel   = s   === 'active' ? 'Active' : s   === 'investigating' ? 'Investigating' : 'Resolved';
-      const evs: ActivityEvent[] = [{
-        id: `system-status-${Date.now()}`,
+    const who = owner || 'Someone';
+    const fromLabel = incidentStatus === 'active' ? 'Active' : incidentStatus === 'investigating' ? 'Investigating' : 'Resolved';
+    const toLabel   = s   === 'active' ? 'Active' : s   === 'investigating' ? 'Investigating' : 'Resolved';
+    const evs: ActivityEvent[] = [{
+      id: `system-status-${Date.now()}`,
+      type: 'system',
+      text: `Status: ${fromLabel} → ${toLabel}`,
+      actor: who,
+      ts: new Date().toISOString(),
+    }];
+    if (s === 'resolved' && group) {
+      const { failureRatePct, totalErrors, totalExecs, firstSeen, rateBeforePct } = group;
+      const durationMin = Math.round(
+        (Date.now() - new Date(firstSeen).getTime()) / 60000
+      );
+      const summary = [
+        `Failure rate: ${failureRatePct}%${totalErrors === 0 ? ' → 0% ✓' : ' (still elevated — monitor)'}`,
+        `Total errors: ${totalErrors} over ${totalExecs} executions`,
+        `Duration: ${durationMin >= 60 ? `${Math.floor(durationMin / 60)}h ${durationMin % 60}m` : `${durationMin}m`}`,
+        rateBeforePct !== null ? `Baseline: ${rateBeforePct}%` : null,
+      ].filter(Boolean).join(' · ');
+      evs.push({
+        id: `system-resolve-summary-${Date.now()}`,
         type: 'system',
-        text: `Status: ${fromLabel} → ${toLabel}`,
-        actor: who,
-        ts: new Date().toISOString(),
-      }];
-      // If resolving, auto-post a resolution summary
-      if (s === 'resolved' && group) {
-        const { failureRatePct, totalErrors, totalExecs, firstSeen, rateBeforePct } = group;
-        const durationMin = Math.round(
-          (Date.now() - new Date(firstSeen).getTime()) / 60000
-        );
-        const summary = [
-          `Failure rate: ${failureRatePct}%${totalErrors === 0 ? ' → 0% ✓' : ' (still elevated — monitor)'}`,
-          `Total errors: ${totalErrors} over ${totalExecs} executions`,
-          `Duration: ${durationMin >= 60 ? `${Math.floor(durationMin / 60)}h ${durationMin % 60}m` : `${durationMin}m`}`,
-          rateBeforePct !== null ? `Baseline: ${rateBeforePct}%` : null,
-        ].filter(Boolean).join(' · ');
-        evs.push({
-          id: `system-resolve-summary-${Date.now()}`,
-          type: 'system',
-          text: `Resolution summary — ${summary}`,
-          ts: new Date(Date.now() + 100).toISOString(),
-        });
-      }
-      persistActivity([...currentActivity, ...evs]);
-      return s;
+        text: `Resolution summary — ${summary}`,
+        ts: new Date(Date.now() + 100).toISOString(),
+      });
+    }
+
+    setIncidentStatus(s);
+    api.updateIncidentStatus(id, title, s).catch(() => {
+      // Non-blocking status persistence.
     });
-  }, [persistActivity, group, owner]);
+    persistActivity([...currentActivity, ...evs]);
+    appendEventsToServer(evs);
+  }, [appendEventsToServer, api, id, title, persistActivity, group, owner, incidentStatus]);
 
   const assignOwner = useCallback((name: string, currentActivity: ActivityEvent[]) => {
     const trimmed = name.trim();
     setOwnerState(trimmed);
+    api.updateIncidentOwner(id, title, trimmed).catch(() => {
+      // Non-blocking owner persistence.
+    });
     if (!trimmed) return;
     const who = owner || 'Someone';
     const ev: ActivityEvent = {
@@ -427,7 +420,8 @@ export default function IncidentDetailPage({
       ts: new Date().toISOString(),
     };
     persistActivity([...currentActivity, ev]);
-  }, [persistActivity, owner]);
+    appendEventsToServer([ev]);
+  }, [appendEventsToServer, api, id, title, persistActivity, owner]);
 
   const addComment = useCallback((text: string, currentActivity: ActivityEvent[]) => {
     const trimmed = text.trim();
@@ -513,9 +507,12 @@ export default function IncidentDetailPage({
     setCheckedActions(prev => {
       const next = new Set(prev);
       next.has(i) ? next.delete(i) : next.add(i);
+      api.updateIncidentChecklist(id, title, [...next]).catch(() => {
+        // Non-blocking checklist persistence.
+      });
       return next;
     });
-  }, []);
+  }, [api, id, title]);
 
   const pinToTimeline = useCallback((text: string, currentActivity: ActivityEvent[]) => {
     const ev: ActivityEvent = {
@@ -526,7 +523,8 @@ export default function IncidentDetailPage({
       ts: new Date().toISOString(),
     };
     persistActivity([...currentActivity, ev]);
-  }, [persistActivity, owner]);
+    appendEventsToServer([ev]);
+  }, [appendEventsToServer, persistActivity, owner]);
 
   useEffect(() => {
     if (!api.ready) return;
@@ -589,11 +587,12 @@ export default function IncidentDetailPage({
       }
 
       if (!toAdd.length) return prev;
+      appendEventsToServer(toAdd);
       return [...toAdd, ...prev].sort(
         (a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime()
       );
     });
-  }, [group, title]);
+  }, [group, title, appendEventsToServer]);
 
   if (loading) {
     return (

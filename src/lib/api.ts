@@ -161,6 +161,36 @@ export function useFluxApi(projectId?: string) {
           method: "PUT",
           body: JSON.stringify({ project_id: projectId, title, ...state }),
         }),
+      updateIncidentStatus: (projectId: string, title: string, status: "active" | "investigating" | "resolved") =>
+        request<{ ok: boolean }>(`/incidents/state/status`, token(), {
+          method: "PATCH",
+          body: JSON.stringify({ project_id: projectId, title, status }),
+        }),
+      updateIncidentOwner: (projectId: string, title: string, owner: string) =>
+        request<{ ok: boolean }>(`/incidents/state/owner`, token(), {
+          method: "PATCH",
+          body: JSON.stringify({ project_id: projectId, title, owner }),
+        }),
+      updateIncidentChecklist: (projectId: string, title: string, checkedActions: number[]) =>
+        request<{ ok: boolean }>(`/incidents/state/checklist`, token(), {
+          method: "PUT",
+          body: JSON.stringify({ project_id: projectId, title, checkedActions }),
+        }),
+      appendIncidentActivity: (
+        projectId: string,
+        title: string,
+        event: {
+          id: string;
+          type: "system" | "comment" | "ai";
+          text: string;
+          actor?: string;
+          ts: string;
+        },
+      ) =>
+        request<{ ok: boolean }>(`/incidents/state/activity`, token(), {
+          method: "POST",
+          body: JSON.stringify({ project_id: projectId, title, event }),
+        }),
 
       /* Routes */
       getRoutes: (id?: string) =>
