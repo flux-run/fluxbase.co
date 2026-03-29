@@ -3,7 +3,6 @@ import type {
   Project,
   Execution,
   ExecutionDetail,
-  RequestTimelineResponse,
   Function,
   Org,
   OrgMember,
@@ -113,11 +112,6 @@ export function useFluxApi(projectId?: string) {
         ),
       getExecution: (execId: string) =>
         request<ExecutionDetail>(`/executions/${execId}`, token()),
-      getRequestTimeline: (reqProjectId: string, requestId: string) =>
-        request<RequestTimelineResponse>(
-          `/projects/${reqProjectId}/requests/${requestId}/timeline`,
-          token(),
-        ),
       getFunctionExecutions: (funcId: string) =>
         request<Execution[]>(`/executions?function_id=${funcId}`, token()),
       replayExecution: (execId: string) =>

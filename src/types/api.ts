@@ -218,59 +218,6 @@ export interface ExecutionDetail {
   };
 }
 
-export interface RequestTimelineAttempt {
-  attempt: number;
-  execution_id: string;
-  status: string;
-  error_source?: string | null;
-  error_message?: string | null;
-  error_name?: string | null;
-  actor_name?: string | null;
-  actor_type?: string | null;
-  started_at?: string | null;
-  duration_ms?: number | null;
-  is_latest: boolean;
-}
-
-export interface RequestTimelineEvent {
-  type: string;
-  at: string;
-  meta: Record<string, unknown>;
-}
-
-export interface RequestTimelineSummary {
-  attempts: number;
-  final_status: string;
-  recovered: boolean;
-  first_actor?: string | null;
-  final_actor?: string | null;
-  primary_failure?: {
-    error_message?: string | null;
-    error_name?: string | null;
-    error_source?: string | null;
-    attempt: number;
-  } | null;
-  system_failure_note?: string | null;
-}
-
-export interface RequestTimelineRequest {
-  id: string;
-  status: string;
-  retry_count: number;
-  retry_reason?: string | null;
-  created_at: string;
-  updated_at: string;
-  first_failure_at?: string | null;
-  resolved_at?: string | null;
-}
-
-export interface RequestTimelineResponse {
-  request: RequestTimelineRequest;
-  summary: RequestTimelineSummary;
-  attempts: RequestTimelineAttempt[];
-  events: RequestTimelineEvent[];
-}
-
 export interface ServiceToken {
   id: string;
   name?: string;
