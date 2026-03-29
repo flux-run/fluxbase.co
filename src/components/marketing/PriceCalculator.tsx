@@ -126,7 +126,7 @@ export function PriceCalculator() {
       <div style={{ fontSize: '.78rem', fontWeight: 600, marginTop: 12, color: overage > 0 ? '#f59e0b' : '#10b981' }}>
         {overage > 0
           ? `You may exceed the ${plan} plan's included volume — soft overage applies.`
-          : `You'll stay within the ${plan} plan at this volume.`}
+          : `You'll stay within the ${plan} plan at this volume. Based on your current usage trend.`}
       </div>
 
       {/* Pricing clarification */}

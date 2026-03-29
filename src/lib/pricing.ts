@@ -97,6 +97,7 @@ export const PRICING_TIERS: PricingTier[] = [
       { label: 'Team members', value: '3' },
       { label: 'Basic incident detection', value: true },
       { label: 'Execution replay', value: 'Limited' },
+      { label: 'Soft rate limits apply', value: true },
       { label: 'Advanced insights', value: false },
       { label: 'No credit card required', value: true },
     ],

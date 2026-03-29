@@ -32,17 +32,20 @@ export default function PricingPage() {
             <br />
             Nothing else.
           </h1>
-          <p className="text-base sm:text-xl text-neutral-500 font-medium leading-relaxed max-w-3xl mx-auto">
+          <p className="text-lg sm:text-2xl font-semibold text-neutral-300 leading-snug">
+            See exactly what happened in every execution.
+          </p>
+          <p className="text-base sm:text-lg text-neutral-500 font-medium leading-relaxed max-w-3xl mx-auto">
             You only pay for what actually runs, not noisy logs. Start free, keep team collaboration available, and upgrade only when debugging becomes mission-critical.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
             <Link href="/login" className="bg-white text-black text-[11px] font-black uppercase tracking-[0.18em] px-6 py-3 rounded-sm hover:bg-neutral-200 transition-colors">
-              Start free
+              Start free (no credit card)
             </Link>
-            <span className="text-[10px] font-black uppercase tracking-[0.18em] text-neutral-600">
-              No credit card required
-            </span>
           </div>
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-neutral-700">
+            Used by teams debugging production systems
+          </p>
         </section>
 
         <section className="grid grid-cols-1 lg:grid-cols-4 gap-5 items-stretch">
@@ -151,7 +154,7 @@ export default function PricingPage() {
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <span>Compute time</span>
-                  <span className="font-mono text-neutral-400">~$0.001 / ms</span>
+                  <span className="font-mono text-neutral-400">usage-based (runtime)</span>
                 </div>
               </div>
               <p className="text-[11px] text-neutral-500 mt-4 leading-relaxed">
