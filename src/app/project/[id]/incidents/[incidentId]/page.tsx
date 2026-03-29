@@ -417,6 +417,8 @@ export default function IncidentDetailPage({
       id: `system-status-${Date.now()}`,
       type: 'system',
       text: `Status changed: ${fromLabel} → ${toLabel}`,
+      actor: viewerName || 'You',
+      actor_id: viewerId ?? undefined,
       ts: new Date().toISOString(),
     }];
     if (s === 'resolved' && group) {
@@ -444,7 +446,7 @@ export default function IncidentDetailPage({
     });
     persistActivity([...currentActivity, ...evs]);
     appendEventsToServer(evs);
-  }, [appendEventsToServer, api, id, title, persistActivity, group, incidentStatus]);
+  }, [appendEventsToServer, api, id, title, persistActivity, group, incidentStatus, viewerName, viewerId]);
 
     const handleCommentChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
       const val = e.target.value;
