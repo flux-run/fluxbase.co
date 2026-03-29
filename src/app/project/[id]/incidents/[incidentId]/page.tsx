@@ -1,5 +1,5 @@
 "use client";
-import { use, useEffect, useMemo, useState, useCallback } from "react";
+import { use, useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, CheckCircle2, AlertTriangle, Info, Zap, Terminal, MessageSquare, Clock, Bot, ChevronDown } from "lucide-react";
 import { useFluxApi } from "@/lib/api";
@@ -271,6 +271,7 @@ export default function IncidentDetailPage({
   const [commentDraft, setCommentDraft] = useState('');
   const { users: teamUsers } = useTeam();
   const [ownerDropdownOpen, setOwnerDropdownOpen] = useState(false);
+  const ownerDropdownButtonRef = useRef<HTMLButtonElement>(null);
 
   // Compute incident group early so callbacks can reference it
   const group = useMemo(() => {
@@ -1155,8 +1156,9 @@ export default function IncidentDetailPage({
               <div className="space-y-2 pt-0.5">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[9px] text-neutral-600 font-mono shrink-0">Owner</span>
-                  <div className="relative">
+                  <div className="relative overflow-visible">
                     <button
+                      ref={ownerDropdownButtonRef}
                       onClick={() => setOwnerDropdownOpen(o => !o)}
                       className="flex items-center gap-1.5 group"
                     >
@@ -1175,7 +1177,13 @@ export default function IncidentDetailPage({
                     {ownerDropdownOpen && (
                       <>
                         <div className="fixed inset-0 z-10" onClick={() => setOwnerDropdownOpen(false)} />
-                        <div className="absolute right-0 top-full mt-1 z-20 w-48 rounded-xl border border-neutral-800 bg-neutral-950 shadow-xl overflow-hidden">
+                        <div 
+                          className="fixed z-20 w-48 rounded-xl border border-neutral-800 bg-neutral-950 shadow-xl overflow-hidden"
+                          style={ownerDropdownButtonRef.current ? {
+                            top: `${ownerDropdownButtonRef.current.getBoundingClientRect().bottom + 4}px`,
+                            right: `${window.innerWidth - ownerDropdownButtonRef.current.getBoundingClientRect().right}px`,
+                          } : {}}
+                        >
                           {teamUsers.map(u => (
                             <button
                               key={u.id}
