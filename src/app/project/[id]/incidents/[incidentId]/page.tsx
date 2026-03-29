@@ -368,14 +368,12 @@ export default function IncidentDetailPage({
   }, [api, id, title]);
 
   const updateStatus = useCallback((s: IncidentStatus, currentActivity: ActivityEvent[]) => {
-    const who = owner || 'Someone';
     const fromLabel = incidentStatus === 'active' ? 'Active' : incidentStatus === 'investigating' ? 'Investigating' : 'Resolved';
     const toLabel   = s   === 'active' ? 'Active' : s   === 'investigating' ? 'Investigating' : 'Resolved';
     const evs: ActivityEvent[] = [{
       id: `system-status-${Date.now()}`,
       type: 'system',
-      text: `Status: ${fromLabel} → ${toLabel}`,
-      actor: who,
+      text: `Status changed: ${fromLabel} → ${toLabel}`,
       ts: new Date().toISOString(),
     }];
     if (s === 'resolved' && group) {
@@ -411,18 +409,26 @@ export default function IncidentDetailPage({
     api.updateIncidentOwner(id, title, trimmed).catch(() => {
       // Non-blocking owner persistence.
     });
-    if (!trimmed) return;
-    const who = owner || 'Someone';
+    if (!trimmed) {
+      const unassignEv: ActivityEvent = {
+        id: `system-unassign-${Date.now()}`,
+        type: 'system',
+        text: `Owner removed`,
+        ts: new Date().toISOString(),
+      };
+      persistActivity([...currentActivity, unassignEv]);
+      appendEventsToServer([unassignEv]);
+      return;
+    }
     const ev: ActivityEvent = {
       id: `system-owner-${Date.now()}`,
       type: 'system',
-      text: `assigned to ${trimmed}`,
-      actor: who,
+      text: `Assigned to ${trimmed}`,
       ts: new Date().toISOString(),
     };
     persistActivity([...currentActivity, ev]);
     appendEventsToServer([ev]);
-  }, [appendEventsToServer, api, id, title, persistActivity, owner]);
+  }, [appendEventsToServer, api, id, title, persistActivity]);
 
   const addComment = useCallback((text: string, currentActivity: ActivityEvent[]) => {
     const trimmed = text.trim();
@@ -475,7 +481,7 @@ export default function IncidentDetailPage({
       id: `comment-${Date.now()}`,
       type: 'comment',
       text: trimmed,
-      actor: owner || 'You',
+      actor: owner || 'You', // user's actual name or 'You'
       ts: new Date().toISOString(),
     };
     const isQuestion = /\?|^why|^how|^what|^when|^explain|^is |^does /i.test(trimmed);
@@ -519,13 +525,12 @@ export default function IncidentDetailPage({
     const ev: ActivityEvent = {
       id: `pin-${Date.now()}`,
       type: 'system',
-      text: `pinned: ${text}`,
-      actor: owner || undefined,
+      text: text,
       ts: new Date().toISOString(),
     };
     persistActivity([...currentActivity, ev]);
     appendEventsToServer([ev]);
-  }, [appendEventsToServer, persistActivity, owner]);
+  }, [appendEventsToServer, persistActivity]);
 
   useEffect(() => {
     if (!api.ready) return;
@@ -1399,26 +1404,34 @@ export default function IncidentDetailPage({
                 )}
 
                 {/* content */}
-                <div className={`flex-1 pb-4 min-w-0 ${isAi ? 'bg-cyan-950/10 border border-cyan-900/20 rounded-lg px-3 py-2 -ml-1 mb-3' : ''}`}>
+                <div className={`flex-1 pb-4 min-w-0 ${isAi ? 'bg-cyan-950/10 border border-cyan-900/20 rounded-lg px-3 py-2 -ml-1 mb-3' : isSystemAuto ? 'bg-neutral-900/20 border border-neutral-800/20 rounded-lg px-3 py-2 -ml-1 mb-2' : ''}`}>
                   <div className="flex items-baseline gap-1.5 flex-wrap">
                     {/* actor name */}
                     {(isHumanAction || isComment) && event.actor && (
-                      <span className={`text-[10px] font-black ${isComment ? 'text-emerald-300' : 'text-neutral-300'}`}>
+                      <span className={`text-[10px] font-black ${isComment ? 'text-emerald-300' : 'text-white'}`}>
                         {event.actor}
                       </span>
+                    )}
+                    {isSystemAuto && (
+                      <span className="text-[10px] font-black text-neutral-500">System</span>
                     )}
                     {isAi && (
                       <span className="text-[10px] font-black text-cyan-400">Flux AI</span>
                     )}
+                    {/* action separator for system events */}
+                    {(isSystemAuto || isHumanAction) && (
+                      <span className={`text-[9px] ${isSystemAuto ? 'text-neutral-700' : 'text-neutral-600'}`}>—</span>
+                    )}
                     {/* event text */}
                     <span className={`text-[10px] font-mono leading-relaxed ${
-                      isSystemAuto  ? 'text-blue-400/70'
-                      : isHumanAction ? 'text-neutral-400'
+                      isSystemAuto  ? 'text-neutral-500'
+                      : isHumanAction ? 'text-neutral-300'
+                      : isComment ? 'text-neutral-200'
                       : isAi          ? 'text-neutral-300'
                       : 'text-neutral-300'
                     }`}>{event.text}</span>
                     {/* timestamp */}
-                    <span className="text-[9px] text-neutral-700 font-mono shrink-0 ml-auto">{formatTs(event.ts)}</span>
+                    <span className={`text-[9px] font-mono shrink-0 ml-auto ${isSystemAuto ? 'text-neutral-700' : 'text-neutral-700'}`}>{formatTs(event.ts)}</span>
                   </div>
                 </div>
               </div>
@@ -1476,7 +1489,7 @@ export default function IncidentDetailPage({
                     addComment(commentDraft, activity);
                   }
                 }}
-                placeholder={`Comment${owner ? ` as ${owner}` : ''}… or /assign @user · /investigate · /resolve · /note ...`}
+                placeholder={`${owner ? `Comment as ${owner}` : 'Add note'}… or try /assign @user, /investigate, /resolve`}
                 rows={1}
                 className="w-full text-[10px] font-mono bg-neutral-900/60 border border-neutral-800 hover:border-neutral-700 focus:border-neutral-600 rounded-lg px-3 py-2 text-neutral-300 placeholder-neutral-700 outline-none transition-colors resize-none"
               />
