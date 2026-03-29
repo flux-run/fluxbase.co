@@ -314,6 +314,7 @@ export default function UsagePage({
     : "text-emerald-300 bg-emerald-950/15 border-emerald-800/40";
   const includedLabel = CURRENT_PLAN === "free" ? "(Free)" : "(Included in plan)";
   const healthErrorRatePct = observabilityData ? Math.round(observabilityData.health.error_rate * 100) : null;
+  const estimatedDebugHoursSaved = Math.max(1, Math.round(stats.failed * 0.25));
   const freeTierUrgencyLine = daysUntilLimit !== null
     ? daysUntilLimit <= 90
       ? `At this pace, you'll hit free tier limit in ~${daysUntilLimit} day${daysUntilLimit === 1 ? "" : "s"}`
@@ -488,12 +489,14 @@ export default function UsagePage({
         </div>
       </div>
 
-      <div className="rounded-xl border border-neutral-800/60 bg-neutral-950/60 px-4 py-3">
-        <p className="text-[9px] font-black uppercase tracking-widest text-neutral-600">Value captured</p>
-        <p className="text-[11px] text-neutral-300 font-mono mt-1">
-          {stats.failed.toLocaleString()} production failures captured -&gt; each replayable with full context.
+      <div className="rounded-xl border border-amber-700/40 bg-amber-950/20 px-4 py-3 shadow-[0_0_24px_rgba(245,158,11,0.12)]">
+        <p className="text-[9px] font-black uppercase tracking-widest text-amber-300">Value captured</p>
+        <p className="text-base font-black text-white mt-1">
+          {stats.failed.toLocaleString()} production failures captured
         </p>
-        <p className="text-[10px] text-neutral-500 font-mono mt-1">Without Flux: logs + guesswork. With Flux: replay + exact failure point.</p>
+        <p className="text-[11px] text-amber-100/90 font-mono mt-1">All replayable with full context -&gt; each one means faster root cause.</p>
+        <p className="text-[10px] text-neutral-500 font-mono mt-1">Estimated impact: ~{estimatedDebugHoursSaved}h of debugging time saved.</p>
+        <p className="text-[10px] text-emerald-300 font-mono mt-1">Replay any failure in seconds.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -679,7 +682,7 @@ export default function UsagePage({
               {observabilityData && (observabilityData.health.severity === "critical" || observabilityData.health.severity === "warning") && healthErrorRatePct !== null && (
                 <div className="mt-2 rounded-lg border border-amber-800/40 bg-amber-950/20 px-3 py-2">
                   <p className="text-[10px] font-black text-amber-300">{healthErrorRatePct}% of your executions are failing</p>
-                  <p className="text-[9px] text-neutral-500 font-mono mt-1">Without full replay, you&apos;re debugging blind and root cause takes longer.</p>
+                  <p className="text-[9px] text-neutral-500 font-mono mt-1">Without full replay, failures take longer to diagnose and issues may repeat in production.</p>
                   <p className="text-[9px] text-amber-200 font-mono mt-1">Upgrade to see full execution context instantly.</p>
                 </div>
               )}
@@ -688,13 +691,14 @@ export default function UsagePage({
                 <span className="flex items-center gap-1 text-[9px] text-neutral-400 font-mono"><CheckCircle2 className="w-2.5 h-2.5 text-emerald-500/60" />{LIMITS[nextPlan.id].retentionDays === -1 ? "Custom" : `${LIMITS[nextPlan.id].retentionDays}-day`} retention for production history</span>
                 <span className="flex items-center gap-1 text-[9px] text-neutral-400 font-mono"><CheckCircle2 className="w-2.5 h-2.5 text-emerald-500/60" />{LIMITS[nextPlan.id].executions === -1 ? "Unlimited" : fmtNum(LIMITS[nextPlan.id].executions)} executions for production workloads</span>
               </div>
-              <p className="text-[9px] text-neutral-500 font-mono mt-2">Without upgrade: limited replay data, short retention (14 days), slower production debugging.</p>
+              <p className="text-[9px] text-neutral-500 font-mono mt-2">Without upgrade: limited replay data, short retention (14 days), slower diagnosis, and repeat production issues.</p>
+              <p className="text-[9px] text-emerald-300/90 font-mono mt-1">Replay any failure in seconds with full context.</p>
               {billingPeriod === "mtd" && daysUntilLimit !== null && execPct >= 20 && (
                 <p className="text-[9px] text-blue-300/80 font-mono mt-2">You may need this in ~{daysUntilLimit} day{daysUntilLimit === 1 ? "" : "s"} at the current pace.</p>
               )}
             </div>
             <a href="/pricing" className="shrink-0 flex items-center gap-1.5 text-[10px] font-black text-white bg-blue-600 hover:bg-blue-500 rounded-lg px-4 py-2 transition-colors">
-              View plans <ArrowRight className="w-3 h-3" />
+              Unlock full replay <ArrowRight className="w-3 h-3" />
             </a>
           </div>
         </div>
