@@ -1,9 +1,9 @@
 "use client";
 import { useEffect, useState, use } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useFluxApi } from "@/lib/api";
 import { Activity, Terminal, Copy, Check, ChevronRight, ChevronDown, GitMerge } from "lucide-react";
-import { ExecutionDetail as ExecutionDetailType, LogEntry } from "@/types/api";
+import { ExecutionDetail as ExecutionDetailType, LogEntry, RequestTimelineResponse, RequestTimelineAttempt } from "@/types/api";
 import { ExecutionTimeline } from "@/components/dashboard/ExecutionTimeline";
 
 function formatErrorHeadline(
@@ -199,8 +199,46 @@ function debuggerFailureReason(errorName?: string | null, errorMessage?: string 
   return "request failed";
 }
 
+function attemptStatusTone(status: string) {
+  const normalized = status.toLowerCase();
+  if (["ok", "success", "completed"].includes(normalized)) {
+    return {
+      label: "success",
+      icon: "✓",
+      className: "border-emerald-800/60 bg-emerald-950/20 text-emerald-300",
+    };
+  }
+  if (["running"].includes(normalized)) {
+    return {
+      label: "running",
+      icon: "⏳",
+      className: "border-amber-800/60 bg-amber-950/20 text-amber-300",
+    };
+  }
+  if (["starting", "retrying", "dispatched", "started"].includes(normalized)) {
+    return {
+      label: "starting",
+      icon: "◌",
+      className: "border-neutral-700 bg-neutral-900/80 text-neutral-300",
+    };
+  }
+  return {
+    label: "failed",
+    icon: "✕",
+    className: "border-red-800/60 bg-red-950/20 text-red-300",
+  };
+}
+
+function formatTimelineEventLabel(type: string) {
+  return type
+    .split("_")
+    .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1))
+    .join(" ");
+}
+
 export default function ExecutionDetail({ params }: { params: Promise<{ id: string, exec_id: string }> }) {
   const { id, exec_id } = use(params);
+  const router = useRouter();
   const searchParams = useSearchParams();
   const api = useFluxApi(id);
   const [data, setData] = useState<ExecutionDetailType | null>(null);
@@ -209,6 +247,10 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
   const [copiedCurl, setCopiedCurl] = useState(false);
   const [showStack, setShowStack] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [timeline, setTimeline] = useState<RequestTimelineResponse | null>(null);
+  const [timelineLoading, setTimelineLoading] = useState(false);
+  const [selectedAttempt, setSelectedAttempt] = useState<number | null>(null);
+  const [showAllAttempts, setShowAllAttempts] = useState(false);
   const [rawOpen, setRawOpen] = useState(false);
   const [rawTab, setRawTab] = useState<'request' | 'headers' | 'response'>('request');
   const debuggerMode = searchParams.get("debugger") === "1";
@@ -224,6 +266,26 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
       setLoading(false);
     });
   }, [exec_id, api]);
+
+  useEffect(() => {
+    if (!api.ready || !data?.execution.request_id) return;
+    setTimelineLoading(true);
+    api.getRequestTimeline(id, data.execution.request_id)
+      .then((res) => {
+        setTimeline(res);
+        const currentAttempt = res.attempts.find((attempt) => attempt.execution_id === exec_id);
+        if (currentAttempt) {
+          setSelectedAttempt(currentAttempt.attempt);
+          return;
+        }
+        const latestAttempt = res.attempts.find((attempt) => attempt.is_latest);
+        setSelectedAttempt(latestAttempt?.attempt ?? res.attempts[res.attempts.length - 1]?.attempt ?? null);
+      })
+      .catch((err: unknown) => {
+        console.error(err);
+      })
+      .finally(() => setTimelineLoading(false));
+  }, [api, api.ready, data?.execution.request_id, exec_id, id]);
 
   const copyReplay = () => {
     navigator.clipboard.writeText(`flux replay ${exec_id}`);
@@ -373,6 +435,15 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
     );
   }
 
+  const attempts = timeline?.attempts ?? [];
+  const selectedAttemptData: RequestTimelineAttempt | null = selectedAttempt != null
+    ? attempts.find((attempt) => attempt.attempt === selectedAttempt) ?? null
+    : null;
+  const visibleAttempts = showAllAttempts || attempts.length <= 5
+    ? attempts
+    : [attempts[0], attempts[1], attempts[attempts.length - 2], attempts[attempts.length - 1]].filter(Boolean);
+  const hasCollapsedAttempts = attempts.length > 5 && !showAllAttempts;
+
   return (
     <div className="space-y-8 pb-24 max-w-5xl mx-auto">
       <header className="flex justify-between items-start border-b border-neutral-900 pb-8">
@@ -431,6 +502,18 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
              <span className="w-1.5 h-1.5 bg-neutral-900 rounded-full" />
              <span>{new Date(exec.started_at ?? new Date().toISOString()).toUTCString()}</span>
           </div>
+          {timeline?.summary.recovered && (
+            <div className="mt-3 inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-emerald-950/30 border border-emerald-900/40 text-emerald-300 text-[10px] font-black uppercase tracking-widest">
+              <span>Recovered after {Math.max(0, (timeline.summary.attempts ?? 1) - 1)} retries</span>
+            </div>
+          )}
+          {timeline?.summary.first_actor && timeline?.summary.final_actor && timeline.summary.first_actor !== timeline.summary.final_actor && (
+            <p className="mt-2 text-[11px] font-mono text-neutral-400">
+              Introduced by <span className="text-neutral-200">{timeline.summary.first_actor}</span>
+              <span className="text-neutral-700"> → </span>
+              Resolved by <span className="text-neutral-200">{timeline.summary.final_actor}</span>
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -455,6 +538,106 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
           </button>
         </div>
       </header>
+
+      {/* Attempts timeline strip */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Attempts</h3>
+          {timelineLoading && <span className="text-[10px] font-mono text-neutral-600">Loading timeline...</span>}
+        </div>
+        {attempts.length > 0 ? (
+          <>
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-neutral-800">
+              {visibleAttempts.map((attempt, idx) => {
+                const tone = attemptStatusTone(attempt.status);
+                const active = selectedAttempt === attempt.attempt;
+                return (
+                  <button
+                    key={`${attempt.execution_id}-${attempt.attempt}`}
+                    onClick={() => {
+                      setSelectedAttempt(attempt.attempt);
+                      if (attempt.execution_id !== exec_id) {
+                        router.push(`/project/${id}/executions/${attempt.execution_id}`);
+                      }
+                    }}
+                    className={`min-w-[132px] text-left border rounded-lg px-3 py-2 transition-colors ${tone.className} ${active ? "ring-2 ring-white/70" : "hover:border-neutral-500"}`}
+                    title={`Attempt ${attempt.attempt}`}
+                  >
+                    <div className="text-[10px] font-black uppercase tracking-widest">Attempt {attempt.attempt}</div>
+                    <div className="text-xs font-semibold mt-0.5">{tone.icon} {attempt.actor_name || "system"}</div>
+                    <div className="text-[10px] mt-1 opacity-80">{attempt.duration_ms ?? "-"}ms</div>
+                  </button>
+                );
+              })}
+              {hasCollapsedAttempts && (
+                <button
+                  onClick={() => setShowAllAttempts(true)}
+                  className="min-w-[96px] border border-neutral-700 rounded-lg px-3 py-2 text-[10px] font-black uppercase tracking-widest text-neutral-400 hover:text-white hover:border-neutral-500 transition-colors"
+                >
+                  +{attempts.length - visibleAttempts.length} more
+                </button>
+              )}
+            </div>
+
+            {selectedAttemptData && (
+              <div className="p-4 rounded-xl bg-neutral-900/60 border border-neutral-800">
+                <div className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Triggered by</div>
+                <div className="text-lg text-white font-semibold mt-0.5">{selectedAttemptData.actor_name || "system"}</div>
+                <div className="text-[11px] text-neutral-500 font-mono mt-0.5">Type: {selectedAttemptData.actor_type || "system"}</div>
+                <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                  <div>
+                    <div className="text-[10px] uppercase tracking-widest text-neutral-500">Status</div>
+                    <div className="text-neutral-200 font-mono">{selectedAttemptData.status}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase tracking-widest text-neutral-500">Error Source</div>
+                    <div className="text-neutral-200 font-mono">{selectedAttemptData.error_source || "-"}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase tracking-widest text-neutral-500">Duration</div>
+                    <div className="text-neutral-200 font-mono">{selectedAttemptData.duration_ms ?? "-"}ms</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase tracking-widest text-neutral-500">Started</div>
+                    <div className="text-neutral-200 font-mono">
+                      {selectedAttemptData.started_at
+                        ? new Date(selectedAttemptData.started_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+                        : "-"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {timeline?.events?.length ? (
+              <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800">
+                <h4 className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-3">Event Timeline</h4>
+                <div className="flex flex-col gap-3">
+                  {timeline.events.map((event, idx) => {
+                    const metaReason = typeof event.meta?.reason === "string" ? event.meta.reason : null;
+                    return (
+                      <div key={`${event.type}-${event.at}-${idx}`} className="flex gap-3 items-start">
+                        <div className="w-2 h-2 mt-1.5 rounded-full bg-white/90" />
+                        <div>
+                          <div className="text-sm text-neutral-200">
+                            {formatTimelineEventLabel(event.type)}
+                            {metaReason ? <span className="text-neutral-500"> ({metaReason})</span> : null}
+                          </div>
+                          <div className="text-xs text-neutral-600 font-mono">{new Date(event.at).toLocaleString()}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <div className="text-xs font-mono text-neutral-600 border border-neutral-900 rounded-lg px-4 py-3">
+            Attempt timeline unavailable for this execution.
+          </div>
+        )}
+      </section>
 
       {/* 1. EXECUTION TIMELINE — PRIMARY */}
       <section>
