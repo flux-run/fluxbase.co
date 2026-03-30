@@ -1,5 +1,5 @@
 "use client";
-import { use, useEffect, useMemo, useState } from "react";
+import { Suspense, use, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ArrowRight, Zap, CheckCircle2, AlertTriangle, TrendingUp, Clock, Database, DollarSign, ExternalLink } from "lucide-react";
 import { useFluxApi } from "@/lib/api";
@@ -84,7 +84,7 @@ function MetaRow({ label, value, dim }: { label: string; value: string; dim?: bo
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
-export default function UsagePage({
+function UsagePageContent({
   params, 
 }: {
   params: Promise<{ id: string }>;
@@ -714,5 +714,17 @@ export default function UsagePage({
         </div>
       )}
     </div>
+  );
+}
+
+export default function UsagePage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  return (
+    <Suspense fallback={null}>
+      <UsagePageContent params={params} />
+    </Suspense>
   );
 }

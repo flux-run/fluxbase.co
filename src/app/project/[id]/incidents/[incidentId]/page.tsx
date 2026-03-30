@@ -1,5 +1,5 @@
 "use client";
-import { use, useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { Suspense, use, useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, ArrowRight, CheckCircle2, AlertTriangle, Info, Zap, Terminal, MessageSquare, Clock, Bot, ChevronDown, XCircle } from "lucide-react";
 import { useFluxApi } from "@/lib/api";
@@ -274,7 +274,7 @@ function generateSuggestedFix(errorClass: string, title: string): { summary: str
   return null;
 }
 
-export default function IncidentDetailPage({
+function IncidentDetailPageContent({
   params,
 }: {
   params: Promise<{ id: string; incidentId: string }>;
@@ -1968,5 +1968,17 @@ export default function IncidentDetailPage({
         </div>
       </div>
     </div>
+  );
+}
+
+export default function IncidentDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string; incidentId: string }>;
+}) {
+  return (
+    <Suspense fallback={null}>
+      <IncidentDetailPageContent params={params} />
+    </Suspense>
   );
 }

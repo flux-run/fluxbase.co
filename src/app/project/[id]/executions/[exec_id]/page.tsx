@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, use } from "react";
+import { Suspense, useEffect, useState, use } from "react";
 import { useSearchParams } from "next/navigation";
 import { useFluxApi } from "@/lib/api";
 import { Activity, Terminal, Copy, Check, ChevronRight, ChevronDown, GitMerge } from "lucide-react";
@@ -199,7 +199,7 @@ function debuggerFailureReason(errorName?: string | null, errorMessage?: string 
   return "request failed";
 }
 
-export default function ExecutionDetail({ params }: { params: Promise<{ id: string, exec_id: string }> }) {
+function ExecutionDetailContent({ params }: { params: Promise<{ id: string, exec_id: string }> }) {
   const { id, exec_id } = use(params);
   const searchParams = useSearchParams();
   const api = useFluxApi(id);
@@ -732,6 +732,14 @@ export default function ExecutionDetail({ params }: { params: Promise<{ id: stri
         )}
       </section>
     </div>
+  );
+}
+
+export default function ExecutionDetail({ params }: { params: Promise<{ id: string, exec_id: string }> }) {
+  return (
+    <Suspense fallback={null}>
+      <ExecutionDetailContent params={params} />
+    </Suspense>
   );
 }
 

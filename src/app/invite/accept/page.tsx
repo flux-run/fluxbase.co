@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Loader2, CheckCircle, XCircle, Users } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -18,7 +18,7 @@ type InviteDetails = {
 const roleLabel = (r: string) =>
   ({ owner: "Owner", admin: "Admin", member: "Member", viewer: "Viewer" }[r] ?? r);
 
-export default function InviteAcceptPage() {
+function InviteAcceptPageContent() {
   const searchParams  = useSearchParams();
   const router        = useRouter();
   const token         = searchParams.get("token") ?? "";
@@ -166,6 +166,14 @@ export default function InviteAcceptPage() {
         </div>
       )}
     </Shell>
+  );
+}
+
+export default function InviteAcceptPage() {
+  return (
+    <Suspense fallback={null}>
+      <InviteAcceptPageContent />
+    </Suspense>
   );
 }
 

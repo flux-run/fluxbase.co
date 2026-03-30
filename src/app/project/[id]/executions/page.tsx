@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, use, Fragment, useRef } from "react";
+import { Suspense, useEffect, useState, use, Fragment, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useFluxApi } from "@/lib/api";
@@ -65,7 +65,7 @@ function pickDebuggerExecution(
   return scored[0]?.e ?? failed[0] ?? null;
 }
 
-export default function ExecutionsPage({ params }: { params: Promise<{ id: string }> }) {
+function ExecutionsPageContent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -284,5 +284,13 @@ export default function ExecutionsPage({ params }: { params: Promise<{ id: strin
         )}
       </div>
     </div>
+  );
+}
+
+export default function ExecutionsPage({ params }: { params: Promise<{ id: string }> }) {
+  return (
+    <Suspense fallback={null}>
+      <ExecutionsPageContent params={params} />
+    </Suspense>
   );
 }
