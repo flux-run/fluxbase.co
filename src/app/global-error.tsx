@@ -11,7 +11,16 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    captureException(error);
+    captureException(error, {
+      category: "ui",
+      operation: "global_error_boundary",
+      tags: {
+        route: typeof window !== "undefined" ? window.location.pathname : "unknown",
+      },
+      extras: {
+        digest: error.digest || "",
+      },
+    });
   }, [error]);
 
   return (
