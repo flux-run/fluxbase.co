@@ -11,6 +11,7 @@ type CaptureContext = {
 
 let activeProvider: MonitoringProvider = "none";
 let activeService = "web";
+let listenersAttached = false;
 
 function parseProvider(): MonitoringProvider {
   const raw = (
@@ -36,6 +37,89 @@ function parseSampleRate(raw: string | undefined): number {
     return 0;
   }
   return Math.min(1, Math.max(0, value));
+}
+
+function isProductionEnvironment(target: MonitoringTarget): boolean {
+  if (target === "browser") {
+    const env = (
+      process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT ||
+      process.env.SENTRY_ENVIRONMENT ||
+      process.env.NODE_ENV ||
+      "development"
+    )
+      .trim()
+      .toLowerCase();
+    return env === "production";
+  }
+
+  const env = (process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV || "development")
+    .trim()
+    .toLowerCase();
+  return env === "production";
+}
+
+function strictModeEnabled(target: MonitoringTarget): boolean {
+  const raw = process.env.NEXT_PUBLIC_MONITORING_STRICT_MODE || process.env.MONITORING_STRICT_MODE;
+  if (!raw) {
+    return isProductionEnvironment(target);
+  }
+  const normalized = raw.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
+}
+
+function attachGlobalHandlers(target: MonitoringTarget): void {
+  if (listenersAttached || activeProvider !== "sentry") {
+    return;
+  }
+
+  if (target === "browser" && typeof window !== "undefined") {
+    window.addEventListener("error", (event) => {
+      captureException((event as ErrorEvent).error || new Error((event as ErrorEvent).message), {
+        category: "global",
+        operation: "window_error",
+      });
+    });
+
+    window.addEventListener("unhandledrejection", (event) => {
+      const rejectionEvent = event as PromiseRejectionEvent;
+      captureException(rejectionEvent.reason, {
+        category: "global",
+        operation: "window_unhandled_rejection",
+      });
+    });
+
+    window.addEventListener("pagehide", () => {
+      void flushMonitoring(1500);
+    });
+  }
+
+  if (target === "server" && typeof process !== "undefined" && typeof process.on === "function") {
+    process.on("uncaughtException", (error: Error) => {
+      captureException(error, {
+        category: "global",
+        operation: "uncaught_exception",
+      });
+      void flushMonitoring(2000);
+    });
+    process.on("unhandledRejection", (reason: unknown) => {
+      captureException(reason, {
+        category: "global",
+        operation: "unhandled_rejection",
+      });
+      void flushMonitoring(2000);
+    });
+    process.on("beforeExit", () => {
+      void flushMonitoring(2000);
+    });
+    process.on("SIGTERM", () => {
+      void flushMonitoring(2000);
+    });
+    process.on("SIGINT", () => {
+      void flushMonitoring(2000);
+    });
+  }
+
+  listenersAttached = true;
 }
 
 function resolveDsn(target: MonitoringTarget): string {
@@ -78,6 +162,11 @@ export function initMonitoring(target: MonitoringTarget): MonitoringProvider {
 
   const dsn = resolveDsn(target);
   if (!dsn) {
+    const message = `[monitoring] SENTRY_DSN is missing for target '${target}' while MONITORING_PROVIDER=sentry`;
+    if (strictModeEnabled(target)) {
+      throw new Error(message);
+    }
+    console.warn(message);
     activeProvider = "none";
     return "none";
   }
@@ -93,7 +182,20 @@ export function initMonitoring(target: MonitoringTarget): MonitoringProvider {
     },
   });
 
+  attachGlobalHandlers(target);
+
   return "sentry";
+}
+
+export async function flushMonitoring(timeoutMs = 2000): Promise<boolean> {
+  if (activeProvider !== "sentry") {
+    return true;
+  }
+  try {
+    return await Sentry.flush(timeoutMs);
+  } catch {
+    return false;
+  }
 }
 
 export function captureException(error: unknown, context?: CaptureContext): void {
