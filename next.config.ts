@@ -1,10 +1,8 @@
 import type { NextConfig } from "next";
-import { withSentryConfig } from "@sentry/nextjs";
+import { withMonitoringConfig } from "./src/lib/monitoring";
 
 // Public website — deployed to Vercel.
 // No static export; standard Next.js server-side rendering.
 const nextConfig: NextConfig = {};
 
-export default withSentryConfig(nextConfig, {
-	silent: true,
-});
+export default withMonitoringConfig(nextConfig);
